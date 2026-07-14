@@ -1,0 +1,27 @@
+{
+  "name": "bar-xp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Consolidate ERC-20 tokens and leftover native gas from many EVM wallets you control into a single destination wallet.",
+  "bin": {
+    "consolidate": "./src/index.ts"
+  },
+  "scripts": {
+    "sweep": "tsx src/index.ts",
+    "dry-run": "tsx src/index.ts",
+    "execute": "tsx src/index.ts --execute",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.4"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

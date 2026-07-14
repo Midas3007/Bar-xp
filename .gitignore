@@ -1,0 +1,19 @@
+# Secrets — NEVER commit these
+.env
+.env.local
+.env.*.local
+*.key
+keys.txt
+wallets.json
+
+# Local overrides
+tokens.local.json
+
+# Deps / build
+node_modules/
+dist/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
