@@ -1,0 +1,200 @@
+rules_version = '2';
+
+// =============================================================================
+//  Bar XP — Firestore security rules
+//
+//  Model:
+//    users/{uid}          A user's own document. Owner-write, authenticated-read
+//                         (the global leaderboard needs to read other rows).
+//    workouts/{id}        Private to the owner. Immutable once written.
+//    stats_history/{id}   Private to the owner. Immutable once written.
+//
+//  The anti-cheat bounds mirror `src/lib/game/validation.ts` so a hand-rolled
+//  client cannot write numbers the UI would have rejected.
+// =============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* --------------------------------------------------------------------- */
+    /* Helpers                                                                */
+    /* --------------------------------------------------------------------- */
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // A finite number within [min, max].
+    function isNumInRange(value, min, max) {
+      return value is number && value >= min && value <= max;
+    }
+
+    function isIntInRange(value, min, max) {
+      return value is int && value >= min && value <= max;
+    }
+
+    function isShortString(value, maxLen) {
+      return value is string && value.size() <= maxLen;
+    }
+
+    // `YYYY-MM-DD`
+    function isDayKey(value) {
+      return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    // Milliseconds since epoch, loosely bounded to catch garbage.
+    function isTimestampMs(value) {
+      return value is number && value >= 0 && value <= 4102444800000;
+    }
+
+    function statsAreValid(stats) {
+      return stats is map
+        && stats.keys().hasOnly(['strength', 'endurance', 'aesthetics', 'discipline'])
+        && stats.keys().hasAll(['strength', 'endurance', 'aesthetics', 'discipline'])
+        && isNumInRange(stats.strength, 0, 100000)
+        && isNumInRange(stats.endurance, 0, 100000)
+        && isNumInRange(stats.aesthetics, 0, 100000)
+        && isNumInRange(stats.discipline, 0, 100000);
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* users                                                                  */
+    /* --------------------------------------------------------------------- */
+
+    match /users/{uid} {
+
+      // Any signed-in user can read profiles — this powers the leaderboard.
+      // Only non-sensitive fields are ever surfaced by the client.
+      allow read: if isSignedIn();
+
+      allow create: if isOwner(uid)
+        && userFieldsAreValid()
+        && incoming().totalXp == 0
+        && isIntInRange(incoming().coins, 0, 1000);
+
+      allow update: if isOwner(uid)
+        && userFieldsAreValid()
+        // XP is monotonic — it can never be reduced.
+        && incoming().totalXp >= resource.data.get('totalXp', 0);
+
+      // Profiles are never deleted from the client.
+      allow delete: if false;
+
+      function userFieldsAreValid() {
+        let d = incoming();
+        return isShortString(d.displayName, 40)
+          && d.displayName.size() >= 1
+          && isShortString(d.get('email', ''), 320)
+          && isShortString(d.get('photoURL', ''), 2048)
+          && d.onboarded is bool
+          && isIntInRange(d.level, 1, 100)
+          && isNumInRange(d.totalXp, 0, 100000000)
+          && isIntInRange(d.coins, 0, 100000000)
+          && statsAreValid(d.stats)
+          && isShortString(d.tier, 24)
+          && isShortString(d.identity, 24)
+          && isNumInRange(d.get('bodyFat', 0), 0, 60)
+          && isIntInRange(d.workoutCount, 0, 1000000)
+          && isIntInRange(d.totalReps, 0, 1000000000)
+          && streakIsValid(d.streak)
+          && inventoryIsValid(d.inventory)
+          && (d.get('activeCosmetic', null) == null || isShortString(d.activeCosmetic, 40))
+          && d.goals is list && d.goals.size() <= 10
+          && d.customExercises is list && d.customExercises.size() <= 20
+          && d.personalBests is map && d.personalBests.size() <= 200
+          && isTimestampMs(d.get('createdAt', 0))
+          && isTimestampMs(d.get('updatedAt', 0));
+      }
+
+      function streakIsValid(streak) {
+        return streak is map
+          && isIntInRange(streak.current, 0, 100000)
+          && isIntInRange(streak.best, 0, 100000)
+          && isIntInRange(streak.get('shieldsUsed', 0), 0, 100000)
+          && (streak.get('lastWorkoutDay', null) == null || isDayKey(streak.lastWorkoutDay));
+      }
+
+      function inventoryIsValid(inv) {
+        return inv is map
+          // Shields are capped at the shop's max stack.
+          && isIntInRange(inv.streakShields, 0, 5)
+          && inv.cosmetics is list && inv.cosmetics.size() <= 20
+          && inv.unlocks is list && inv.unlocks.size() <= 20;
+      }
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* workouts                                                               */
+    /* --------------------------------------------------------------------- */
+
+    match /workouts/{workoutId} {
+
+      // Sessions are private to the athlete who logged them.
+      allow read: if isSignedIn() && isOwner(resource.data.uid);
+
+      allow create: if isOwner(incoming().uid) && workoutIsValid();
+
+      // Logged sessions are an immutable record.
+      allow update, delete: if false;
+
+      function workoutIsValid() {
+        let d = incoming();
+        return isDayKey(d.day)
+          && isTimestampMs(d.createdAt)
+          && d.entries is list
+          && d.entries.size() >= 1
+          && d.entries.size() <= 12
+          && isIntInRange(d.xpEarned, 0, 1000000)
+          && isIntInRange(d.coinsEarned, 0, 1000000)
+          // Mirrors MAX_SESSION_VOLUME in validation.ts.
+          && isIntInRange(d.totalVolume, 0, 5000)
+          && isIntInRange(d.totalReps, 0, 5000)
+          && (d.get('presetId', null) == null || isShortString(d.presetId, 40));
+      }
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* stats_history                                                          */
+    /* --------------------------------------------------------------------- */
+
+    match /stats_history/{snapshotId} {
+
+      allow read: if isSignedIn() && isOwner(resource.data.uid);
+
+      allow create: if isOwner(incoming().uid) && snapshotIsValid();
+
+      // Snapshots are an append-only audit trail.
+      allow update, delete: if false;
+
+      function snapshotIsValid() {
+        let d = incoming();
+        return isDayKey(d.day)
+          && isTimestampMs(d.createdAt)
+          && statsAreValid(d.stats)
+          && isIntInRange(d.level, 1, 100)
+          && isNumInRange(d.totalXp, 0, 100000000)
+          && isShortString(d.tier, 24)
+          && isNumInRange(d.bodyFat, 0, 60)
+          && isIntInRange(d.totalReps, 0, 1000000000)
+          && isIntInRange(d.streak, 0, 100000)
+          && d.source in ['assessment', 'workout'];
+      }
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* Default deny                                                           */
+    /* --------------------------------------------------------------------- */
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

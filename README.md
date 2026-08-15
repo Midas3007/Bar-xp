@@ -1,3 +1,15 @@
+> **Note** — this repository currently holds two unrelated projects:
+>
+> - [`app/`](app/) — **Bar XP**, a calisthenics fitness RPG (React + Firebase).
+>   See [`app/README.md`](app/README.md).
+> - the repository root — the EVM wallet consolidation CLI documented below.
+>
+> They share no code or dependencies. If Bar XP is meant to be the repo's
+> primary project, move it to the root with `git mv app/* app/.* .` and delete
+> the CLI's `src/`, `package.json` and `tokens.example.json`.
+
+---
+
 # bar-xp — wallet consolidation
 
 Scrape all your EVM wallets for tokens and sweep them into **one** destination

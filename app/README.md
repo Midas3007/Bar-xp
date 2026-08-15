@@ -1,0 +1,207 @@
+# Bar XP — Calisthenics RPG
+
+A fitness tracker that treats training like a character sheet. Log calisthenics
+work to earn XP, level up, bank **Bar Coins**, and grow four core stats —
+**Strength, Endurance, Aesthetics, Discipline** — that decide your rank.
+
+React 18 · TypeScript · Vite · Tailwind CSS · Firebase (Auth + Firestore) ·
+Recharts · Lucide React.
+
+---
+
+## Quick start
+
+```bash
+npm install
+cp .env.example .env      # fill in your Firebase web config
+npm run dev
+```
+
+Without a `.env` the app boots to a setup screen listing the missing keys
+rather than crashing, so `npm run dev` is useful on a fresh clone.
+
+| Script            | Does                                        |
+| ----------------- | ------------------------------------------- |
+| `npm run dev`     | Dev server on :5173                         |
+| `npm run build`   | Typecheck, then production build to `dist/` |
+| `npm run preview` | Serve the built bundle                      |
+| `npm run typecheck` | `tsc --noEmit`                            |
+
+---
+
+## Firebase setup
+
+1. Create a project at [console.firebase.google.com](https://console.firebase.google.com).
+2. **Authentication → Sign-in method**: enable **Google** and **Email/Password**.
+3. **Firestore Database**: create one in production mode.
+4. Copy the web app config into `.env` (see `.env.example`). These values are
+   public by design — access is controlled by the security rules, not by hiding
+   them.
+5. Deploy the rules and indexes:
+
+```bash
+firebase deploy --only firestore:rules,firestore:indexes
+```
+
+`firestore.indexes.json` contains the two composite indexes the history queries
+need (`uid` + `createdAt` on `workouts` and `stats_history`). Without them the
+Progress view loads empty and the console prints an index-creation link.
+
+---
+
+## Game systems
+
+### Levels & XP
+
+Each movement carries an XP-per-unit value (per rep, or per second for holds).
+A session's XP is the sum of its entries, with two adjustments:
+
+- **Diminishing returns** — volume past 100 units in one entry is worth 60%, so
+  grinding a single movement is never the optimal play.
+- **Streak multiplier** — `+3%` per streak day, capped at `+45%`.
+
+Level is **always derived** from lifetime XP (`levelFromTotalXp`) rather than
+trusted from the document, so the two can never drift apart. The curve is
+`100 · level^1.32 + 20 · level`, capped at level 100.
+
+### Tiers
+
+Rank comes from the **average of the four core stats**:
+
+| Tier | Avg stat | | Tier | Avg stat |
+| --- | --- | --- | --- | --- |
+| Uninitiated | 0 | | Platinum | 68 |
+| Bronze | 12 | | Diamond | 95 |
+| Silver | 26 | | Mythic | 130 |
+| Gold | 45 | | Legend | 175 |
+
+### Identities & streaks
+
+Consecutive training days map to an identity label:
+
+`0 → Fading` · `1 → Stirring` · `3 → Consistent` · `7 → Disciplined` ·
+`15+ → Relentless`
+
+Streaks use **local calendar days** (`YYYY-MM-DD`), not timestamps, so a 23:50
+session and a 00:10 session correctly count as two days.
+
+### Background recalculation
+
+`AuthContext` runs a recalculation pass on sign-in, **every hour**, and whenever
+the tab regains focus (an hourly timer alone would miss a laptop asleep across
+the day boundary). Each pass:
+
+1. Applies **streak decay**. Training today or yesterday is safe. Each fully
+   missed day can be bridged by consuming one **Streak Shield**, spent
+   automatically. If the gap outruns the shields the streak resets — and the
+   shields are *not* spent on a gap they cannot bridge, so they carry over.
+2. Recomputes **tier** and **identity**, persisting any drift.
+
+### Economy
+
+Bar Coins come from sessions (`15 + xp/12`) and completed goals. They buy:
+
+- **Streak Shields** (consumable, max 5 held)
+- **Name cosmetics** — Neon / Ember / Void gradients, applied to your display
+  name everywhere including the leaderboard
+- **Movement unlocks** — early access to muscle-ups, planches, levers and more,
+  bypassing their level gate
+
+### Goals
+
+Three active goals at a time, rolled from templates filtered by level. A
+completed goal pays out instantly and is replaced.
+
+---
+
+## Architecture
+
+```
+src/
+  lib/
+    safe.ts             Total numeric helpers — the NaN firewall
+    types.ts            Domain types
+    firebase.ts         SDK bootstrap + config detection
+    data.ts             Every Firestore read and write
+    game/
+      constants.ts      XP curve, tiers, identities, stat metadata
+      exercises.ts      Movement catalog, unlock gating, presets
+      xp.ts             Session scoring and stat gains
+      streak.ts         Calendar-day streak decay and shield logic
+      goals.ts          Goal templates, rolling, advancement
+      shop.ts           Shop catalog and purchase states
+      profile.ts        Document normalization + assessment baseline
+      validation.ts     Anti-cheat bounds
+  context/
+    AuthContext.tsx     Auth state, profile listener, hourly recalculation
+    ToastContext.tsx    Toast notifications
+  components/           UI primitives, game widgets, app shell
+  views/                One file per screen
+```
+
+### Preventing NaN in the UI
+
+Firestore documents can carry `undefined`, `null`, strings, or fields written by
+an older schema. A single `NaN` reaching JSX renders the literal text "NaN" and
+can break a chart's axis domain. Three layers guard against it:
+
+1. **`lib/safe.ts`** — `num`, `int`, `pct`, `fmt` and friends are *total*: they
+   always return a finite number, whatever they are handed.
+2. **`normalizeProfile`** — every profile read passes through it, producing a
+   fully populated object with finite values. Level and tier are re-derived
+   rather than trusted.
+3. **Component-level coercion** — `ProgressBar` clamps its own width to 0–100,
+   so an invalid value can never produce an invalid style.
+
+### Firestore listener lifecycle
+
+The profile `onSnapshot` teardown lives in a ref so sign-out can detach it
+**synchronously**, before Firebase revokes the token. An attached listener plus
+a revoked token produces a `permission-denied` storm against a document the user
+can no longer read, and leaks the subscription. The listener is also detached
+when the auth state changes to a different user, on unmount, and from inside its
+own error handler on `permission-denied`.
+
+### Auth UX
+
+`auth/popup-closed-by-user`, `auth/cancelled-popup-request` and
+`auth/user-cancelled` are swallowed silently — closing a popup is a deliberate
+user action, not a failure. Every other code maps to a plain-language message.
+
+---
+
+## Anti-cheat
+
+Client-side bounds in `lib/game/validation.ts` are **mirrored in
+`firestore.rules`**, so a hand-rolled client cannot write numbers the UI would
+have rejected:
+
+| Bound | Limit |
+| --- | --- |
+| Reps in one set | 1–499 (500+ rejected) |
+| Seconds in one hold | 1–3599 (3600+ rejected) |
+| Sets per exercise | 1–20 |
+| Exercises per session | 12 |
+| Total session volume | 5,000 units |
+| Custom exercise XP/unit | 0.1–8 |
+| Body fat | 3–60% |
+
+The rules additionally enforce that `totalXp` is **monotonic** — it can never be
+reduced — and that `workouts` and `stats_history` documents are **immutable**
+once written.
+
+### Data model
+
+| Collection | Access |
+| --- | --- |
+| `users/{uid}` | Owner-write; readable by any signed-in user (the leaderboard needs it). Only name, tier, level, streak and XP are ever surfaced. |
+| `workouts/{id}` | Private to the owner. Create-only, never updated or deleted. |
+| `stats_history/{id}` | Private to the owner. Append-only audit trail. |
+
+A logged session writes all three in **one batch**, so it can never half-commit.
+
+---
+
+## License
+
+MIT — see [LICENSE](../LICENSE).

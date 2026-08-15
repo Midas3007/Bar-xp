@@ -1,0 +1,186 @@
+/** Shared domain types for the Bar XP RPG layer. */
+
+export type StatKey = 'strength' | 'endurance' | 'aesthetics' | 'discipline';
+
+export type Stats = Record<StatKey, number>;
+
+export type ExerciseUnit = 'reps' | 'seconds';
+
+export type ExerciseCategory = 'push' | 'pull' | 'legs' | 'core' | 'skill' | 'conditioning';
+
+export interface Exercise {
+  id: string;
+  name: string;
+  category: ExerciseCategory;
+  unit: ExerciseUnit;
+  /** XP granted per rep (or per second for holds), before multipliers. */
+  xpPerUnit: number;
+  /** How this movement distributes stat growth. Weights should sum to ~1. */
+  statWeights: Partial<Stats>;
+  /** Level the user must reach before this appears in the logger. */
+  minLevel: number;
+  /** Shop unlock id that bypasses `minLevel`. */
+  unlockId?: string;
+  /** Shown in the logger to explain what the movement is. */
+  hint?: string;
+  /** True for user-authored movements stored on the profile. */
+  custom?: boolean;
+}
+
+export interface CustomExercise {
+  id: string;
+  name: string;
+  unit: ExerciseUnit;
+  xpPerUnit: number;
+  category: ExerciseCategory;
+}
+
+export interface WorkoutEntry {
+  exerciseId: string;
+  exerciseName: string;
+  unit: ExerciseUnit;
+  sets: number;
+  /** Reps per set, or seconds per set for holds. */
+  amount: number;
+  /** sets * amount */
+  volume: number;
+  xp: number;
+}
+
+export interface Workout {
+  id: string;
+  uid: string;
+  /** Local calendar day, `YYYY-MM-DD`. */
+  day: string;
+  createdAt: number;
+  entries: WorkoutEntry[];
+  xpEarned: number;
+  coinsEarned: number;
+  totalVolume: number;
+  totalReps: number;
+  presetId?: string | null;
+}
+
+export interface StatsSnapshot {
+  id: string;
+  uid: string;
+  createdAt: number;
+  day: string;
+  stats: Stats;
+  level: number;
+  totalXp: number;
+  tier: string;
+  bodyFat: number;
+  totalReps: number;
+  streak: number;
+  /** `assessment` for the onboarding baseline, `workout` for post-session snapshots. */
+  source: 'assessment' | 'workout';
+}
+
+export interface PersonalBest {
+  exerciseId: string;
+  exerciseName: string;
+  unit: ExerciseUnit;
+  /** Best single-set amount recorded. */
+  value: number;
+  achievedAt: number;
+}
+
+export type GoalType = 'workouts' | 'reps' | 'xp' | 'streak' | 'category';
+
+export interface Goal {
+  id: string;
+  /** Stable identifier of the template this goal was rolled from. */
+  templateId: string;
+  title: string;
+  description: string;
+  type: GoalType;
+  /** Only set for `category` goals. */
+  category?: ExerciseCategory;
+  target: number;
+  progress: number;
+  rewardXp: number;
+  rewardCoins: number;
+  createdAt: number;
+  completedAt?: number | null;
+}
+
+export interface Assessment {
+  maxPullUps: number;
+  maxPushUps: number;
+  plankSeconds: number;
+  bodyFat: number;
+  completedAt: number;
+}
+
+export interface Inventory {
+  /** Consumable — bridges one missed day each. */
+  streakShields: number;
+  /** Owned cosmetic ids. */
+  cosmetics: string[];
+  /** Owned exercise-unlock ids. */
+  unlocks: string[];
+}
+
+export interface Streak {
+  current: number;
+  best: number;
+  /** Local calendar day of the last logged workout, `YYYY-MM-DD`. */
+  lastWorkoutDay: string | null;
+  /** How many shields have been auto-consumed over the account's lifetime. */
+  shieldsUsed: number;
+}
+
+export interface Profile {
+  uid: string;
+  displayName: string;
+  email: string;
+  photoURL: string;
+  createdAt: number;
+  updatedAt: number;
+
+  onboarded: boolean;
+  assessment: Assessment | null;
+
+  level: number;
+  totalXp: number;
+  coins: number;
+
+  stats: Stats;
+  /** Derived from `stats` — always consistent with the rank bar. */
+  tier: string;
+  /** Derived from `streak.current`. */
+  identity: string;
+  /**
+   * The tier/identity as they are currently persisted. These exist only so the
+   * background recalculation can detect drift from the derived values above and
+   * write a correction; nothing in the UI should read them.
+   */
+  storedTier: string;
+  storedIdentity: string;
+  bodyFat: number;
+
+  streak: Streak;
+  inventory: Inventory;
+  /** Cosmetic id currently applied to the display name, or null. */
+  activeCosmetic: string | null;
+
+  personalBests: Record<string, PersonalBest>;
+  customExercises: CustomExercise[];
+  goals: Goal[];
+
+  workoutCount: number;
+  totalReps: number;
+}
+
+export interface LeaderboardRow {
+  uid: string;
+  displayName: string;
+  photoURL: string;
+  level: number;
+  totalXp: number;
+  tier: string;
+  streak: number;
+  activeCosmetic: string | null;
+  cosmetics: string[];
+}
