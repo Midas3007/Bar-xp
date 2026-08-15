@@ -27,3 +27,6 @@ yarn-error.log*
 # Firebase tooling
 .firebase/
 firebase-debug.log
+
+# Firebase CLI local project selection
+.firebaserc
