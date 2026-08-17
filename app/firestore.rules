@@ -110,6 +110,9 @@ service cloud.firestore {
           && d.goals is list && d.goals.size() <= 10
           && d.customExercises is list && d.customExercises.size() <= 20
           && d.personalBests is map && d.personalBests.size() <= 200
+          // Per-muscle lifetime volume. Bounded so it cannot be used as storage.
+          && d.get('muscleVolume', {}) is map
+          && d.get('muscleVolume', {}).size() <= 20
           && isTimestampMs(d.get('createdAt', 0))
           && isTimestampMs(d.get('updatedAt', 0));
       }

@@ -31,6 +31,7 @@ import { dayKey, registerWorkout, safeStreak, type DecayResult } from './game/st
 import { advanceGoals, ensureGoals } from './game/goals';
 import { aestheticsFromBodyFat, scoreSession } from './game/xp';
 import { findShopItem, type ShopItem } from './game/shop';
+import { mergeMuscleVolume, sessionMuscleVolume } from './game/muscles';
 import { LIMITS } from './game/validation';
 
 /* -------------------------------------------------------------------------- */
@@ -223,6 +224,10 @@ export async function logWorkout(
 
   const { personalBests, fresh } = mergePersonalBests(profile.personalBests, entries);
 
+  // Per-muscle lifetime volume, which drives the muscle ratings and the
+  // balance analysis on the profile.
+  const muscleVolume = mergeMuscleVolume(profile.muscleVolume, sessionMuscleVolume(entries));
+
   const workoutRef = doc(collection(db, COLLECTIONS.workouts));
   const snapshotRef = doc(collection(db, COLLECTIONS.statsHistory));
   const totalReps = Math.max(0, int(profile.totalReps, 0)) + totals.totalReps;
@@ -261,6 +266,7 @@ export async function logWorkout(
     goals: goalOutcome.goals,
     workoutCount: Math.max(0, int(profile.workoutCount, 0)) + 1,
     totalReps,
+    muscleVolume,
     updatedAt: now,
   });
 

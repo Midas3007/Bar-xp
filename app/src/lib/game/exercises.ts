@@ -108,7 +108,7 @@ export const EXERCISES: Exercise[] = [
     xpPerUnit: 1.8,
     statWeights: { strength: 0.55, endurance: 0.2, aesthetics: 0.2, discipline: 0.05 },
     minLevel: 1,
-    diagram: 'pushup',
+    diagram: 'diamond',
     hint: 'Hands together under the chest — the triceps take the load.',
     formCues: [
       'Index fingers and thumbs touching to form a diamond under the sternum.',
@@ -126,7 +126,7 @@ export const EXERCISES: Exercise[] = [
     xpPerUnit: 3.4,
     statWeights: { strength: 0.65, endurance: 0.12, aesthetics: 0.18, discipline: 0.05 },
     minLevel: 6,
-    diagram: 'pushup',
+    diagram: 'archer_push',
     hint: 'One arm bends and takes the load, the other stays straight.',
     formCues: [
       'Set the hands much wider than a normal push-up.',
@@ -185,7 +185,7 @@ export const EXERCISES: Exercise[] = [
     statWeights: { strength: 0.72, endurance: 0.08, aesthetics: 0.15, discipline: 0.05 },
     minLevel: 18,
     unlockId: 'unlock_one_arm',
-    diagram: 'pushup',
+    diagram: 'onearm_push',
     hint: 'One hand behind the back, hips square. As much core as it is chest.',
     formCues: [
       'Feet wider than normal for a stable base.',
@@ -234,7 +234,7 @@ export const EXERCISES: Exercise[] = [
     xpPerUnit: 3.2,
     statWeights: { strength: 0.62, endurance: 0.15, aesthetics: 0.18, discipline: 0.05 },
     minLevel: 1,
-    diagram: 'pullup',
+    diagram: 'chinup',
     hint: 'Palms toward you. Easier than a pull-up — biceps get to help.',
     formCues: [
       'Underhand grip, hands about shoulder width.',
@@ -272,7 +272,7 @@ export const EXERCISES: Exercise[] = [
     xpPerUnit: 4.2,
     statWeights: { strength: 0.66, endurance: 0.12, aesthetics: 0.17, discipline: 0.05 },
     minLevel: 1,
-    diagram: 'pullup',
+    diagram: 'wide_pullup',
     hint: 'Grip well outside the shoulders. The lats do nearly all the work.',
     formCues: [
       'Hands roughly 1.5× shoulder width.',
@@ -290,7 +290,7 @@ export const EXERCISES: Exercise[] = [
     xpPerUnit: 6.5,
     statWeights: { strength: 0.7, endurance: 0.1, aesthetics: 0.15, discipline: 0.05 },
     minLevel: 8,
-    diagram: 'pullup',
+    diagram: 'archer_pullup',
     hint: 'Pull up to one hand while the far arm stays straight along the bar.',
     formCues: [
       'Take a wide grip and pull toward one hand.',
@@ -318,7 +318,7 @@ export const EXERCISES: Exercise[] = [
     statWeights: { strength: 0.72, endurance: 0.08, aesthetics: 0.15, discipline: 0.05 },
     minLevel: 12,
     unlockId: 'unlock_muscle_up',
-    diagram: 'pullup',
+    diagram: 'muscleup',
     hint: 'Pull, transition over the bar, press out. The classic rite of passage.',
     formCues: [
       'False grip helps enormously — wrists over the top of the bar.',
@@ -491,7 +491,7 @@ export const EXERCISES: Exercise[] = [
     xpPerUnit: 3,
     statWeights: { strength: 0.45, endurance: 0.2, aesthetics: 0.3, discipline: 0.05 },
     minLevel: 5,
-    diagram: 'kneeraise',
+    diagram: 'toestobar',
     hint: 'Straight legs, all the way up to touch the bar.',
     formCues: [
       'Start from a hang with the shoulders engaged.',
@@ -549,7 +549,7 @@ export const EXERCISES: Exercise[] = [
     statWeights: { strength: 0.65, endurance: 0.15, aesthetics: 0.13, discipline: 0.07 },
     minLevel: 14,
     unlockId: 'unlock_planche',
-    diagram: 'planche',
+    diagram: 'planche_lean',
     hint: 'Push-up position with the shoulders leaned far past the wrists.',
     formCues: [
       'Start in a push-up position with the hands turned slightly outward.',
@@ -687,7 +687,7 @@ export const EXERCISES: Exercise[] = [
     xpPerUnit: 0.4,
     statWeights: { strength: 0.15, endurance: 0.55, aesthetics: 0.25, discipline: 0.05 },
     minLevel: 1,
-    diagram: 'plank',
+    diagram: 'mountain',
     hint: 'Count each knee drive as one rep.',
     formCues: [
       'Start in a strong push-up plank.',
@@ -840,6 +840,10 @@ export interface Preset {
   /** Recommended level — presets above it are shown but flagged. */
   recommendedLevel: number;
   focus: ExerciseCategory;
+  /** The setup this routine assumes. Used to filter by what you have access to. */
+  setup: 'bodyweight' | 'bar' | 'power_tower' | 'park';
+  /** Headline muscles this routine targets, for the muscle-group filter. */
+  targets: string[];
   items: PresetItem[];
 }
 
@@ -850,6 +854,8 @@ export const PRESETS: Preset[] = [
     description: 'The first pressing block. Builds the elbow and shoulder strength everything else stands on.',
     recommendedLevel: 1,
     focus: 'push',
+    setup: 'bodyweight',
+    targets: ['chest', 'triceps', 'abs'],
     items: [
       { exerciseId: 'push_up', sets: 3, amount: 10 },
       { exerciseId: 'incline_push_up', sets: 2, amount: 12 },
@@ -862,6 +868,8 @@ export const PRESETS: Preset[] = [
     description: 'Rows and hangs to build the back and grip that a first pull-up demands.',
     recommendedLevel: 1,
     focus: 'pull',
+    setup: 'park',
+    targets: ['upper_back', 'lats', 'abs'],
     items: [
       { exerciseId: 'australian_row', sets: 3, amount: 10 },
       { exerciseId: 'leg_raise', sets: 3, amount: 12 },
@@ -874,6 +882,8 @@ export const PRESETS: Preset[] = [
     description: 'A balanced push/pull/legs circuit. The best default when you are unsure what to train.',
     recommendedLevel: 1,
     focus: 'conditioning',
+    setup: 'park',
+    targets: ['chest', 'upper_back', 'quads', 'abs'],
     items: [
       { exerciseId: 'push_up', sets: 4, amount: 12 },
       { exerciseId: 'australian_row', sets: 4, amount: 10 },
@@ -887,6 +897,8 @@ export const PRESETS: Preset[] = [
     description: 'Everything that hangs from a bar. The core session for building real pulling strength.',
     recommendedLevel: 1,
     focus: 'pull',
+    setup: 'bar',
+    targets: ['lats', 'biceps', 'abs'],
     items: [
       { exerciseId: 'pull_up', sets: 4, amount: 6 },
       { exerciseId: 'chin_up', sets: 3, amount: 8 },
@@ -899,6 +911,8 @@ export const PRESETS: Preset[] = [
     description: 'Dips and presses together. The fastest route to visible upper-body strength.',
     recommendedLevel: 1,
     focus: 'push',
+    setup: 'power_tower',
+    targets: ['chest', 'triceps', 'shoulders'],
     items: [
       { exerciseId: 'dip', sets: 4, amount: 8 },
       { exerciseId: 'push_up', sets: 3, amount: 15 },
@@ -911,6 +925,8 @@ export const PRESETS: Preset[] = [
     description: 'Midline work that carries straight over into every skill movement.',
     recommendedLevel: 1,
     focus: 'core',
+    setup: 'bar',
+    targets: ['abs', 'obliques'],
     items: [
       { exerciseId: 'hollow_hold', sets: 3, amount: 30 },
       { exerciseId: 'hanging_knee_raise', sets: 3, amount: 12 },
@@ -924,6 +940,8 @@ export const PRESETS: Preset[] = [
     description: 'Short, unpleasant, effective. Big endurance gains with no equipment at all.',
     recommendedLevel: 1,
     focus: 'conditioning',
+    setup: 'bodyweight',
+    targets: ['quads', 'abs', 'calves'],
     items: [
       { exerciseId: 'burpee', sets: 4, amount: 12 },
       { exerciseId: 'mountain_climber', sets: 4, amount: 30 },
@@ -936,6 +954,8 @@ export const PRESETS: Preset[] = [
     description: 'Compression and straight-arm strength — the prerequisites for L-sits and levers.',
     recommendedLevel: 6,
     focus: 'core',
+    setup: 'power_tower',
+    targets: ['abs', 'obliques', 'quads'],
     items: [
       { exerciseId: 'l_sit', sets: 4, amount: 15 },
       { exerciseId: 'toes_to_bar', sets: 3, amount: 8 },
@@ -948,10 +968,126 @@ export const PRESETS: Preset[] = [
     description: 'Low volume, maximum intent. Static holds trained fresh, never to failure.',
     recommendedLevel: 14,
     focus: 'skill',
+    setup: 'park',
+    targets: ['shoulders', 'lats', 'abs'],
     items: [
       { exerciseId: 'planche_lean', sets: 5, amount: 15 },
       { exerciseId: 'front_lever', sets: 5, amount: 8 },
       { exerciseId: 'l_sit', sets: 3, amount: 20 },
+    ],
+  },
+  {
+    id: 'lat_width',
+    name: 'Back Width',
+    description: 'Everything that builds the V-taper. The highest-leverage session for how your upper body reads.',
+    recommendedLevel: 1,
+    focus: 'pull',
+    setup: 'bar',
+    targets: ['lats', 'upper_back'],
+    items: [
+      { exerciseId: 'wide_pull_up', sets: 4, amount: 6 },
+      { exerciseId: 'pull_up', sets: 3, amount: 8 },
+      { exerciseId: 'australian_row', sets: 3, amount: 12 },
+    ],
+  },
+  {
+    id: 'chest_focus',
+    name: 'Chest Focus',
+    description: 'Pec-biased pressing from three angles. Dips do the heavy lifting.',
+    recommendedLevel: 1,
+    focus: 'push',
+    setup: 'power_tower',
+    targets: ['chest', 'triceps'],
+    items: [
+      { exerciseId: 'dip', sets: 4, amount: 8 },
+      { exerciseId: 'push_up', sets: 4, amount: 15 },
+      { exerciseId: 'incline_push_up', sets: 3, amount: 15 },
+    ],
+  },
+  {
+    id: 'shoulder_focus',
+    name: 'Shoulder Builder',
+    description: 'Vertical pressing volume. Shoulder width frames everything else.',
+    recommendedLevel: 1,
+    focus: 'push',
+    setup: 'bodyweight',
+    targets: ['shoulders', 'triceps'],
+    items: [
+      { exerciseId: 'pike_push_up', sets: 5, amount: 10 },
+      { exerciseId: 'push_up', sets: 3, amount: 15 },
+      { exerciseId: 'plank', sets: 3, amount: 45 },
+    ],
+  },
+  {
+    id: 'arms_focus',
+    name: 'Arm Day',
+    description: 'Chin-ups for biceps, diamonds and dips for triceps. Triceps are two thirds of arm size.',
+    recommendedLevel: 1,
+    focus: 'pull',
+    setup: 'power_tower',
+    targets: ['biceps', 'triceps', 'forearms'],
+    items: [
+      { exerciseId: 'chin_up', sets: 4, amount: 8 },
+      { exerciseId: 'diamond_push_up', sets: 4, amount: 12 },
+      { exerciseId: 'dip', sets: 3, amount: 10 },
+    ],
+  },
+  {
+    id: 'legs_focus',
+    name: 'Legs & Glutes',
+    description: 'The session most calisthenics athletes skip. Costs no equipment and fixes your proportions.',
+    recommendedLevel: 1,
+    focus: 'legs',
+    setup: 'bodyweight',
+    targets: ['quads', 'glutes', 'hamstrings', 'calves'],
+    items: [
+      { exerciseId: 'squat', sets: 4, amount: 25 },
+      { exerciseId: 'lunge', sets: 4, amount: 20 },
+      { exerciseId: 'burpee', sets: 3, amount: 10 },
+    ],
+  },
+  {
+    id: 'abs_focus',
+    name: 'Midsection',
+    description: 'Direct ab and oblique work. Remember definition is mostly a body-fat story.',
+    recommendedLevel: 1,
+    focus: 'core',
+    setup: 'bar',
+    targets: ['abs', 'obliques'],
+    items: [
+      { exerciseId: 'hanging_knee_raise', sets: 4, amount: 12 },
+      { exerciseId: 'hollow_hold', sets: 3, amount: 40 },
+      { exerciseId: 'leg_raise', sets: 3, amount: 15 },
+      { exerciseId: 'mountain_climber', sets: 3, amount: 30 },
+    ],
+  },
+  {
+    id: 'posture_fix',
+    name: 'Posture Repair',
+    description: 'Pulling-heavy work to undo rounded shoulders. Standing tall changes your silhouette more than any single muscle.',
+    recommendedLevel: 1,
+    focus: 'pull',
+    setup: 'park',
+    targets: ['upper_back', 'lats', 'lower_back'],
+    items: [
+      { exerciseId: 'australian_row', sets: 4, amount: 12 },
+      { exerciseId: 'pull_up', sets: 3, amount: 6 },
+      { exerciseId: 'plank', sets: 3, amount: 45 },
+    ],
+  },
+  {
+    id: 'hotel_room',
+    name: 'Hotel Room',
+    description: 'Zero equipment, zero space, no excuses. Full body in under twenty minutes.',
+    recommendedLevel: 1,
+    focus: 'conditioning',
+    setup: 'bodyweight',
+    targets: ['chest', 'quads', 'abs'],
+    items: [
+      { exerciseId: 'push_up', sets: 4, amount: 15 },
+      { exerciseId: 'squat', sets: 4, amount: 25 },
+      { exerciseId: 'plank', sets: 3, amount: 45 },
+      { exerciseId: 'mountain_climber', sets: 3, amount: 40 },
     ],
   },
 ];

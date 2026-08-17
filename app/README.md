@@ -69,6 +69,28 @@ or not the movement is unlocked.
 Each movement also carries form cues, common mistakes, a schematic side-view
 diagram (inline SVG, so it works offline), and a link to video demos.
 
+### Muscle groups & equipment
+
+Every movement is mapped to primary and secondary muscle groups
+(`lib/game/muscles.ts`), and to the equipment it needs. Equipment is bundled
+into the setups people actually have — **No equipment**, **Bar only**,
+**Power tower**, **Calisthenics park** — which filters the logger, the library
+and the routine list in one control.
+
+Logging a session accumulates per-muscle volume on the profile (assisting
+muscles at a third weight; four seconds of a hold counts as one rep). That
+drives:
+
+- **Muscle ratings**, scored relative to the athlete's own best-trained muscle.
+  Absolute targets would be meaningless across experience levels; the useful
+  question is which muscles you are neglecting compared to the rest of your body.
+- **Structural balance checks** — push/pull, upper/lower, front/back — with the
+  ratio ranges that keep shoulders healthy and proportions even.
+- **The Physique Lab**, a private section rating eight physique traits with a
+  specific next action for each. Collapsed by default, revealed by a local
+  toggle. Scores come only from logged data; body-fat guidance stops at healthy
+  ranges rather than rewarding ever-lower numbers.
+
 ### Levels & XP
 
 Each movement carries an XP-per-unit value (per rep, or per second for holds).
@@ -155,6 +177,8 @@ src/
       profile.ts        Document normalization + assessment baseline
       validation.ts     Anti-cheat bounds
       achievements.ts   Derived badge definitions
+      muscles.ts        Muscle groups, equipment setups, volume & balance
+      aesthetics.ts     Physique trait ratings and tips
   context/
     AuthContext.tsx     Auth state, profile listener, hourly recalculation
     ToastContext.tsx    Toast notifications
@@ -162,6 +186,8 @@ src/
     ExerciseDiagram.tsx Inline SVG movement figures
     ExerciseDetail.tsx  Form cues, mistakes, progression routes
     RestTimer.tsx       Between-sets countdown
+    MuscleMap.tsx       Muscle ratings and balance checks
+    PhysiqueLab.tsx     Private physique breakdown
     Achievements.tsx    Badge grid
     ui/, layout/        Primitives and app shell
   views/                One file per screen

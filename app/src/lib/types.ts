@@ -19,22 +19,32 @@ export type ExerciseGrade = 'foundation' | 'intermediate' | 'elite';
 /** Identifies which schematic figure to draw for a movement. */
 export type DiagramKey =
   | 'pushup'
+  | 'diamond'
+  | 'archer_push'
+  | 'onearm_push'
   | 'incline'
   | 'pike'
   | 'dip'
+  | 'handstand'
   | 'row'
+  | 'chinup'
   | 'pullup'
+  | 'wide_pullup'
+  | 'archer_pullup'
+  | 'muscleup'
   | 'squat'
   | 'lunge'
   | 'pistol'
   | 'plank'
+  | 'mountain'
   | 'hollow'
   | 'legraise'
   | 'kneeraise'
+  | 'toestobar'
   | 'lsit'
   | 'lever'
+  | 'planche_lean'
   | 'planche'
-  | 'handstand'
   | 'flag'
   | 'burpee'
   | 'jump';
@@ -224,6 +234,8 @@ export interface Profile {
 
   workoutCount: number;
   totalReps: number;
+  /** Lifetime work per muscle group, accumulated on every logged session. */
+  muscleVolume: Record<string, number>;
 }
 
 export interface LeaderboardRow {

@@ -40,6 +40,18 @@ import {
   lockReason,
   type Preset,
 } from '../lib/game/exercises';
+import {
+  EQUIPMENT_META,
+  MUSCLE_META,
+  SETUPS,
+  equipmentFor,
+  matchesSetup,
+  MUSCLE_KEYS,
+  muscleProfileFor,
+  musclesFor,
+  type MuscleKey,
+  type SetupKey,
+} from '../lib/game/muscles';
 import { buildEntry, entryXp, streakMultiplier } from '../lib/game/xp';
 import { validateEntry, validateSession, LIMITS } from '../lib/game/validation';
 import { logWorkout } from '../lib/data';
@@ -64,6 +76,8 @@ export function WorkoutLoggerView({
   const [sheetExercise, setSheetExercise] = useState<Exercise | null>(null);
   /** Set when the Library's "Log this" jumps back to the log tab. */
   const [pickedId, setPickedId] = useState<string | null>(null);
+  /** Which equipment the user has access to right now. */
+  const [setup, setSetup] = useState<SetupKey>('all');
 
   // The session card is scrolled into view after an add on small screens.
   const sessionRef = useRef<HTMLDivElement | null>(null);
@@ -75,12 +89,12 @@ export function WorkoutLoggerView({
   const resolve = useMemo(() => (id: string) => catalog.find((e) => e.id === id), [catalog]);
 
   const available = useMemo(
-    () => catalog.filter((e) => isUnlocked(e, profile)),
-    [catalog, profile],
+    () => catalog.filter((e) => isUnlocked(e, profile) && matchesSetup(e, setup)),
+    [catalog, profile, setup],
   );
   const locked = useMemo(
-    () => catalog.filter((e) => !isUnlocked(e, profile)),
-    [catalog, profile],
+    () => catalog.filter((e) => !isUnlocked(e, profile) && matchesSetup(e, setup)),
+    [catalog, profile, setup],
   );
 
   const multiplier = streakMultiplier(profile.streak.current);
@@ -217,6 +231,9 @@ export function WorkoutLoggerView({
         </TabButton>
       </div>
 
+      {/* --- What equipment do you have right now? --- */}
+      <SetupFilter setup={setup} onChange={setSetup} />
+
       {/*
         Explicit grid placement rather than plain column order: on a phone the
         session panel must sit immediately after the add form, otherwise it
@@ -237,9 +254,11 @@ export function WorkoutLoggerView({
               onConsumePick={consumePick}
             />
           ) : null}
-          {tab === 'presets' ? <PresetList profile={profile} onLoad={loadPreset} /> : null}
+          {tab === 'presets' ? (
+            <PresetList profile={profile} setup={setup} onLoad={loadPreset} />
+          ) : null}
           {tab === 'library' ? (
-            <LibraryList profile={profile} onInspect={setSheetExercise} />
+            <LibraryList profile={profile} setup={setup} onInspect={setSheetExercise} />
           ) : null}
         </div>
 
@@ -436,6 +455,69 @@ export function WorkoutLoggerView({
 }
 
 /* -------------------------------------------------------------------------- */
+/* Setup filter                                                                */
+/* -------------------------------------------------------------------------- */
+
+/** What can you actually train with right now? Filters everything below it. */
+function SetupFilter({
+  setup,
+  onChange,
+}: {
+  setup: SetupKey;
+  onChange: (setup: SetupKey) => void;
+}) {
+  const active = SETUPS.find((s) => s.key === setup) ?? SETUPS[0];
+  return (
+    <Card className="p-4">
+      <p className="mb-2.5 font-display text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+        What have you got access to?
+      </p>
+      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+        {SETUPS.map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            onClick={() => onChange(option.key)}
+            className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+              setup === option.key
+                ? 'bg-forge-500/15 text-forge-300 ring-1 ring-forge-500/30'
+                : 'bg-white/5 text-slate-500 ring-1 ring-white/5 hover:text-slate-300'
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-[11px] text-slate-600">{active.description}</p>
+    </Card>
+  );
+}
+
+/** The muscles a movement trains, primary highlighted. */
+function MuscleChips({ exerciseId }: { exerciseId: string }) {
+  const profile = muscleProfileFor(exerciseId);
+  if (profile.primary.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {profile.primary.map((m: MuscleKey) => (
+        <span
+          key={m}
+          className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+          style={{ color: MUSCLE_META[m].hex, backgroundColor: `${MUSCLE_META[m].hex}1f` }}
+        >
+          {MUSCLE_META[m].label}
+        </span>
+      ))}
+      {profile.secondary.map((m: MuscleKey) => (
+        <span key={m} className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500">
+          {MUSCLE_META[m].label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Exercise picker                                                             */
 /* -------------------------------------------------------------------------- */
 
@@ -576,9 +658,12 @@ function ExercisePicker({
                   </Chip>
                 ) : null}
               </div>
+              <div className="mt-1.5">
+                <MuscleChips exerciseId={selected.id} />
+              </div>
               <p className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-forge-300">
                 <Info className="h-3 w-3" aria-hidden />
-                How to do it
+                How to do it · needs {EQUIPMENT_META[equipmentFor(selected)].short}
               </p>
             </div>
           </button>
@@ -698,21 +783,75 @@ function Stepper({
 
 function LibraryList({
   profile,
+  setup,
   onInspect,
 }: {
   profile: Profile;
+  setup: SetupKey;
   onInspect: (exercise: Exercise) => void;
 }) {
-  const catalog = useMemo(() => allExercisesFor(profile), [profile]);
+  const [muscle, setMuscle] = useState<MuscleKey | 'all'>('all');
+
+  const catalog = useMemo(
+    () =>
+      allExercisesFor(profile)
+        .filter((e) => matchesSetup(e, setup))
+        .filter((e) => muscle === 'all' || musclesFor(e.id).includes(muscle)),
+    [profile, setup, muscle],
+  );
 
   return (
     <div className="space-y-5">
       <Card className="p-4">
         <p className="text-xs leading-relaxed text-slate-500">
-          Every movement in the game, with form cues, common mistakes and — for the elite skills —
-          a step-by-step route to earning them. Tap any movement for the full breakdown.
+          Every movement, with form cues, common mistakes and — for the elite skills — a
+          step-by-step route to earning them. Tap any movement for the full breakdown.
         </p>
+        <p className="mb-2 mt-4 font-display text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+          Filter by muscle
+        </p>
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+          <button
+            type="button"
+            onClick={() => setMuscle('all')}
+            className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition ${
+              muscle === 'all'
+                ? 'bg-forge-500/15 text-forge-300 ring-1 ring-forge-500/30'
+                : 'bg-white/5 text-slate-500 ring-1 ring-white/5'
+            }`}
+          >
+            All
+          </button>
+          {MUSCLE_KEYS.map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setMuscle(key)}
+              className="shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-medium ring-1 transition"
+              style={
+                muscle === key
+                  ? {
+                      color: MUSCLE_META[key].hex,
+                      backgroundColor: `${MUSCLE_META[key].hex}26`,
+                      borderColor: 'transparent',
+                    }
+                  : { color: '#64748b', backgroundColor: 'rgba(255,255,255,0.04)' }
+              }
+            >
+              {MUSCLE_META[key].label}
+            </button>
+          ))}
+        </div>
       </Card>
+
+      {catalog.length === 0 ? (
+        <Card>
+          <EmptyState
+            title="Nothing matches"
+            message="No movement fits that muscle and equipment combination. Widen either filter."
+          />
+        </Card>
+      ) : null}
 
       {CATEGORY_ORDER.map((category) => {
         const group = catalog.filter((e) => e.category === category);
@@ -757,10 +896,12 @@ function LibraryList({
                           >
                             {grade.label}
                           </span>
-                          <span className="font-mono text-[10px] text-slate-600">
-                            {fmtDecimal(exercise.xpPerUnit, 2)} XP/
-                            {exercise.unit === 'seconds' ? 'sec' : 'rep'}
+                          <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500">
+                            {EQUIPMENT_META[equipmentFor(exercise)].short}
                           </span>
+                        </div>
+                        <div className="mt-1">
+                          <MuscleChips exerciseId={exercise.id} />
                         </div>
                       </div>
                       <ChevronRight className="h-4 w-4 shrink-0 text-slate-600" aria-hidden />
@@ -782,16 +923,41 @@ function LibraryList({
 
 function PresetList({
   profile,
+  setup,
   onLoad,
 }: {
   profile: Profile;
+  setup: SetupKey;
   onLoad: (preset: Preset) => void;
 }) {
   const catalog = useMemo(() => allExercisesFor(profile), [profile]);
 
+  // A routine is offered when every movement in it fits the chosen setup.
+  const visible = useMemo(
+    () =>
+      PRESETS.filter((preset) =>
+        preset.items.every((item) => {
+          const exercise = catalog.find((e) => e.id === item.exerciseId);
+          return !exercise || matchesSetup(exercise, setup);
+        }),
+      ),
+    [catalog, setup],
+  );
+
+  if (visible.length === 0) {
+    return (
+      <Card>
+        <EmptyState
+          title="No routines for that setup"
+          message="Every stored routine needs equipment you have not selected. Choose a broader setup above."
+        />
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {PRESETS.map((preset) => {
+      {visible.map((preset) => {
         const items = preset.items.map((item) => {
           const exercise = catalog.find((e) => e.id === item.exerciseId);
           return { item, exercise, unlocked: exercise ? isUnlocked(exercise, profile) : false };
@@ -820,6 +986,21 @@ function PresetList({
                 ) : null}
               </div>
               <p className="mt-2 text-sm leading-relaxed text-slate-500">{preset.description}</p>
+              <div className="mt-2.5 flex flex-wrap gap-1">
+                {preset.targets.map((t) => {
+                  const meta = MUSCLE_META[t as MuscleKey];
+                  if (!meta) return null;
+                  return (
+                    <span
+                      key={t}
+                      className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                      style={{ color: meta.hex, backgroundColor: `${meta.hex}1f` }}
+                    >
+                      {meta.label}
+                    </span>
+                  );
+                })}
+              </div>
             </div>
 
             <ul className="divide-y divide-white/5 border-t border-white/5">
