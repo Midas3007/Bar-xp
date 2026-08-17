@@ -42,6 +42,46 @@ export function userDocRef(uid: string) {
   return doc(getDbOrThrow(), COLLECTIONS.users, uid);
 }
 
+export function publicProfileRef(uid: string) {
+  return doc(getDbOrThrow(), COLLECTIONS.publicProfiles, uid);
+}
+
+/**
+ * The public projection of a profile — exactly the fields the leaderboard
+ * renders, and nothing else.
+ *
+ * Built by explicit allow-list rather than by deleting private keys from the
+ * profile, so a field added to `Profile` later can never leak into the public
+ * collection by default. The security rules enforce the same list with
+ * `hasOnly`, so a hand-rolled client cannot widen it either.
+ */
+export function publicProfileFrom(profile: Profile): Record<string, unknown> {
+  return {
+    displayName: str(profile.displayName, '').trim().slice(0, 40) || 'Unnamed Athlete',
+    photoURL: str(profile.photoURL, ''),
+    level: Math.max(1, int(profile.level, 1)),
+    totalXp: Math.max(0, num(profile.totalXp, 0)),
+    tier: str(profile.tier, 'Uninitiated'),
+    streak: Math.max(0, int(profile.streak?.current, 0)),
+    activeCosmetic: profile.activeCosmetic ?? null,
+    cosmetics: arr<string>(profile.inventory?.cosmetics).slice(0, 20),
+    updatedAt: Date.now(),
+  };
+}
+
+/**
+ * Mirror the public fields. Called after any write that can change one of
+ * them; failures are logged rather than thrown, since a stale leaderboard row
+ * is never worth failing the user's actual action over.
+ */
+export async function syncPublicProfile(profile: Profile): Promise<void> {
+  try {
+    await setDoc(publicProfileRef(profile.uid), publicProfileFrom(profile));
+  } catch (error) {
+    console.error('[data] failed to sync public profile', error);
+  }
+}
+
 /** Create the user document on first sign-in, or return the existing one. */
 export async function ensureProfile(user: User): Promise<Profile> {
   const ref = userDocRef(user.uid);
@@ -62,6 +102,10 @@ export async function ensureProfile(user: User): Promise<Profile> {
       await updateDoc(ref, patch);
     }
 
+    // Keeps the leaderboard row in step for accounts created before the public
+    // collection existed, and repairs it if a mirrored write was ever missed.
+    await syncPublicProfile(profile);
+
     return profile;
   }
 
@@ -78,6 +122,7 @@ export async function ensureProfile(user: User): Promise<Profile> {
   // none of them belong in the document body.
   const { uid: _uid, storedTier: _tier, storedIdentity: _identity, ...document } = fresh;
   await setDoc(ref, stripUndefined(document));
+  await syncPublicProfile(fresh);
   return fresh;
 }
 
@@ -147,6 +192,12 @@ export async function completeAssessment(
     totalReps: 0,
     streak: 0,
     source: 'assessment',
+  });
+
+  batch.set(publicProfileRef(profile.uid), {
+    ...publicProfileFrom(profile),
+    tier,
+    updatedAt: now,
   });
 
   await batch.commit();
@@ -270,6 +321,17 @@ export async function logWorkout(
     updatedAt: now,
   });
 
+  // Public leaderboard row rides along in the same batch, so a session can
+  // never leave the leaderboard showing stale XP.
+  batch.set(publicProfileRef(profile.uid), {
+    ...publicProfileFrom(profile),
+    level: newLevel,
+    totalXp: newTotalXp,
+    tier: tierAfter.name,
+    streak: streakAfter.current,
+    updatedAt: now,
+  });
+
   batch.set(snapshotRef, {
     uid: profile.uid,
     createdAt: now,
@@ -354,6 +416,7 @@ export async function updateBodyFat(profile: Profile, bodyFat: number): Promise<
   const batch = writeBatch(db);
 
   batch.update(userDocRef(profile.uid), { bodyFat: value, stats, tier, updatedAt: now });
+  batch.set(publicProfileRef(profile.uid), { ...publicProfileFrom(profile), tier, updatedAt: now });
 
   const snapshotRef = doc(collection(db, COLLECTIONS.statsHistory));
   batch.set(snapshotRef, {
@@ -433,6 +496,14 @@ export async function purchaseItem(profile: Profile, itemId: string): Promise<Pu
     updatedAt: Date.now(),
   });
 
+  if (item.kind === 'cosmetic') {
+    await syncPublicProfile({
+      ...profile,
+      inventory,
+      activeCosmetic: (patch.activeCosmetic as string | undefined) ?? profile.activeCosmetic,
+    });
+  }
+
   return { ok: true, item };
 }
 
@@ -446,6 +517,7 @@ export async function setActiveCosmetic(
     activeCosmetic: cosmeticId,
     updatedAt: Date.now(),
   });
+  await syncPublicProfile({ ...profile, activeCosmetic: cosmeticId });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -485,6 +557,7 @@ export async function updateDisplayName(profile: Profile, name: string): Promise
   const trimmed = str(name, '').trim().slice(0, LIMITS.MAX_NAME_LENGTH);
   if (trimmed.length < 2) return;
   await updateDoc(userDocRef(profile.uid), { displayName: trimmed, updatedAt: Date.now() });
+  await syncPublicProfile({ ...profile, displayName: trimmed });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -520,8 +593,9 @@ export async function fetchWorkouts(uid: string, max = 60): Promise<Workout[]> {
 
 export async function fetchLeaderboard(max = 50): Promise<LeaderboardRow[]> {
   const db = getDbOrThrow();
+  // Reads the public projection, never the user documents — those are private.
   const q = query(
-    collection(db, COLLECTIONS.users),
+    collection(db, COLLECTIONS.publicProfiles),
     orderBy('totalXp', 'desc'),
     fbLimit(max),
   );
@@ -529,7 +603,7 @@ export async function fetchLeaderboard(max = 50): Promise<LeaderboardRow[]> {
 
   return snap.docs.map((d) => {
     const data = d.data() as Record<string, unknown>;
-    const cosmetics = arr<string>((data.inventory as { cosmetics?: unknown })?.cosmetics);
+    const cosmetics = arr<string>(data.cosmetics);
     const active = str(data.activeCosmetic, '');
     return {
       uid: d.id,
@@ -538,7 +612,7 @@ export async function fetchLeaderboard(max = 50): Promise<LeaderboardRow[]> {
       level: levelFromTotalXp(data.totalXp),
       totalXp: Math.max(0, int(data.totalXp, 0)),
       tier: str(data.tier, 'Uninitiated'),
-      streak: Math.max(0, int((data.streak as { current?: unknown })?.current, 0)),
+      streak: Math.max(0, int(data.streak, 0)),
       // Only honour a cosmetic the row genuinely owns.
       activeCosmetic: active && cosmetics.includes(active) ? active : null,
       cosmetics,

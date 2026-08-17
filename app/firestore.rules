@@ -71,9 +71,15 @@ service cloud.firestore {
 
     match /users/{uid} {
 
-      // Any signed-in user can read profiles — this powers the leaderboard.
-      // Only non-sensitive fields are ever surfaced by the client.
-      allow read: if isSignedIn();
+      // Strictly owner-only. The user document holds email, body-fat readings,
+      // the onboarding assessment, personal bests and per-muscle volume — none
+      // of which any other athlete has any business reading. The leaderboard
+      // reads `public_profiles` instead.
+      //
+      // Restricting the *client UI* to safe fields would not have been enough:
+      // rules govern the database, and anyone signed in could have queried the
+      // raw document directly.
+      allow read: if isOwner(uid);
 
       allow create: if isOwner(uid)
         && userFieldsAreValid()
@@ -131,6 +137,43 @@ service cloud.firestore {
           && isIntInRange(inv.streakShields, 0, 5)
           && inv.cosmetics is list && inv.cosmetics.size() <= 20
           && inv.unlocks is list && inv.unlocks.size() <= 20;
+      }
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* public_profiles                                                        */
+    /*                                                                        */
+    /* The only thing other athletes can see: exactly the fields the           */
+    /* leaderboard renders, and nothing else. Mirrored from the user document  */
+    /* on every write that changes one of them.                               */
+    /* --------------------------------------------------------------------- */
+
+    match /public_profiles/{uid} {
+
+      allow read: if isSignedIn();
+
+      allow create, update: if isOwner(uid) && publicProfileIsValid();
+
+      allow delete: if false;
+
+      function publicProfileIsValid() {
+        let d = incoming();
+        // `hasOnly` is the important part — it makes it impossible to smuggle a
+        // private field into the public collection later by accident.
+        return d.keys().hasOnly([
+              'displayName', 'photoURL', 'level', 'totalXp',
+              'tier', 'streak', 'activeCosmetic', 'cosmetics', 'updatedAt',
+            ])
+          && isShortString(d.displayName, 40)
+          && d.displayName.size() >= 1
+          && isShortString(d.get('photoURL', ''), 2048)
+          && isIntInRange(d.level, 1, 100)
+          && isNumInRange(d.totalXp, 0, 100000000)
+          && isShortString(d.tier, 24)
+          && isIntInRange(d.streak, 0, 100000)
+          && (d.get('activeCosmetic', null) == null || isShortString(d.activeCosmetic, 40))
+          && d.cosmetics is list && d.cosmetics.size() <= 20
+          && isTimestampMs(d.get('updatedAt', 0));
       }
     }
 

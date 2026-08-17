@@ -248,9 +248,28 @@ once written.
 
 | Collection | Access |
 | --- | --- |
-| `users/{uid}` | Owner-write; readable by any signed-in user (the leaderboard needs it). Only name, tier, level, streak and XP are ever surfaced. |
+| `users/{uid}` | **Owner-only, read and write.** Holds email, body-fat readings, the assessment, personal bests and per-muscle volume. |
+| `public_profiles/{uid}` | Readable by any signed-in user. Exactly the nine fields the leaderboard renders, enforced with `hasOnly`. Mirrored from the user document on every write that changes one. |
 | `workouts/{id}` | Private to the owner. Create-only, never updated or deleted. |
 | `stats_history/{id}` | Private to the owner. Append-only audit trail. |
+
+The split matters: an earlier version let any signed-in user read whole user
+documents, on the reasoning that the client only rendered safe fields. That was
+wrong — rules govern the database, not the UI, so anyone signed in could query
+the raw document and read another athlete's email and body fat. Restricting the
+UI would not have helped; the data had to move.
+
+### Testing the rules
+
+```bash
+npm run test:rules
+```
+
+Runs 42 assertions against the Firestore emulator, which executes the real
+rules engine — the rules are enforced, not merely inspected. Needs the Firebase
+CLI on your PATH and a JVM. Coverage includes cross-user read/write denial,
+XP monotonicity, immutability of `workouts` and `stats_history`, the anti-cheat
+bounds, and that private fields cannot be smuggled into `public_profiles`.
 
 A logged session writes all three in **one batch**, so it can never half-commit.
 
