@@ -8,10 +8,65 @@ export type ExerciseUnit = 'reps' | 'seconds';
 
 export type ExerciseCategory = 'push' | 'pull' | 'legs' | 'core' | 'skill' | 'conditioning';
 
+/**
+ * How hard a movement is to access.
+ *  - foundation:   available to everyone from day one
+ *  - intermediate: a modest level gate, reached within a few weeks
+ *  - elite:        true skill work, gated by level or a shop unlock
+ */
+export type ExerciseGrade = 'foundation' | 'intermediate' | 'elite';
+
+/** Identifies which schematic figure to draw for a movement. */
+export type DiagramKey =
+  | 'pushup'
+  | 'diamond'
+  | 'archer_push'
+  | 'onearm_push'
+  | 'incline'
+  | 'pike'
+  | 'dip'
+  | 'handstand'
+  | 'row'
+  | 'chinup'
+  | 'pullup'
+  | 'wide_pullup'
+  | 'archer_pullup'
+  | 'muscleup'
+  | 'squat'
+  | 'lunge'
+  | 'pistol'
+  | 'plank'
+  | 'mountain'
+  | 'hollow'
+  | 'legraise'
+  | 'kneeraise'
+  | 'toestobar'
+  | 'lsit'
+  | 'lever'
+  | 'planche_lean'
+  | 'planche'
+  | 'flag'
+  | 'burpee'
+  | 'jump';
+
+/** A route from where you are now to a movement you cannot do yet. */
+export interface Progression {
+  /** One line on what the movement actually demands. */
+  intro: string;
+  /** Ordered drills to work through. */
+  steps: Array<{
+    title: string;
+    detail: string;
+    /** Catalog id to train, when the step maps to a loggable movement. */
+    exerciseId?: string;
+  }>;
+}
+
 export interface Exercise {
   id: string;
   name: string;
   category: ExerciseCategory;
+  grade: ExerciseGrade;
   unit: ExerciseUnit;
   /** XP granted per rep (or per second for holds), before multipliers. */
   xpPerUnit: number;
@@ -21,8 +76,16 @@ export interface Exercise {
   minLevel: number;
   /** Shop unlock id that bypasses `minLevel`. */
   unlockId?: string;
-  /** Shown in the logger to explain what the movement is. */
+  /** One-line description shown next to the picker. */
   hint?: string;
+  /** Which schematic figure to draw. */
+  diagram: DiagramKey;
+  /** Technique points, most important first. */
+  formCues: string[];
+  /** Frequent errors worth naming explicitly. */
+  mistakes: string[];
+  /** How to train toward it. Present on everything that is gated. */
+  progression?: Progression;
   /** True for user-authored movements stored on the profile. */
   custom?: boolean;
 }
@@ -171,6 +234,8 @@ export interface Profile {
 
   workoutCount: number;
   totalReps: number;
+  /** Lifetime work per muscle group, accumulated on every logged session. */
+  muscleVolume: Record<string, number>;
 }
 
 export interface LeaderboardRow {

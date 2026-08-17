@@ -163,8 +163,10 @@ export function AppShell({
 
       {/* --- Mobile bottom bar --- */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/5 bg-ink-900/95 backdrop-blur-xl lg:hidden">
+        {/* All six destinations: Profile holds PRs, achievements and custom
+            movements, so burying it in the drawer made it unreachable. */}
         <div className="mx-auto flex max-w-lg items-stretch justify-around">
-          {NAV.slice(0, 5).map((item) => {
+          {NAV.map((item) => {
             const Icon = item.icon;
             const active = view === item.key;
             return (
@@ -172,7 +174,7 @@ export function AppShell({
                 key={item.key}
                 type="button"
                 onClick={() => onNavigate(item.key)}
-                className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition ${
+                className={`flex flex-1 flex-col items-center gap-0.5 px-0.5 py-2 text-[9px] font-medium leading-tight transition ${
                   active ? 'text-forge-300' : 'text-slate-500 hover:text-slate-300'
                 }`}
                 aria-current={active ? 'page' : undefined}

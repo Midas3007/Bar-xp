@@ -4,6 +4,7 @@ import { EMPTY_STATS, identityForStreak, levelFromTotalXp, safeStats, tierForSta
 import { EMPTY_STREAK, safeStreak } from './streak';
 import { ensureGoals } from './goals';
 import { LIMITS } from './validation';
+import { normalizeMuscleVolume } from './muscles';
 
 export const EMPTY_INVENTORY: Inventory = {
   streakShields: 0,
@@ -76,6 +77,7 @@ export function normalizeProfile(uid: string, raw: unknown): Profile {
 
     workoutCount: Math.max(0, int(data.workoutCount, 0)),
     totalReps: Math.max(0, int(data.totalReps, 0)),
+    muscleVolume: normalizeMuscleVolume(data.muscleVolume) as Record<string, number>,
   };
 }
 
@@ -229,5 +231,6 @@ export function newProfile(params: {
 
     workoutCount: 0,
     totalReps: 0,
+    muscleVolume: {},
   };
 }

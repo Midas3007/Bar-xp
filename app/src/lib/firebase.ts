@@ -62,4 +62,5 @@ export const COLLECTIONS = {
   users: 'users',
   workouts: 'workouts',
   statsHistory: 'stats_history',
+  publicProfiles: 'public_profiles',
 } as const;

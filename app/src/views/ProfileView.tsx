@@ -25,6 +25,9 @@ import {
   Spinner,
 } from '../components/ui/Primitives';
 import { Avatar } from '../components/layout/AppShell';
+import { Achievements } from '../components/Achievements';
+import { MuscleMap } from '../components/MuscleMap';
+import { PhysiqueLab } from '../components/PhysiqueLab';
 import {
   IdentityChip,
   LevelBar,
@@ -114,6 +117,12 @@ export function ProfileView({ profile }: { profile: Profile }) {
           <CustomExercisesCard profile={profile} />
         </div>
       </div>
+
+      <MuscleMap profile={profile} />
+
+      <PhysiqueLab profile={profile} />
+
+      <Achievements profile={profile} />
     </div>
   );
 }

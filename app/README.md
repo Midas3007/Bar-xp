@@ -51,6 +51,46 @@ Progress view loads empty and the console prints an index-creation link.
 
 ## Game systems
 
+### Movement access
+
+Movements are graded rather than uniformly level-gated:
+
+| Grade | Access | Examples |
+| --- | --- | --- |
+| **Foundation** | Open from level 1 | Push-up, Pull-up, Dip, Squat, Plank, Chin-up, Row |
+| **Intermediate** | Light level gate (5–8) | Archer push-up, L-sit, Pistol squat, Toes to bar |
+| **Elite** | Level 12–20, or a shop unlock | Muscle-up, Front lever, Planche, Human flag, HSPU |
+
+Gating the basics only blocks training, so everything a beginner can reasonably
+attempt is available immediately. Every gated movement carries a **progression**
+— an ordered set of drills describing how to earn it — which is visible whether
+or not the movement is unlocked.
+
+Each movement also carries form cues, common mistakes, a schematic side-view
+diagram (inline SVG, so it works offline), and a link to video demos.
+
+### Muscle groups & equipment
+
+Every movement is mapped to primary and secondary muscle groups
+(`lib/game/muscles.ts`), and to the equipment it needs. Equipment is bundled
+into the setups people actually have — **No equipment**, **Bar only**,
+**Power tower**, **Calisthenics park** — which filters the logger, the library
+and the routine list in one control.
+
+Logging a session accumulates per-muscle volume on the profile (assisting
+muscles at a third weight; four seconds of a hold counts as one rep). That
+drives:
+
+- **Muscle ratings**, scored relative to the athlete's own best-trained muscle.
+  Absolute targets would be meaningless across experience levels; the useful
+  question is which muscles you are neglecting compared to the rest of your body.
+- **Structural balance checks** — push/pull, upper/lower, front/back — with the
+  ratio ranges that keep shoulders healthy and proportions even.
+- **The Physique Lab**, a private section rating eight physique traits with a
+  specific next action for each. Collapsed by default, revealed by a local
+  toggle. Scores come only from logged data; body-fat guidance stops at healthy
+  ranges rather than rewarding ever-lower numbers.
+
 ### Levels & XP
 
 Each movement carries an XP-per-unit value (per rep, or per second for holds).
@@ -107,10 +147,14 @@ Bar Coins come from sessions (`15 + xp/12`) and completed goals. They buy:
 - **Movement unlocks** — early access to muscle-ups, planches, levers and more,
   bypassing their level gate
 
-### Goals
+### Goals & achievements
 
 Three active goals at a time, rolled from templates filtered by level. A
 completed goal pays out instantly and is replaced.
+
+Achievements are **derived, never stored** — every badge is computed from data
+the profile already holds, so there is no schema to migrate, no extra writes,
+and no way for the badge list to drift out of sync with reality.
 
 ---
 
@@ -132,10 +176,20 @@ src/
       shop.ts           Shop catalog and purchase states
       profile.ts        Document normalization + assessment baseline
       validation.ts     Anti-cheat bounds
+      achievements.ts   Derived badge definitions
+      muscles.ts        Muscle groups, equipment setups, volume & balance
+      aesthetics.ts     Physique trait ratings and tips
   context/
     AuthContext.tsx     Auth state, profile listener, hourly recalculation
     ToastContext.tsx    Toast notifications
-  components/           UI primitives, game widgets, app shell
+  components/
+    ExerciseDiagram.tsx Inline SVG movement figures
+    ExerciseDetail.tsx  Form cues, mistakes, progression routes
+    RestTimer.tsx       Between-sets countdown
+    MuscleMap.tsx       Muscle ratings and balance checks
+    PhysiqueLab.tsx     Private physique breakdown
+    Achievements.tsx    Badge grid
+    ui/, layout/        Primitives and app shell
   views/                One file per screen
 ```
 
@@ -194,9 +248,28 @@ once written.
 
 | Collection | Access |
 | --- | --- |
-| `users/{uid}` | Owner-write; readable by any signed-in user (the leaderboard needs it). Only name, tier, level, streak and XP are ever surfaced. |
+| `users/{uid}` | **Owner-only, read and write.** Holds email, body-fat readings, the assessment, personal bests and per-muscle volume. |
+| `public_profiles/{uid}` | Readable by any signed-in user. Exactly the nine fields the leaderboard renders, enforced with `hasOnly`. Mirrored from the user document on every write that changes one. |
 | `workouts/{id}` | Private to the owner. Create-only, never updated or deleted. |
 | `stats_history/{id}` | Private to the owner. Append-only audit trail. |
+
+The split matters: an earlier version let any signed-in user read whole user
+documents, on the reasoning that the client only rendered safe fields. That was
+wrong — rules govern the database, not the UI, so anyone signed in could query
+the raw document and read another athlete's email and body fat. Restricting the
+UI would not have helped; the data had to move.
+
+### Testing the rules
+
+```bash
+npm run test:rules
+```
+
+Runs 42 assertions against the Firestore emulator, which executes the real
+rules engine — the rules are enforced, not merely inspected. Needs the Firebase
+CLI on your PATH and a JVM. Coverage includes cross-user read/write denial,
+XP monotonicity, immutability of `workouts` and `stats_history`, the anti-cheat
+bounds, and that private fields cannot be smuggled into `public_profiles`.
 
 A logged session writes all three in **one batch**, so it can never half-commit.
 
