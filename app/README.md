@@ -51,6 +51,24 @@ Progress view loads empty and the console prints an index-creation link.
 
 ## Game systems
 
+### Movement access
+
+Movements are graded rather than uniformly level-gated:
+
+| Grade | Access | Examples |
+| --- | --- | --- |
+| **Foundation** | Open from level 1 | Push-up, Pull-up, Dip, Squat, Plank, Chin-up, Row |
+| **Intermediate** | Light level gate (5–8) | Archer push-up, L-sit, Pistol squat, Toes to bar |
+| **Elite** | Level 12–20, or a shop unlock | Muscle-up, Front lever, Planche, Human flag, HSPU |
+
+Gating the basics only blocks training, so everything a beginner can reasonably
+attempt is available immediately. Every gated movement carries a **progression**
+— an ordered set of drills describing how to earn it — which is visible whether
+or not the movement is unlocked.
+
+Each movement also carries form cues, common mistakes, a schematic side-view
+diagram (inline SVG, so it works offline), and a link to video demos.
+
 ### Levels & XP
 
 Each movement carries an XP-per-unit value (per rep, or per second for holds).
@@ -107,10 +125,14 @@ Bar Coins come from sessions (`15 + xp/12`) and completed goals. They buy:
 - **Movement unlocks** — early access to muscle-ups, planches, levers and more,
   bypassing their level gate
 
-### Goals
+### Goals & achievements
 
 Three active goals at a time, rolled from templates filtered by level. A
 completed goal pays out instantly and is replaced.
+
+Achievements are **derived, never stored** — every badge is computed from data
+the profile already holds, so there is no schema to migrate, no extra writes,
+and no way for the badge list to drift out of sync with reality.
 
 ---
 
@@ -132,10 +154,16 @@ src/
       shop.ts           Shop catalog and purchase states
       profile.ts        Document normalization + assessment baseline
       validation.ts     Anti-cheat bounds
+      achievements.ts   Derived badge definitions
   context/
     AuthContext.tsx     Auth state, profile listener, hourly recalculation
     ToastContext.tsx    Toast notifications
-  components/           UI primitives, game widgets, app shell
+  components/
+    ExerciseDiagram.tsx Inline SVG movement figures
+    ExerciseDetail.tsx  Form cues, mistakes, progression routes
+    RestTimer.tsx       Between-sets countdown
+    Achievements.tsx    Badge grid
+    ui/, layout/        Primitives and app shell
   views/                One file per screen
 ```
 

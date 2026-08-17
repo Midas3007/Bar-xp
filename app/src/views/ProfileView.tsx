@@ -25,6 +25,7 @@ import {
   Spinner,
 } from '../components/ui/Primitives';
 import { Avatar } from '../components/layout/AppShell';
+import { Achievements } from '../components/Achievements';
 import {
   IdentityChip,
   LevelBar,
@@ -114,6 +115,8 @@ export function ProfileView({ profile }: { profile: Profile }) {
           <CustomExercisesCard profile={profile} />
         </div>
       </div>
+
+      <Achievements profile={profile} />
     </div>
   );
 }

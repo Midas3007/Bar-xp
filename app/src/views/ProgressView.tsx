@@ -13,7 +13,14 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { BarChart3, LineChart as LineChartIcon, Percent, TrendingUp } from 'lucide-react';
+import {
+  BarChart3,
+  ChevronDown,
+  History,
+  LineChart as LineChartIcon,
+  Percent,
+  TrendingUp,
+} from 'lucide-react';
 
 import type { Profile, StatsSnapshot, Workout } from '../lib/types';
 import { Card, CardHeader, EmptyState, SkeletonBlock } from '../components/ui/Primitives';
@@ -362,6 +369,9 @@ export function ProgressView({ profile }: { profile: Profile }) {
         </div>
       )}
 
+      {/* --- Session history --- */}
+      <WorkoutHistory workouts={workouts ?? []} />
+
       {/* --- Summary strip --- */}
       {hasHistory ? (
         <Card className="p-5">
@@ -389,6 +399,87 @@ function Header() {
         Every assessment and session writes a snapshot. This is the long view.
       </p>
     </div>
+  );
+}
+
+/** Full session log, newest first, with each session's movements on demand. */
+function WorkoutHistory({ workouts }: { workouts: Workout[] }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const ordered = useMemo(
+    () => [...workouts].sort((a, b) => num(b.createdAt, 0) - num(a.createdAt, 0)),
+    [workouts],
+  );
+
+  return (
+    <Card>
+      <CardHeader
+        title="Session History"
+        subtitle={`Your last ${ordered.length} logged session${ordered.length === 1 ? '' : 's'}. Tap one to expand.`}
+        icon={<History className="h-4 w-4" aria-hidden />}
+      />
+      {ordered.length === 0 ? (
+        <EmptyState
+          title="No sessions yet"
+          message="Every workout you log will appear here with its full breakdown."
+        />
+      ) : (
+        <ul className="divide-y divide-white/5">
+          {ordered.map((workout) => {
+            const open = expanded === workout.id;
+            return (
+              <li key={workout.id}>
+                <button
+                  type="button"
+                  onClick={() => setExpanded(open ? null : workout.id)}
+                  className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-white/[0.03]"
+                  aria-expanded={open}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-slate-200">
+                      {formatShortDay(workout.day, workout.createdAt)} ·{' '}
+                      {workout.entries.length} movement
+                      {workout.entries.length === 1 ? '' : 's'}
+                    </p>
+                    <p className="mt-0.5 font-mono text-[11px] text-slate-600">
+                      {fmt(workout.totalVolume)} units · {fmt(workout.totalReps)} reps
+                    </p>
+                  </div>
+                  <span className="shrink-0 font-mono text-sm font-semibold text-forge-300">
+                    +{fmt(workout.xpEarned)}
+                  </span>
+                  <ChevronDown
+                    className={`h-4 w-4 shrink-0 text-slate-600 transition-transform ${
+                      open ? 'rotate-180' : ''
+                    }`}
+                    aria-hidden
+                  />
+                </button>
+
+                {open ? (
+                  <ul className="animate-fade-up space-y-1.5 bg-ink-900/40 px-4 pb-4 pt-1">
+                    {workout.entries.map((entry, i) => (
+                      <li
+                        key={`${entry.exerciseId}-${i}`}
+                        className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.03] px-3 py-2"
+                      >
+                        <span className="min-w-0 truncate text-xs text-slate-300">
+                          {entry.exerciseName}
+                        </span>
+                        <span className="shrink-0 font-mono text-[11px] text-slate-500">
+                          {fmt(entry.sets)} × {fmt(entry.amount)}
+                          {entry.unit === 'seconds' ? 's' : ''} · +{fmt(entry.xp)} XP
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Card>
   );
 }
 
