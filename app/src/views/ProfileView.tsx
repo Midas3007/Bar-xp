@@ -236,7 +236,7 @@ function ProfileHeader({ profile }: { profile: Profile }) {
           <StatReadout label="Lifetime reps" value={fmt(profile.totalReps)} />
           <StatReadout
             label="Best streak"
-            value={`${fmt(profile.streak.best)}d`}
+            value={`${fmt(profile.streak.best)}w`}
             accent="text-ember-300"
           />
           <StatReadout
@@ -285,10 +285,10 @@ function DisciplineCard({ profile }: { profile: Profile }) {
       <div className="mt-5 grid grid-cols-3 gap-4 border-t border-white/5 pt-5">
         <StatReadout
           label="Current"
-          value={`${fmt(profile.streak.current)}d`}
+          value={`${fmt(profile.streak.current)}w`}
           accent={identity.text}
         />
-        <StatReadout label="Best" value={`${fmt(profile.streak.best)}d`} />
+        <StatReadout label="Best" value={`${fmt(profile.streak.best)}w`} />
         <StatReadout label="Identity" value={identity.label} accent={identity.text} />
       </div>
 

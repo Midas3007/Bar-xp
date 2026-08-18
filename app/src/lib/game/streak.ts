@@ -2,12 +2,31 @@ import type { Streak } from '../types';
 import { int, str } from '../safe';
 
 /**
- * Streak bookkeeping.
+ * Streak bookkeeping — weekly targets, not daily chains.
  *
- * Days are local calendar days (`YYYY-MM-DD`) rather than timestamps, so a
- * workout at 23:50 and one at 00:10 correctly count as two separate days, and
- * a user's streak follows the calendar they actually live in.
+ * The original model incremented the streak only when the gap since the last
+ * session was exactly one day. That meant a Monday/Wednesday/Friday split —
+ * the most ordinary calisthenics schedule there is — reset the streak to 1 on
+ * every single session, forever, and the +45% bonus was reachable only by
+ * training all seven days a week indefinitely. A fitness app whose reward
+ * system punishes recovery is pushing people toward overtraining, so the model
+ * itself had to change rather than its numbers.
+ *
+ * A streak is now a run of consecutive weeks in which you trained on at least
+ * WEEKLY_TARGET distinct days. Rest days are free. Weeks are local, Monday to
+ * Sunday, and a week is only ever judged once it has fully elapsed.
  */
+
+/** Distinct training days needed in a week to keep the streak alive. */
+export const WEEKLY_TARGET = 4;
+
+/** Bonus per consecutive week held, and the ceiling it stops at. */
+export const WEEKLY_BONUS = 0.05;
+export const MAX_STREAK_BONUS = 0.45;
+
+/* -------------------------------------------------------------------------- */
+/* Day and week keys                                                           */
+/* -------------------------------------------------------------------------- */
 
 /** Local calendar day for a Date, `YYYY-MM-DD`. */
 export function dayKey(date: Date = new Date()): string {
@@ -27,11 +46,7 @@ export function parseDayKey(key: unknown): Date | null {
   const day = Number(match[3]);
   const date = new Date(year, month - 1, day);
   // Reject impossible dates like 2024-02-31 that Date would silently roll over.
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
     return null;
   }
   return date;
@@ -55,131 +70,248 @@ export function addDays(key: string, days: number): string {
   return dayKey(date);
 }
 
+/** The Monday of the week containing `date`, as a day key. Weeks are local. */
+export function weekKey(date: Date = new Date()): string {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  // getDay(): 0 = Sunday. Shift so Monday is the first day of the week.
+  const offset = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - offset);
+  return dayKey(d);
+}
+
+/** The week key for a `YYYY-MM-DD` day key, or null if the day is invalid. */
+export function weekKeyForDay(key: unknown): string | null {
+  const date = parseDayKey(key);
+  return date ? weekKey(date) : null;
+}
+
+/** Whole weeks between two week keys. Null if either is invalid. */
+export function weeksBetween(fromWeek: unknown, toWeek: unknown): number | null {
+  const days = daysBetween(fromWeek, toWeek);
+  return days === null ? null : Math.round(days / 7);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Streak state                                                                */
+/* -------------------------------------------------------------------------- */
+
 export const EMPTY_STREAK: Streak = {
   current: 0,
   best: 0,
   lastWorkoutDay: null,
   shieldsUsed: 0,
+  weekKey: null,
+  daysThisWeek: 0,
 };
 
-/** Normalise a stored streak blob into a complete, finite Streak. */
+/**
+ * Normalise a stored streak blob into a complete, finite Streak.
+ *
+ * Documents written before the weekly model carry a day-count in `current` and
+ * no `weekKey`. Those are migrated on read by `migrateLegacyStreak` rather than
+ * being silently reinterpreted as a week-count, which would hand anyone with an
+ * old 60-day streak an instant maximum bonus.
+ */
 export function safeStreak(value: unknown): Streak {
   const raw = (value ?? {}) as Partial<Streak>;
   const lastDay = parseDayKey(raw.lastWorkoutDay) ? str(raw.lastWorkoutDay) : null;
+  const week = parseDayKey(raw.weekKey) ? str(raw.weekKey) : null;
   return {
     current: Math.max(0, int(raw.current, 0)),
     best: Math.max(0, int(raw.best, 0)),
     lastWorkoutDay: lastDay,
     shieldsUsed: Math.max(0, int(raw.shieldsUsed, 0)),
+    weekKey: week,
+    daysThisWeek: Math.max(0, int(raw.daysThisWeek, 0)),
   };
 }
 
+/** Has this streak been through the daily -> weekly migration yet? */
+export function isLegacyStreak(streak: Streak): boolean {
+  return streak.weekKey === null && (streak.current > 0 || streak.lastWorkoutDay !== null);
+}
+
+/**
+ * Convert a pre-weekly streak document into the weekly model.
+ *
+ * A day-run of N converts to ceil(N / 7) weeks, which is the generous reading —
+ * a 15-day run becomes 3 weeks rather than 2. Nothing else about the account is
+ * touched: level, tier, XP, coins and unlocks are all untouched by this change,
+ * and `best` keeps whichever of the two readings is larger so a past record can
+ * never be erased by the migration.
+ */
+export function migrateLegacyStreak(streak: Streak, today: string = dayKey()): Streak {
+  if (!isLegacyStreak(streak)) return streak;
+
+  const days = streak.current;
+  const weeks = days > 0 ? Math.ceil(days / 7) : 0;
+  const thisWeek = weekKeyForDay(today) ?? weekKey();
+  const trainedThisWeek =
+    streak.lastWorkoutDay !== null && weekKeyForDay(streak.lastWorkoutDay) === thisWeek;
+
+  return {
+    ...streak,
+    current: weeks,
+    best: Math.max(streak.best, weeks),
+    weekKey: thisWeek,
+    // Credit the days already trained inside the current week, capped at the
+    // target so the migration cannot itself complete a week.
+    daysThisWeek: trainedThisWeek ? Math.min(days, WEEKLY_TARGET) : 0,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Settling elapsed weeks                                                      */
+/* -------------------------------------------------------------------------- */
+
 export interface DecayResult {
   streak: Streak;
-  /** Shields consumed to bridge missed days. */
+  /** Shields consumed to bridge weeks that missed the target. */
   shieldsConsumed: number;
   /** True if the streak was reset to zero. */
   broken: boolean;
   /** True if anything at all changed and a write is needed. */
   changed: boolean;
+  /** Weeks credited toward the streak by this settlement. */
+  weeksCredited: number;
 }
 
 /**
- * Apply streak decay for the time elapsed since the last workout.
+ * Bring a streak up to date as of `today`.
  *
- * Rules:
- *  - Worked out today or yesterday -> the streak is still live, nothing to do.
- *  - Each *fully missed* day can be bridged by consuming one Streak Shield.
- *  - Shields are consumed automatically, oldest gap first, while stock lasts.
- *  - If the gap outruns the shields, the streak resets to zero.
+ * Every week that has fully elapsed is judged: hit the target and the streak
+ * grows by one, miss it and a Streak Shield is spent to bridge it, and if no
+ * shield is available the streak resets. Shields are never spent on a gap they
+ * cannot fully bridge, so they carry over rather than being wasted.
  *
- * This is pure: the caller decides whether to persist the result.
+ * This is pure, and it is called from both the logging path and the background
+ * recalculation. The original code settled only from a background timer, so a
+ * shield bought to protect a streak routinely failed to spend before the streak
+ * it was protecting had already broken.
  */
-export function applyStreakDecay(
+export function settleStreak(
   streak: Streak,
   availableShields: unknown,
   today: string = dayKey(),
 ): DecayResult {
-  const current = safeStreak(streak);
+  const current = migrateLegacyStreak(safeStreak(streak), today);
   const shields = Math.max(0, int(availableShields, 0));
+  const thisWeek = weekKeyForDay(today) ?? weekKey();
 
-  if (!current.lastWorkoutDay) {
-    // Never trained. Nothing can decay, but a stale non-zero streak is repaired.
-    if (current.current !== 0) {
-      return {
-        streak: { ...current, current: 0 },
-        shieldsConsumed: 0,
-        broken: true,
-        changed: true,
-      };
-    }
-    return { streak: current, shieldsConsumed: 0, broken: false, changed: false };
-  }
+  const unchanged: DecayResult = {
+    streak: current,
+    shieldsConsumed: 0,
+    broken: false,
+    changed: current !== streak,
+    weeksCredited: 0,
+  };
 
-  const gap = daysBetween(current.lastWorkoutDay, today);
-
-  // Unparseable or a clock that moved backwards — leave the streak untouched.
-  if (gap === null || gap < 0) {
-    return { streak: current, shieldsConsumed: 0, broken: false, changed: false };
-  }
-
-  // Trained today, or trained yesterday and today is still open.
-  if (gap <= 1) {
-    return { streak: current, shieldsConsumed: 0, broken: false, changed: false };
-  }
-
-  // gap >= 2 means (gap - 1) whole days went by with no session.
-  const missedDays = gap - 1;
-
-  if (shields >= missedDays) {
-    // Every missed day is bridged. The streak survives intact, and the last
-    // workout day advances to yesterday so tomorrow's check starts clean.
+  if (!current.weekKey) {
+    // Never trained. Start the clock without judging anything.
     return {
-      streak: {
-        ...current,
-        lastWorkoutDay: addDays(today, -1),
-        shieldsUsed: current.shieldsUsed + missedDays,
-      },
-      shieldsConsumed: missedDays,
-      broken: false,
+      ...unchanged,
+      streak: { ...current, weekKey: thisWeek, daysThisWeek: 0 },
       changed: true,
     };
   }
 
-  // Not enough shields to cover the gap — the streak breaks. Shields are not
-  // spent on a gap they cannot bridge, so they carry over to the next attempt.
+  const elapsed = weeksBetween(current.weekKey, thisWeek);
+  // Unparseable, or a clock that moved backwards — leave the streak alone.
+  if (elapsed === null || elapsed < 0) return unchanged;
+  if (elapsed === 0) return unchanged;
+
+  let run = current.current;
+  let shieldsLeft = shields;
+  let consumed = 0;
+  let credited = 0;
+  let broken = false;
+
+  // The week the counter belongs to was already credited the moment it reached
+  // the target — `registerWorkout` does that so the reward lands when it is
+  // earned rather than the following Monday. Settling it again here would count
+  // the same week twice, so a met week is only checked for *survival*, never
+  // re-credited. Every week between then and now elapsed with no training at
+  // all, and each of those is a miss.
+  const weekMet = current.daysThisWeek >= WEEKLY_TARGET;
+  const misses = (weekMet ? 0 : 1) + Math.max(0, elapsed - 1);
+
+  for (let i = 0; i < misses; i += 1) {
+    if (shieldsLeft > 0) {
+      shieldsLeft -= 1;
+      consumed += 1;
+      continue;
+    }
+    run = 0;
+    broken = true;
+    break;
+  }
+
+  // A shield is not spent on a run that broke anyway.
+  if (broken) consumed = 0;
+
   return {
     streak: {
       ...current,
-      current: 0,
-      lastWorkoutDay: null,
+      current: run,
+      best: Math.max(current.best, run),
+      shieldsUsed: current.shieldsUsed + consumed,
+      weekKey: thisWeek,
+      daysThisWeek: 0,
     },
-    shieldsConsumed: 0,
-    broken: true,
-    changed: current.current !== 0 || current.lastWorkoutDay !== null,
+    shieldsConsumed: consumed,
+    broken,
+    changed: true,
+    weeksCredited: credited,
   };
 }
 
-/** Advance the streak for a workout logged on `today`. */
-export function registerWorkout(streak: Streak, today: string = dayKey()): Streak {
-  const current = safeStreak(streak);
+/** Backwards-compatible alias — the recalculation pass still calls this name. */
+export const applyStreakDecay = settleStreak;
+
+/**
+ * Record a session logged on `today`.
+ *
+ * Settles any elapsed weeks first, so logging after a break resolves the break
+ * correctly instead of leaving it for a timer that may not run until later.
+ * Only *distinct days* count toward the weekly target: a second session on a
+ * day already trained is welcome but does not advance the streak, which removes
+ * the incentive to split one workout into several logged sessions.
+ */
+export function registerWorkout(
+  streak: Streak,
+  today: string = dayKey(),
+  availableShields: unknown = 0,
+): Streak {
+  const settled = settleStreak(streak, availableShields, today).streak;
 
   // Already logged today — the streak does not double-count.
-  if (current.lastWorkoutDay === today) return current;
+  if (settled.lastWorkoutDay === today) return settled;
 
-  const gap = daysBetween(current.lastWorkoutDay, today);
-  // Consecutive if yesterday; otherwise this session starts a fresh streak at 1.
-  const next = gap === 1 ? current.current + 1 : 1;
+  const days = Math.min(settled.daysThisWeek + 1, 7);
+  const justHitTarget = days === WEEKLY_TARGET;
+  const run = justHitTarget ? settled.current + 1 : settled.current;
 
   return {
-    ...current,
-    current: next,
-    best: Math.max(current.best, next),
+    ...settled,
+    current: run,
+    best: Math.max(settled.best, run),
     lastWorkoutDay: today,
+    daysThisWeek: days,
   };
 }
 
 /** Has the user already logged a session today? */
 export function trainedToday(streak: Streak | null | undefined, today: string = dayKey()): boolean {
   return safeStreak(streak).lastWorkoutDay === today;
+}
+
+/** Distinct training days still needed this week to keep the streak alive. */
+export function daysRemainingThisWeek(streak: Streak | null | undefined): number {
+  return Math.max(0, WEEKLY_TARGET - safeStreak(streak).daysThisWeek);
+}
+
+/** Session XP multiplier earned by the current run of weeks. */
+export function streakMultiplier(streak: unknown): number {
+  const weeks = Math.max(0, int(streak, 0));
+  return 1 + Math.min(weeks * WEEKLY_BONUS, MAX_STREAK_BONUS);
 }

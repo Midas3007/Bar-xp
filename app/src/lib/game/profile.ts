@@ -164,6 +164,15 @@ export interface AssessmentInput {
  * plank, 25% body fat) lands at Uninitiated, while a strong athlete (15
  * pull-ups, 60 push-ups, 3min plank, 10% body fat) starts around Gold.
  */
+/**
+ * The highest any single stat can start at from the onboarding assessment.
+ *
+ * Tier is the average of the four core stats, so this ceiling puts the best
+ * possible assessment at Gold (45) and keeps Platinum (68) and everything above
+ * it behind real logged training.
+ */
+export const ASSESSMENT_STAT_CEILING = 60;
+
 export function baselineStats(input: AssessmentInput): Stats {
   const pullUps = Math.max(0, num(input.maxPullUps, 0));
   const pushUps = Math.max(0, num(input.maxPushUps, 0));
@@ -183,11 +192,17 @@ export function baselineStats(input: AssessmentInput): Stats {
   // Everyone starts with a small Discipline floor for finishing the assessment.
   const discipline = round(4 + Math.min(pullUps * 0.4 + pushUps * 0.1, 12), 2);
 
+  // A self-reported form cannot hand out a rank. Even the strongest credible
+  // answers land inside Gold, leaving every tier above it to be earned by
+  // logging actual training. Nothing here is verified, so nothing here should
+  // be able to finish the game.
+  const cap = (value: number) => Math.max(0, Math.min(value, ASSESSMENT_STAT_CEILING));
+
   return {
-    strength: Math.max(0, strength),
-    endurance: Math.max(0, endurance),
-    aesthetics: Math.max(0, aesthetics),
-    discipline: Math.max(0, discipline),
+    strength: cap(strength),
+    endurance: cap(endurance),
+    aesthetics: cap(aesthetics),
+    discipline: cap(discipline),
   };
 }
 

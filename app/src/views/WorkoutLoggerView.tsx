@@ -169,7 +169,7 @@ export function WorkoutLoggerView({
 
       toast.xp(
         `+${fmt(result.xpEarned)} XP · +${fmt(result.coinsEarned)} Bar Coins`,
-        `${fmt(result.totalReps)} reps moved. Streak now ${fmt(result.streak)} day${result.streak === 1 ? '' : 's'}.`,
+        `${fmt(result.totalReps)} reps moved. Streak now ${fmt(result.streak)} week${result.streak === 1 ? '' : 's'}.`,
       );
 
       if (result.levelsGained > 0) {
@@ -332,7 +332,7 @@ export function WorkoutLoggerView({
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-500">
-                      Streak bonus ({fmt(profile.streak.current)}d)
+                      Streak bonus ({fmt(profile.streak.current)}w)
                     </span>
                     <span className="font-mono text-ember-300">×{fmtDecimal(multiplier, 2)}</span>
                   </div>

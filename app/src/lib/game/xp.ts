@@ -1,5 +1,6 @@
 import type { Exercise, Stats, WorkoutEntry } from '../types';
 import { num, round } from '../safe';
+import { streakMultiplier } from './streak';
 import { EMPTY_STATS, STAT_KEYS, levelFromTotalXp } from './constants';
 
 /**
@@ -9,19 +10,25 @@ import { EMPTY_STATS, STAT_KEYS, levelFromTotalXp } from './constants';
  */
 const STAT_GAIN_PER_XP = 0.01;
 
+/** Volume of one movement, in a session, past which XP is worth less. */
+export const DIMINISHING_THRESHOLD = 100;
+
 /** Diminishing returns on very long sets so grinding one movement is not optimal. */
-function volumeMultiplier(volume: number): number {
+export function volumeMultiplier(volume: number): number {
   const v = Math.max(0, num(volume, 0));
-  if (v <= 100) return 1;
-  // Everything past 100 units is worth 60%.
-  return (100 + (v - 100) * 0.6) / v;
+  if (v <= DIMINISHING_THRESHOLD) return 1;
+  // Everything past the threshold is worth 60%.
+  return (DIMINISHING_THRESHOLD + (v - DIMINISHING_THRESHOLD) * 0.6) / v;
 }
 
-/** Streak bonus applied to a whole session: +3% per streak day, capped at +45%. */
-export function streakMultiplier(streak: unknown): number {
-  const days = Math.max(0, num(streak, 0));
-  return 1 + Math.min(days * 0.03, 0.45);
-}
+/**
+ * Streak bonus applied to a whole session.
+ *
+ * Re-exported from `streak.ts`, which owns the weekly model, so the curve can
+ * never drift between the two modules. It used to be defined here as +3% per
+ * consecutive *day*.
+ */
+export { streakMultiplier } from './streak';
 
 /** XP for a single exercise entry, before the session-wide streak bonus. */
 export function entryXp(exercise: Exercise, sets: unknown, amount: unknown): number {
@@ -100,6 +107,43 @@ export function scoreSession(
     const gains = entryStatGains(exercise, xp);
     for (const key of STAT_KEYS) statGains[key] += gains[key];
   }
+
+  // Diminishing returns are applied per *movement across the whole session*,
+  // not per entry. Applying them per entry meant logging 150 push-ups as two
+  // entries of 75 dodged the penalty completely, so a rule meant to discourage
+  // grinding one movement instead rewarded knowing about the loophole.
+  //
+  // The penalty is recomputed from raw volume and the movement's own XP rate
+  // rather than from the stored per-entry XP, because that stored figure has
+  // already had the per-entry penalty applied and re-deriving a rate from it
+  // would apply the discount a second time.
+  let correctedXp = 0;
+  let unresolvedXp = 0;
+  const volumeByExercise = new Map<string, number>();
+  for (const entry of entries) {
+    const volume = Math.max(0, num(entry.volume, 0));
+    if (!Number.isFinite(volume) || volume <= 0) {
+      // Nothing to rescore — keep whatever was stored.
+      unresolvedXp += Math.max(0, num(entry.xp, 0));
+      continue;
+    }
+    if (!resolve(entry.exerciseId)) {
+      // A deleted custom movement keeps its stored XP so historical recomputes
+      // stay stable, but it cannot take part in session-level scaling.
+      unresolvedXp += Math.max(0, num(entry.xp, 0));
+      continue;
+    }
+    volumeByExercise.set(
+      entry.exerciseId,
+      (volumeByExercise.get(entry.exerciseId) ?? 0) + volume,
+    );
+  }
+  for (const [exerciseId, sessionVolume] of volumeByExercise) {
+    const exercise = resolve(exerciseId);
+    const rate = Math.max(0, num(exercise?.xpPerUnit, 0));
+    correctedXp += Math.round(sessionVolume * rate * volumeMultiplier(sessionVolume));
+  }
+  baseXp = Math.max(0, correctedXp + unresolvedXp);
 
   const multiplier = streakMultiplier(streak);
   const xp = Math.round(baseXp * multiplier);

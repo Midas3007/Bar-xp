@@ -186,12 +186,22 @@ export interface Inventory {
 }
 
 export interface Streak {
+  /**
+   * Consecutive weeks in which the weekly training target was met.
+   *
+   * This counted consecutive *days* before the weekly model; documents written
+   * under the old scheme are converted on read by `migrateLegacyStreak`.
+   */
   current: number;
   best: number;
   /** Local calendar day of the last logged workout, `YYYY-MM-DD`. */
   lastWorkoutDay: string | null;
   /** How many shields have been auto-consumed over the account's lifetime. */
   shieldsUsed: number;
+  /** Monday of the week `daysThisWeek` refers to, `YYYY-MM-DD`. */
+  weekKey: string | null;
+  /** Distinct days trained inside the current week. */
+  daysThisWeek: number;
 }
 
 export interface Profile {

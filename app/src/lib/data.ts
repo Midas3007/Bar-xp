@@ -245,7 +245,10 @@ export async function logWorkout(
 
   // The streak advances first — the session's own XP already used the prior
   // multiplier, so today's increment applies from the next session onward.
-  const streakAfter = registerWorkout(streakBefore, today);
+  // Shields are passed in so an elapsed week is settled here, on the logging
+  // path, rather than waiting for the hourly background pass — which is how a
+  // shield bought to protect a streak used to expire before it could spend.
+  const streakAfter = registerWorkout(streakBefore, today, int(profile.inventory?.streakShields, 0));
 
   const goalOutcome = advanceGoals(profile.goals, profile.level, {
     entries,

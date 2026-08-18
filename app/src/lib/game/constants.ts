@@ -5,6 +5,31 @@ import { clamp, int, num, pct } from '../safe';
 /* Levels & XP                                                                 */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Level curve coefficients.
+ *
+ * The original curve (100 * l^1.32 + 20 * l) put level 100 at 1,958,698 lifetime
+ * XP — roughly 2,800 sessions, or thirteen years of training four days a week.
+ * A ceiling nobody can reach is not a goal, it is decoration.
+ *
+ * These values keep the original *shape* (the 1.32 exponent is unchanged) and
+ * rescale it so the ladder is actually walkable:
+ *
+ *   level  10   ~16 sessions   (about a month)
+ *   level  25   ~91 sessions   (about five months)
+ *   level  50  ~303 sessions   (about eighteen months)
+ *   level 100 ~1050 sessions   (about five years)
+ *
+ * The new cumulative cost is below the old one at *every* level — the maximum
+ * ratio is 0.614 — which is what makes the migration free: no existing account
+ * can lose a level when this ships, because every account needs strictly less
+ * XP to hold the level it already has. See constants.test.mjs, which asserts
+ * that property directly rather than trusting this comment.
+ */
+export const XP_COEFFICIENT = 62;
+export const XP_EXPONENT = 1.32;
+export const XP_LINEAR = 10;
+
 export const MAX_LEVEL = 100;
 
 /**
@@ -13,7 +38,7 @@ export const MAX_LEVEL = 100;
  */
 export function xpForLevel(level: number): number {
   const lvl = clamp(level, 1, MAX_LEVEL);
-  return Math.floor(100 * Math.pow(lvl, 1.32) + 20 * lvl);
+  return Math.floor(XP_COEFFICIENT * Math.pow(lvl, XP_EXPONENT) + XP_LINEAR * lvl);
 }
 
 /** Cumulative XP required to *reach* `level` from zero. */
@@ -146,6 +171,40 @@ export const TIERS: Tier[] = [
     ring: 'ring-orange-500/40',
     blurb: 'The bar belongs to you.',
   },
+  /* --------------------------------------------------------------------- */
+  /* Above Legend.                                                          */
+  /*                                                                        */
+  /* Stats accumulate without bound, so an athlete training four days a week */
+  /* reached the old top rank in about seven months and then climbed forever */
+  /* with nothing left to reach — average stat passes 900 inside two years.  */
+  /* These three extend the ladder to cover a realistic training lifetime.   */
+  /* Every threshold below Legend is untouched on purpose: adding ranks can  */
+  /* only ever promote someone, never demote them.                           */
+  /* --------------------------------------------------------------------- */
+  {
+    name: 'Ascendant',
+    min: 240,
+    gradient: 'from-teal-300 via-cyan-200 to-white',
+    text: 'text-teal-200',
+    ring: 'ring-teal-300/40',
+    blurb: 'Years of work, visible in every movement.',
+  },
+  {
+    name: 'Immortal',
+    min: 330,
+    gradient: 'from-violet-500 via-fuchsia-400 to-amber-300',
+    text: 'text-violet-200',
+    ring: 'ring-violet-400/50',
+    blurb: 'The progressions ran out before you did.',
+  },
+  {
+    name: 'Apex',
+    min: 450,
+    gradient: 'from-amber-300 via-white to-amber-300',
+    text: 'text-amber-200',
+    ring: 'ring-amber-200/50',
+    blurb: 'There is no rank above this one. There is still training.',
+  },
 ];
 
 /** Average of the four core stats — the number that drives tier. */
@@ -185,6 +244,13 @@ export interface Identity {
   blurb: string;
 }
 
+/**
+ * Identity ladder, keyed to consecutive *weeks* on target.
+ *
+ * These were day counts under the daily-chain streak. Read as weeks they map
+ * to roughly the same felt commitment: a month on target earns what a week of
+ * unbroken daily training used to.
+ */
 export const IDENTITIES: Identity[] = [
   {
     label: 'Fading',
@@ -202,24 +268,24 @@ export const IDENTITIES: Identity[] = [
   },
   {
     label: 'Consistent',
-    min: 3,
+    min: 2,
     text: 'text-emerald-300',
     bg: 'bg-emerald-500/10 ring-emerald-500/30',
-    blurb: 'Three days deep — this is becoming normal.',
+    blurb: 'Two weeks on target — this is becoming normal.',
   },
   {
     label: 'Disciplined',
-    min: 7,
+    min: 4,
     text: 'text-amber-300',
     bg: 'bg-amber-500/10 ring-amber-500/30',
-    blurb: 'A full week. Discipline is compounding.',
+    blurb: 'A month on target. Discipline is compounding.',
   },
   {
     label: 'Relentless',
-    min: 15,
+    min: 8,
     text: 'text-fuchsia-300',
     bg: 'bg-fuchsia-500/10 ring-fuchsia-500/30',
-    blurb: 'Fifteen days. You do not negotiate with yourself.',
+    blurb: 'Two months unbroken. You do not negotiate with yourself.',
   },
 ];
 
