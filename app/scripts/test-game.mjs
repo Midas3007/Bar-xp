@@ -23,6 +23,7 @@ const SOURCES = [
   'src/lib/game/sets.ts', 'src/lib/game/routines.ts',
   'src/lib/game/profile.ts', 'src/lib/game/validation.ts', 'src/lib/game/shop.ts',
   'src/lib/game/goals.ts', 'src/lib/game/achievements.ts', 'src/lib/game/muscles.ts',
+  'src/lib/share/shareCard.ts',
 ];
 
 const tsc = process.platform === 'win32' ? 'tsc.cmd' : 'tsc';

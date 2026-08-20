@@ -1,4 +1,10 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
+import {
+  useEffect,
+  useState,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+} from 'react';
 import { pct } from '../../lib/safe';
 
 /* -------------------------------------------------------------------------- */
@@ -148,6 +154,7 @@ export function ProgressBar({
   gradient = 'from-forge-500 to-forge-300',
   height = 'h-2',
   animated = true,
+  transition = true,
   label,
 }: {
   value: unknown;
@@ -155,6 +162,8 @@ export function ProgressBar({
   gradient?: string;
   height?: string;
   animated?: boolean;
+  /** Set false when the caller animates `value` itself, frame by frame. */
+  transition?: boolean;
   label?: string;
 }) {
   const percent = pct(value, max);
@@ -168,7 +177,9 @@ export function ProgressBar({
       aria-label={label}
     >
       <div
-        className={`h-full rounded-full bg-gradient-to-r ${gradient} transition-[width] duration-700 ease-out`}
+        className={`h-full rounded-full bg-gradient-to-r ${gradient} ${
+          transition ? 'transition-[width] duration-700 ease-out' : ''
+        }`}
         style={{ width: `${percent}%` }}
       >
         {animated && percent > 0 ? (
@@ -254,4 +265,31 @@ export function SkeletonBlock({ className = 'h-24' }: { className?: string }) {
       className={`animate-shimmer rounded-2xl bg-[linear-gradient(90deg,#0f1119,#1a1f2e,#0f1119)] bg-[length:200%_100%] ${className}`}
     />
   );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Motion preference                                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `index.css` already disarms CSS animation globally under reduced motion, but
+ * JS-driven tweens and staggered delays have to opt out themselves.
+ */
+export function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onChange = (event: MediaQueryListEvent) => setReduced(event.matches);
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
+
+  return reduced;
 }

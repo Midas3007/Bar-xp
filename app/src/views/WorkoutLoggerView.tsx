@@ -31,6 +31,7 @@ import {
 } from '../components/ui/Primitives';
 import { ExerciseDiagram } from '../components/ExerciseDiagram';
 import { ExerciseSheet } from '../components/ExerciseDetail';
+import { SessionSummary } from '../components/SessionSummary';
 import { RestTimer } from '../components/RestTimer';
 import { arr, fmt, fmtDecimal, int, num } from '../lib/safe';
 import {
@@ -62,7 +63,7 @@ import {
   routineItemsFromEntries,
   routineVolume,
 } from '../lib/game/routines';
-import { deleteRoutine, logWorkout, saveRoutine } from '../lib/data';
+import { deleteRoutine, logWorkout, saveRoutine, type LogWorkoutResult } from '../lib/data';
 import { validateEntry, validateRoutine, validateSession, validateSetLadder, LIMITS } from '../lib/game/validation';
 import { useToast } from '../context/ToastContext';
 
@@ -82,6 +83,7 @@ export function WorkoutLoggerView({
   const [presetId, setPresetId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<LogWorkoutResult | null>(null);
   const [sheetExercise, setSheetExercise] = useState<Exercise | null>(null);
   /** Set when the Library's "Log this" jumps back to the log tab. */
   const [pickedId, setPickedId] = useState<string | null>(null);
@@ -252,35 +254,11 @@ export function WorkoutLoggerView({
     setBusy(true);
     try {
       const result = await logWorkout(profile, entries, resolve, presetId);
-
-      toast.xp(
-        `+${fmt(result.xpEarned)} XP · +${fmt(result.coinsEarned)} Bar Coins`,
-        `${fmt(result.totalReps)} reps moved. Streak now ${fmt(result.streak)} week${result.streak === 1 ? '' : 's'}.`,
-      );
-
-      if (result.levelsGained > 0) {
-        toast.success(
-          `Level ${fmt(result.newLevel)} reached`,
-          result.levelsGained > 1
-            ? `${result.levelsGained} levels in one session. New movements may have unlocked.`
-            : 'New movements may have unlocked in the logger.',
-        );
-      }
-      if (result.tierChanged) {
-        toast.success(`New rank: ${result.newTier}`, 'Your stats crossed the threshold.');
-      }
-      for (const pb of result.newPersonalBests) {
-        toast.success(
-          `Personal best — ${pb.exerciseName}`,
-          `${fmt(pb.value)} ${pb.unit === 'seconds' ? 'seconds' : 'reps'} in a single set.`,
-        );
-      }
-      for (const goal of result.completedGoals) {
-        toast.success(`Goal complete — ${goal}`, 'Reward banked and a new goal rolled.');
-      }
-
+      // The session is committed: drop it from local state immediately so a
+      // second tap cannot log it twice, and hold the result for the summary,
+      // which is where every reward is announced now.
       clearSession();
-      onNavigate('dashboard');
+      setSummary(result);
     } catch (error) {
       console.error('[logger] failed to save workout', error);
       setSessionError('Could not save the session. Check your connection and try again.');
@@ -586,6 +564,17 @@ export function WorkoutLoggerView({
           setTab('log');
         }}
       />
+
+      {summary ? (
+        <SessionSummary
+          result={summary}
+          profile={profile}
+          onClose={() => {
+            setSummary(null);
+            onNavigate('dashboard');
+          }}
+        />
+      ) : null}
     </div>
   );
 }

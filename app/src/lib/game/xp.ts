@@ -101,6 +101,8 @@ export function entryStatGains(exercise: Exercise, xp: unknown): Stats {
 
 export interface SessionTotals {
   xp: number;
+  /** Session XP before the streak multiplier, after session-level diminishing returns. */
+  baseXp: number;
   coins: number;
   statGains: Stats;
   totalVolume: number;
@@ -187,6 +189,9 @@ export function scoreSession(
 
   return {
     xp,
+    // Rounded so that baseXp + streakBonusXp === xp exactly, and the summary
+    // screen never shows three numbers that fail to add up.
+    baseXp: Math.round(baseXp),
     coins: coinsForSession(xp),
     statGains,
     totalVolume,

@@ -31,6 +31,15 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 
 const TOAST_MS = 5200;
 
+/**
+ * Visible toasts, oldest evicted first.
+ *
+ * Toasts are for incidental confirmations only. Anything a user has earned and
+ * would be upset to miss belongs on the session summary, which cannot be
+ * evicted by whatever fires next.
+ */
+const MAX_VISIBLE_TOASTS = 4;
+
 const KIND_STYLES: Record<ToastKind, { icon: typeof Info; ring: string; iconColor: string }> = {
   success: { icon: CheckCircle2, ring: 'ring-vital-500/30', iconColor: 'text-vital-400' },
   error: { icon: TriangleAlert, ring: 'ring-rose-500/30', iconColor: 'text-rose-400' },
@@ -56,8 +65,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (toast: Omit<Toast, 'id'>) => {
       const id = nextId.current;
       nextId.current += 1;
-      // Cap the stack so a burst of events cannot cover the whole viewport.
-      setToasts((current) => [...current.slice(-3), { ...toast, id }]);
+      setToasts((current) => [
+        ...current.slice(-(MAX_VISIBLE_TOASTS - 1)),
+        { ...toast, id },
+      ]);
       timers.current.set(id, window.setTimeout(() => dismiss(id), TOAST_MS));
     },
     [dismiss],
