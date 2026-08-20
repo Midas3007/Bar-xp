@@ -5,6 +5,7 @@ import { EMPTY_STREAK, safeStreak } from './streak';
 import { ensureGoals } from './goals';
 import { LIMITS } from './validation';
 import { normalizeMuscleVolume } from './muscles';
+import { normalizeRoutines } from './routines';
 
 /** The placeholder shown when an athlete has no usable name. */
 export const UNNAMED_ATHLETE = 'Unnamed Athlete';
@@ -110,6 +111,7 @@ export function normalizeProfile(uid: string, raw: unknown): Profile {
 
     personalBests: normalizePersonalBests(data.personalBests),
     customExercises: normalizeCustomExercises(data.customExercises),
+    routines: normalizeRoutines(data.routines),
     goals: normalizeGoals(data.goals, level),
 
     workoutCount: Math.max(0, int(data.workoutCount, 0)),
@@ -279,6 +281,7 @@ export function newProfile(params: {
 
     personalBests: {},
     customExercises: [],
+    routines: [],
     goals: [],
 
     workoutCount: 0,

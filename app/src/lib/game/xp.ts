@@ -2,6 +2,7 @@ import type { Exercise, Stats, WorkoutEntry } from '../types';
 import { num, round } from '../safe';
 import { streakMultiplier } from './streak';
 import { EMPTY_STATS, STAT_KEYS, levelFromTotalXp } from './constants';
+import { entryVolume, normalizeReps } from './sets';
 
 /**
  * How much a unit of XP moves a stat. Stats climb far more slowly than XP —
@@ -30,15 +31,17 @@ export function volumeMultiplier(volume: number): number {
  */
 export { streakMultiplier } from './streak';
 
+/** XP for a movement's volume in one entry, before the session-wide streak bonus. */
+export function volumeXp(exercise: Exercise, volume: unknown): number {
+  const v = Math.max(0, num(volume, 0));
+  if (v <= 0) return 0;
+  const raw = v * Math.max(0, num(exercise.xpPerUnit, 0));
+  return Math.max(0, Math.round(raw * volumeMultiplier(v)));
+}
+
 /** XP for a single exercise entry, before the session-wide streak bonus. */
 export function entryXp(exercise: Exercise, sets: unknown, amount: unknown): number {
-  const s = Math.max(0, num(sets, 0));
-  const a = Math.max(0, num(amount, 0));
-  const volume = s * a;
-  if (volume <= 0) return 0;
-
-  const raw = volume * Math.max(0, num(exercise.xpPerUnit, 0));
-  return Math.max(0, Math.round(raw * volumeMultiplier(volume)));
+  return volumeXp(exercise, Math.max(0, num(sets, 0)) * Math.max(0, num(amount, 0)));
 }
 
 /** Build a persisted entry from a picked exercise and its logged numbers. */
@@ -53,6 +56,33 @@ export function buildEntry(exercise: Exercise, sets: unknown, amount: unknown): 
     amount: a,
     volume: s * a,
     xp: entryXp(exercise, s, a),
+  };
+}
+
+/**
+ * Build a persisted entry from a per-set ladder, e.g. `[12, 10, 8]`.
+ *
+ * A ladder whose sets are all equal collapses back to the uniform shape and
+ * stores no `reps` array, so the ordinary case keeps writing exactly the
+ * documents it wrote before this field existed.
+ */
+export function buildEntryFromReps(exercise: Exercise, reps: unknown): WorkoutEntry {
+  const ladder = normalizeReps(reps);
+  if (ladder.length === 0) return buildEntry(exercise, 0, 0);
+
+  const volume = ladder.reduce((total, r) => total + r, 0);
+  const uniform = ladder.every((r) => r === ladder[0]);
+  if (uniform) return buildEntry(exercise, ladder.length, ladder[0]);
+
+  return {
+    exerciseId: exercise.id,
+    exerciseName: exercise.name,
+    unit: exercise.unit,
+    sets: ladder.length,
+    amount: Math.max(...ladder),
+    volume,
+    reps: ladder,
+    xp: volumeXp(exercise, volume),
   };
 }
 
@@ -99,8 +129,9 @@ export function scoreSession(
   for (const entry of entries) {
     const xp = Math.max(0, num(entry.xp, 0));
     baseXp += xp;
-    totalVolume += Math.max(0, num(entry.volume, 0));
-    if (entry.unit !== 'seconds') totalReps += Math.max(0, num(entry.volume, 0));
+    const volume = entryVolume(entry);
+    totalVolume += volume;
+    if (entry.unit !== 'seconds') totalReps += volume;
 
     const exercise = resolve(entry.exerciseId);
     if (!exercise) continue;
@@ -121,7 +152,7 @@ export function scoreSession(
   let unresolvedXp = 0;
   const volumeByExercise = new Map<string, number>();
   for (const entry of entries) {
-    const volume = Math.max(0, num(entry.volume, 0));
+    const volume = entryVolume(entry);
     if (!Number.isFinite(volume) || volume <= 0) {
       // Nothing to rescore — keep whatever was stored.
       unresolvedXp += Math.max(0, num(entry.xp, 0));

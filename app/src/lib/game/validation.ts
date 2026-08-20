@@ -1,5 +1,6 @@
-import type { Exercise } from '../types';
-import { num } from '../safe';
+import type { Exercise, WorkoutEntry } from '../types';
+import { arr, num } from '../safe';
+import { entryVolume } from './sets';
 
 /**
  * Anti-cheat bounds.
@@ -40,6 +41,10 @@ export const LIMITS = {
   MIN_CUSTOM_XP: 0.1,
   MAX_CUSTOM_XP: 8,
   MAX_CUSTOM_EXERCISES: 20,
+  /** Stored training days per athlete. Mirrored in firestore.rules. */
+  MAX_ROUTINES: 12,
+  /** Movements in one routine — the same ceiling as a logged session. */
+  MAX_ROUTINE_ITEMS: 12,
   MAX_NAME_LENGTH: 40,
 } as const;
 
@@ -90,14 +95,14 @@ export function validateEntry(
 
 /** Validate a full session before it is written. */
 export function validateSession(
-  entries: Array<{ volume: number }>,
+  entries: Array<Partial<WorkoutEntry>>,
 ): ValidationResult {
   if (entries.length === 0) return fail('Add at least one exercise before finishing.');
   if (entries.length > LIMITS.MAX_ENTRIES) {
     return fail(`A session can hold up to ${LIMITS.MAX_ENTRIES} exercises.`);
   }
 
-  const total = entries.reduce((acc, e) => acc + num(e.volume, 0), 0);
+  const total = entries.reduce((acc, e) => acc + entryVolume(e), 0);
   if (total > LIMITS.MAX_SESSION_VOLUME) {
     return fail(
       `Total session volume of ${Math.floor(total)} exceeds the ${LIMITS.MAX_SESSION_VOLUME} cap. Log it as two sessions.`,
@@ -156,5 +161,66 @@ export function validateCustomExercise(input: {
     return fail(`Base XP must be between ${LIMITS.MIN_CUSTOM_XP} and ${LIMITS.MAX_CUSTOM_XP} per rep.`);
   }
 
+  return OK;
+}
+
+/** Validate a per-set ladder, e.g. [12, 10, 8], against the anti-cheat bounds. */
+export function validateSetLadder(
+  exercise: Exercise | undefined,
+  reps: unknown,
+): ValidationResult {
+  if (!exercise) return fail('Pick an exercise first.');
+
+  const raw = arr<unknown>(reps);
+  if (raw.length < LIMITS.MIN_SETS) return fail('You need at least 1 set.');
+  if (raw.length > LIMITS.MAX_SETS) {
+    return fail(`${LIMITS.MAX_SETS} sets is the maximum per exercise.`);
+  }
+
+  const seconds = exercise.unit === 'seconds';
+  const max = seconds ? LIMITS.MAX_SECONDS : LIMITS.MAX_REPS;
+  const min = seconds ? LIMITS.MIN_SECONDS : LIMITS.MIN_REPS;
+
+  for (const value of raw) {
+    const v = num(value, NaN);
+    if (!Number.isFinite(v) || !Number.isInteger(v)) {
+      return fail(seconds ? 'Seconds must be a whole number.' : 'Reps must be a whole number.');
+    }
+    if (v < min) {
+      return fail(seconds ? 'A hold needs at least 1 second.' : 'Every set needs at least 1 rep.');
+    }
+    if (v > max) {
+      return fail(
+        seconds
+          ? `A single hold over ${LIMITS.MAX_SECONDS + 1}s is not accepted. Split it into sets.`
+          : `${LIMITS.MAX_REPS + 1}+ reps in one set is not accepted. Split it into sets.`,
+      );
+    }
+  }
+
+  return OK;
+}
+
+/** Validate a user-authored routine before it is stored. */
+export function validateRoutine(input: {
+  name: unknown;
+  items: unknown;
+  /** Routines already stored, excluding one being replaced. */
+  existingCount: number;
+}): ValidationResult {
+  const name = typeof input.name === 'string' ? input.name.trim() : '';
+  const items = arr<unknown>(input.items);
+
+  if (name.length < 2) return fail('Give the routine a name.');
+  if (name.length > LIMITS.MAX_NAME_LENGTH) {
+    return fail(`Keep the name under ${LIMITS.MAX_NAME_LENGTH} characters.`);
+  }
+  if (items.length === 0) return fail('A routine needs at least one movement.');
+  if (items.length > LIMITS.MAX_ROUTINE_ITEMS) {
+    return fail(`A routine can hold up to ${LIMITS.MAX_ROUTINE_ITEMS} movements.`);
+  }
+  if (input.existingCount >= LIMITS.MAX_ROUTINES) {
+    return fail(`You can store up to ${LIMITS.MAX_ROUTINES} routines. Delete one first.`);
+  }
   return OK;
 }

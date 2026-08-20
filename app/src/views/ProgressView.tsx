@@ -27,6 +27,7 @@ import { Card, CardHeader, EmptyState, SkeletonBlock } from '../components/ui/Pr
 import { STAT_META } from '../lib/game/constants';
 import { fetchStatsHistory, fetchWorkouts } from '../lib/data';
 import { fmt, fmtDecimal, num, round } from '../lib/safe';
+import { formatSetLadder } from '../lib/game/sets';
 
 /** Chart palette, aligned with the stat colors used across the app. */
 const AXIS_COLOR = '#4a5266';
@@ -467,7 +468,7 @@ function WorkoutHistory({ workouts }: { workouts: Workout[] }) {
                           {entry.exerciseName}
                         </span>
                         <span className="shrink-0 font-mono text-[11px] text-slate-500">
-                          {fmt(entry.sets)} × {fmt(entry.amount)}
+                          {formatSetLadder(entry)}
                           {entry.unit === 'seconds' ? 's' : ''} · +{fmt(entry.xp)} XP
                         </span>
                       </li>

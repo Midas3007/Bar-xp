@@ -98,15 +98,43 @@ export interface CustomExercise {
   category: ExerciseCategory;
 }
 
+export interface RoutineItem {
+  exerciseId: string;
+  /** Target reps (or seconds) per set, in order. Set count is `reps.length`. */
+  reps: number[];
+}
+
+export interface Routine {
+  id: string;
+  name: string;
+  items: RoutineItem[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface WorkoutEntry {
   exerciseId: string;
   exerciseName: string;
   unit: ExerciseUnit;
+  /** Number of sets performed. With `reps` present this is `reps.length`. */
   sets: number;
-  /** Reps per set, or seconds per set for holds. */
+  /**
+   * The *hardest* set: reps, or seconds for a hold. For a uniform entry this is
+   * simply the per-set figure; with `reps` present it is `Math.max(...reps)`,
+   * which is what a personal best measures.
+   */
   amount: number;
-  /** sets * amount */
+  /** Total units: `sum(reps)` when a ladder is stored, otherwise `sets * amount`. */
   volume: number;
+  /**
+   * Per-set reps (or seconds) in the order performed — `[12, 10, 8]`.
+   *
+   * Absent on every entry written before this field existed, and deliberately
+   * absent on uniform entries, so the common case produces byte-identical
+   * documents to the ones already in Firestore. `volume` stays authoritative;
+   * for a varied ladder it is deliberately *less* than `sets * amount`.
+   */
+  reps?: number[];
   xp: number;
 }
 
@@ -240,6 +268,8 @@ export interface Profile {
 
   personalBests: Record<string, PersonalBest>;
   customExercises: CustomExercise[];
+  /** User-authored training days. The editable counterpart to `PRESETS`. */
+  routines: Routine[];
   goals: Goal[];
 
   workoutCount: number;
