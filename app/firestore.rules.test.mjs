@@ -73,6 +73,30 @@ function userDoc(overrides = {}) {
   };
 }
 
+/**
+ * Put Alice's document back to a known baseline, with rules disabled.
+ *
+ * This suite runs every assertion against one database, and an early test
+ * leaves `totalXp` high. Because a `setDoc` over an existing document is
+ * evaluated as an *update*, the monotonic-XP clause then rejects any later
+ * fixture defaulting to zero **before the field under test is ever reached** —
+ * so the test passes while proving nothing. Resetting is the fix; threading
+ * `totalXp: 6000` through each fixture only hides the coupling until the next
+ * person adds a test.
+ */
+async function resetAlice(overrides = {}) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users', ALICE), userDoc(overrides));
+  });
+}
+
+/**
+ * The leaderboard row, matching `userDoc()` field for field.
+ *
+ * The rules now cross-read the private document, so these two fixtures have to
+ * agree — which is the whole guarantee: a row that disagrees with the profile
+ * it claims to mirror is a forged row.
+ */
 function publicDoc(overrides = {}) {
   return {
     displayName: 'Alice',
@@ -180,6 +204,7 @@ const anon = testEnv.unauthenticatedContext().firestore();
 section('users — privacy');
 
 await test('owner can create their own profile', async () => {
+  await resetAlice();
   await assertSucceeds(setDoc(doc(alice, 'users', ALICE), userDoc()));
 });
 
@@ -198,10 +223,12 @@ await test('anonymous users cannot read a profile', async () => {
 });
 
 await test('another user cannot write to your profile', async () => {
+  await resetAlice();
   await assertFails(setDoc(doc(bob, 'users', ALICE), userDoc({ displayName: 'Pwned' })));
 });
 
 await test('profiles cannot be created for someone else', async () => {
+  await resetAlice();
   await assertFails(setDoc(doc(bob, 'users', ALICE), userDoc()));
 });
 
@@ -219,70 +246,83 @@ await test('XP can increase', async () => {
 });
 
 await test('rejects a non-numeric stat', async () => {
+  await resetAlice();
   await assertFails(
     setDoc(doc(alice, 'users', ALICE), userDoc({ stats: { strength: 'lots', endurance: 1, aesthetics: 1, discipline: 1 } })),
   );
 });
 
 await test('rejects a missing stat key', async () => {
+  await resetAlice();
   await assertFails(
     setDoc(doc(alice, 'users', ALICE), userDoc({ stats: { strength: 1, endurance: 1, aesthetics: 1 } })),
   );
 });
 
 await test('rejects negative coins', async () => {
+  await resetAlice();
   await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ coins: -50 })));
 });
 
 await test('rejects a level above the cap', async () => {
+  await resetAlice();
   await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ level: 500 })));
 });
 
 await test('rejects body fat outside the accepted range', async () => {
+  await resetAlice();
   await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ bodyFat: 95 })));
 });
 
 await test('rejects more streak shields than the shop allows', async () => {
+  await resetAlice();
   await assertFails(
     setDoc(doc(alice, 'users', ALICE), userDoc({ inventory: { streakShields: 99, cosmetics: [], unlocks: [] } })),
   );
 });
 
 await test('rejects a malformed lastWorkoutDay', async () => {
+  await resetAlice();
   await assertFails(
     setDoc(doc(alice, 'users', ALICE), userDoc({ streak: { current: 1, best: 1, lastWorkoutDay: 'yesterday', shieldsUsed: 0 } })),
   );
 });
 
 await test('accepts a well-formed lastWorkoutDay', async () => {
+  await resetAlice();
   await assertSucceeds(
-    setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, streak: { current: 1, best: 1, lastWorkoutDay: '2026-08-17', shieldsUsed: 0 } })),
+    setDoc(doc(alice, 'users', ALICE), userDoc({ streak: { current: 1, best: 1, lastWorkoutDay: '2026-08-17', shieldsUsed: 0 } })),
   );
 });
 
 await test('rejects an empty display name', async () => {
+  await resetAlice();
   await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ displayName: '' })));
 });
 
 await test('accepts a display name at the 40-character limit', async () => {
+  await resetAlice();
   await assertSucceeds(
-    setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, displayName: 'x'.repeat(40) })),
+    setDoc(doc(alice, 'users', ALICE), userDoc({ displayName: 'x'.repeat(40) })),
   );
 });
 
 await test('rejects a display name one character over the limit', async () => {
+  await resetAlice();
   await assertFails(
-    setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, displayName: 'x'.repeat(41) })),
+    setDoc(doc(alice, 'users', ALICE), userDoc({ displayName: 'x'.repeat(41) })),
   );
 });
 
 await test('the nameFixedAt repair marker is accepted on the user document', async () => {
+  await resetAlice();
   await assertSucceeds(
-    setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, nameFixedAt: Date.now() })),
+    setDoc(doc(alice, 'users', ALICE), userDoc({ nameFixedAt: Date.now() })),
   );
 });
 
 await test('accepts a routine list', async () => {
+  await resetAlice();
   const routines = [
     {
       id: 'routine_abc',
@@ -292,10 +332,11 @@ await test('accepts a routine list', async () => {
       updatedAt: Date.now(),
     },
   ];
-  await assertSucceeds(setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, routines })));
+  await assertSucceeds(setDoc(doc(alice, 'users', ALICE), userDoc({ routines })));
 });
 
 await test('rejects more routines than the limit', async () => {
+  await resetAlice();
   const routines = Array.from({ length: 13 }, (_, i) => ({
     id: `routine_${i}`,
     name: `Day ${i}`,
@@ -303,12 +344,12 @@ await test('rejects more routines than the limit', async () => {
     createdAt: Date.now(),
     updatedAt: Date.now(),
   }));
-  await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, routines })));
+  await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ routines })));
 });
 
 await test('a document without routines is still valid', async () => {
   // The live-data guarantee: no account has this field until it saves one.
-  const withoutRoutines = userDoc({ totalXp: 6000 });
+  const withoutRoutines = userDoc();
   delete withoutRoutines.routines;
   await assertSucceeds(setDoc(doc(alice, 'users', ALICE), withoutRoutines));
 });
@@ -322,18 +363,85 @@ await test('only the owner can delete their profile', async () => {
   // Later assertions in this file write to the document again, and an update
   // against a missing document is a create.
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
-    await setDoc(doc(ctx.firestore(), 'users', ALICE), userDoc({ totalXp: 6000 }));
+    await setDoc(doc(ctx.firestore(), 'users', ALICE), userDoc());
   });
+});
+
+await test('a profile cannot be created already carrying XP', async () => {
+  // The create-time clauses were never exercised: every earlier test wrote over
+  // an existing document, which is an update.
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const { deleteDoc } = await import('firebase/firestore');
+    await deleteDoc(doc(ctx.firestore(), 'users', ALICE));
+  });
+  await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 500 })));
+});
+
+await test('a profile cannot be created already rich', async () => {
+  await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ coins: 5000 })));
+});
+
+await test('a clean profile can be created', async () => {
+  await assertSucceeds(setDoc(doc(alice, 'users', ALICE), userDoc()));
+});
+
+await test('an unknown field on the user document is ACCEPTED, and that is known', async () => {
+  // Documenting a real limitation rather than pretending it is closed. A
+  // `hasOnly` allow-list here costs about (32 document keys x 32 list entries)
+  // expressions against Firestore's 1,000-per-request budget, which denied
+  // onboarding outright. The residual risk is an athlete filling their own
+  // private document, bounded by Firestore's 1 MiB limit — per-account, and
+  // not reachable by anyone else.
+  await resetAlice();
+  await assertSucceeds(setDoc(doc(alice, 'users', ALICE), userDoc({ isAdmin: true })));
+  // What matters is that it buys nothing: the field is unreadable by others...
+  await assertFails(getDoc(doc(bob, 'users', ALICE)));
+  // ...and cannot reach the leaderboard, which has its own allow-list.
+  await assertFails(setDoc(doc(alice, 'public_profiles', ALICE), publicDoc({ isAdmin: true })));
+});
+
+await test('XP cannot leap by more than a session could earn', async () => {
+  await resetAlice({ totalXp: 1000, level: 4 });
+  await assertFails(updateDoc(doc(alice, 'users', ALICE), { totalXp: 1000 + 100000 }));
+  await assertSucceeds(updateDoc(doc(alice, 'users', ALICE), { totalXp: 1000 + 30000 }));
+});
+
+await test('coins cannot leap by more than a session could earn', async () => {
+  await resetAlice({ coins: 100 });
+  await assertFails(updateDoc(doc(alice, 'users', ALICE), { coins: 100 + 50000 }));
+  await assertSucceeds(updateDoc(doc(alice, 'users', ALICE), { coins: 100 + 2000 }));
+});
+
+await test('photoURL is restricted to the provider image host', async () => {
+  await resetAlice();
+  await assertSucceeds(setDoc(doc(alice, 'users', ALICE), userDoc({ photoURL: '' })));
+  await assertSucceeds(
+    setDoc(
+      doc(alice, 'users', ALICE),
+      userDoc({ photoURL: 'https://lh3.googleusercontent.com/a/ACg8ocK123' }),
+    ),
+  );
+  // An arbitrary host would receive an HTTP request from every athlete who
+  // opened the leaderboard.
+  await assertFails(
+    setDoc(doc(alice, 'users', ALICE), userDoc({ photoURL: 'https://tracker.example.com/p.gif' })),
+  );
+  await assertFails(
+    setDoc(
+      doc(alice, 'users', ALICE),
+      userDoc({ photoURL: 'https://lh3.googleusercontent.com.evil.test/x' }),
+    ),
+  );
 });
 
 section('users — body measurements and preferences');
 
 await test('accepts a well-formed measurement block', async () => {
+  await resetAlice();
   await assertSucceeds(
     setDoc(
       doc(alice, 'users', ALICE),
       userDoc({
-        totalXp: 6000,
         measurements: { values: { bodyweight: 82.4, chest: 104 }, recordedAt: Date.now() },
       }),
     ),
@@ -341,51 +449,55 @@ await test('accepts a well-formed measurement block', async () => {
 });
 
 await test('rejects a measurement outside the sanity bounds', async () => {
+  await resetAlice();
   await assertFails(
     setDoc(
       doc(alice, 'users', ALICE),
-      userDoc({ totalXp: 6000, measurements: { values: { bodyweight: 900 }, recordedAt: Date.now() } }),
+      userDoc({ measurements: { values: { bodyweight: 900 }, recordedAt: Date.now() } }),
     ),
   );
   await assertFails(
     setDoc(
       doc(alice, 'users', ALICE),
-      userDoc({ totalXp: 6000, measurements: { values: { chest: 300 }, recordedAt: Date.now() } }),
+      userDoc({ measurements: { values: { chest: 300 }, recordedAt: Date.now() } }),
     ),
   );
 });
 
 await test('rejects an unknown measurement site', async () => {
+  await resetAlice();
   await assertFails(
     setDoc(
       doc(alice, 'users', ALICE),
-      userDoc({ totalXp: 6000, measurements: { values: { neck: 40 }, recordedAt: Date.now() } }),
+      userDoc({ measurements: { values: { neck: 40 }, recordedAt: Date.now() } }),
     ),
   );
 });
 
 await test('rejects an extra key on the measurement block', async () => {
+  await resetAlice();
   await assertFails(
     setDoc(
       doc(alice, 'users', ALICE),
-      userDoc({ totalXp: 6000, measurements: { values: {}, recordedAt: Date.now(), note: 'x' } }),
+      userDoc({ measurements: { values: {}, recordedAt: Date.now(), note: 'x' } }),
     ),
   );
 });
 
 await test('accepts the display preferences, rejects junk in them', async () => {
+  await resetAlice();
   await assertSucceeds(
-    setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, gymBroMode: false, unitSystem: 'imperial' })),
+    setDoc(doc(alice, 'users', ALICE), userDoc({ gymBroMode: false, unitSystem: 'imperial' })),
   );
-  await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, gymBroMode: 'yes' })));
-  await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, unitSystem: 'furlongs' })));
+  await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ gymBroMode: 'yes' })));
+  await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ unitSystem: 'furlongs' })));
 });
 
 await test('a document predating measurements still validates', async () => {
   // `userDoc()` deliberately carries none of the three new keys, so every other
   // assertion in this file doubles as a legacy-compatibility check. This one
   // says so explicitly.
-  const legacy = userDoc({ totalXp: 6000 });
+  const legacy = userDoc();
   assert.ok(!('measurements' in legacy));
   assert.ok(!('gymBroMode' in legacy));
   assert.ok(!('unitSystem' in legacy));
@@ -416,7 +528,56 @@ await test('gross XP still cannot be reduced by a correction', async () => {
 section('public_profiles — the leaderboard projection');
 
 await test('owner can write their own public row', async () => {
+  await resetAlice();
   await assertSucceeds(setDoc(doc(alice, 'public_profiles', ALICE), publicDoc()));
+});
+
+await test('a public row cannot claim more XP than the profile holds', async () => {
+  // The forged-leaderboard case. Before the cross-read this succeeded and put
+  // the writer straight to the top without touching their real profile.
+  await resetAlice();
+  await assertFails(
+    setDoc(doc(alice, 'public_profiles', ALICE), publicDoc({ totalXp: 999999, level: 100 })),
+  );
+});
+
+await test('a public row cannot claim a different name, tier or streak', async () => {
+  await resetAlice();
+  await assertFails(setDoc(doc(alice, 'public_profiles', ALICE), publicDoc({ tier: 'Apex' })));
+  await assertFails(setDoc(doc(alice, 'public_profiles', ALICE), publicDoc({ streak: 500 })));
+  await assertFails(
+    setDoc(doc(alice, 'public_profiles', ALICE), publicDoc({ displayName: 'Someone Else' })),
+  );
+});
+
+await test('a public row cannot wear a cosmetic the profile does not own', async () => {
+  await resetAlice();
+  await assertFails(
+    setDoc(
+      doc(alice, 'public_profiles', ALICE),
+      publicDoc({ activeCosmetic: 'neon_name', cosmetics: ['neon_name'] }),
+    ),
+  );
+  await resetAlice({ inventory: { streakShields: 0, cosmetics: ['neon_name'], unlocks: [] } });
+  await assertSucceeds(
+    setDoc(
+      doc(alice, 'public_profiles', ALICE),
+      publicDoc({ activeCosmetic: 'neon_name', cosmetics: ['neon_name'] }),
+    ),
+  );
+});
+
+await test('a public row tracks net XP after a correction', async () => {
+  // The private document keeps gross lifetime XP; the mirror shows the net
+  // figure. Comparing against the raw field would lock out every athlete who
+  // has ever corrected a session.
+  await resetAlice({ totalXp: 5000, xpVoided: 1200, level: 5 });
+  await assertSucceeds(
+    setDoc(doc(alice, 'public_profiles', ALICE), publicDoc({ totalXp: 3800, level: 5 })),
+  );
+  await assertFails(
+    setDoc(doc(alice, 'public_profiles', ALICE), publicDoc({ totalXp: 5000, level: 5 })),
+  );
 });
 
 await test('other signed-in users CAN read it (leaderboard)', async () => {
@@ -875,6 +1036,20 @@ section('friendship teardown');
 await test('either member can remove the friendship', async () => {
   await assertFails(deleteDoc(doc(carol, 'friendships', `${ALICE}__${BOB}`)));
   await assertSucceeds(deleteDoc(doc(alice, 'friendships', `${ALICE}__${BOB}`)));
+});
+
+section('unauthenticated and cross-user writes');
+
+await test('a signed-out client cannot write anything', async () => {
+  const nobody = testEnv.unauthenticatedContext().firestore();
+  await assertFails(setDoc(doc(nobody, 'users', ALICE), userDoc()));
+  await assertFails(setDoc(doc(nobody, 'public_profiles', ALICE), publicDoc()));
+  await assertFails(setDoc(doc(nobody, 'workouts', 'nope'), workoutDoc(ALICE)));
+  await assertFails(setDoc(doc(nobody, 'stats_history', 'nope'), snapshotDoc(ALICE)));
+});
+
+await test('a snapshot cannot be created carrying another athlete\'s uid', async () => {
+  await assertFails(setDoc(doc(bob, 'stats_history', 'forged'), snapshotDoc(ALICE)));
 });
 
 section('everything else is denied');

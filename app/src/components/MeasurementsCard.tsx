@@ -17,8 +17,10 @@ import { Button, Card, EmptyState, Field, Input, Spinner } from './ui/Primitives
 /**
  * Record and review body measurements.
  *
- * Nothing here is scored. There is no target, no ideal ratio and no comparison
- * against another athlete — the numbers are stored, charted, and that is all.
+ * There is no target and no comparison against another athlete. One pair does
+ * feed a rating — back over waist drives the Physique Lab's V-taper trait,
+ * because that is the one physique ratio a tape can actually settle — and the
+ * copy says so rather than promising nothing is scored.
  */
 export function MeasurementsCard({ profile }: { profile: Profile }) {
   const toast = useToast();
@@ -93,7 +95,8 @@ export function MeasurementsCard({ profile }: { profile: Profile }) {
             Body Measurements
           </h2>
           <p className="mt-1 text-xs text-content-muted">
-            Tracked and charted. Never scored, never ranked, never compared to anyone.
+            Charted over time and never compared to anyone else. Only your back and waist
+            feed a rating — the V-taper trait in the Physique Lab.
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={() => (open ? setOpen(false) : openForm())}>

@@ -86,7 +86,7 @@ export function MeasurementCharts({
       <Card>
         <CardHeader
           title="Body Measurements"
-          subtitle="Tracked and charted. Never scored, never ranked."
+          subtitle="Charted over time, and never compared to anyone else."
           icon={<Ruler className="h-4 w-4" aria-hidden />}
         />
         <div className="p-4">
@@ -109,7 +109,7 @@ export function MeasurementCharts({
       <Card>
         <CardHeader
           title={`Bodyweight (${bwUnit})`}
-          subtitle="Recorded readings. Not scored and not compared to anyone."
+          subtitle="Recorded readings. Not scored, and not compared to anyone else."
           icon={<Ruler className="h-4 w-4" aria-hidden />}
         />
         <div className="h-64 p-4 pr-5">
