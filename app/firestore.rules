@@ -104,11 +104,19 @@ service cloud.firestore {
 
       allow update: if isOwner(uid)
         && userFieldsAreValid()
-        // XP is monotonic — it can never be reduced.
-        && incoming().totalXp >= resource.data.get('totalXp', 0);
+        // Gross lifetime XP is monotonic — it can never be reduced. A
+        // correction does not subtract from it; it adds to `xpVoided`, which is
+        // itself append-only and can never exceed what was actually earned. The
+        // net figure the game shows is therefore always the difference of two
+        // counters that only ever grow, and no write can invent XP.
+        && incoming().totalXp >= resource.data.get('totalXp', 0)
+        && incoming().get('xpVoided', 0) >= resource.data.get('xpVoided', 0)
+        && incoming().get('xpVoided', 0) <= incoming().totalXp;
 
-      // Profiles are never deleted from the client.
-      allow delete: if false;
+      // Erasure is the one exception to "profiles are never deleted from the
+      // client": an athlete must be able to remove their own account from
+      // inside the app. Still owner-only.
+      allow delete: if isOwner(uid);
 
       function userFieldsAreValid() {
         let d = incoming();
@@ -119,6 +127,7 @@ service cloud.firestore {
           && d.onboarded is bool
           && isIntInRange(d.level, 1, 100)
           && isNumInRange(d.totalXp, 0, 100000000)
+          && isNumInRange(d.get('xpVoided', 0), 0, 100000000)
           && isIntInRange(d.coins, 0, 100000000)
           && statsAreValid(d.stats)
           && isShortString(d.tier, 24)
@@ -191,7 +200,9 @@ service cloud.firestore {
 
       allow create, update: if isOwner(uid) && publicProfileIsValid();
 
-      allow delete: if false;
+      // Owner-only, so an athlete erasing their account takes their leaderboard
+      // row with it.
+      allow delete: if isOwner(uid);
 
       function publicProfileIsValid() {
         let d = incoming();
@@ -225,8 +236,16 @@ service cloud.firestore {
 
       allow create: if isOwner(incoming().uid) && workoutIsValid();
 
-      // Logged sessions are an immutable record.
-      allow update, delete: if false;
+      // Logged sessions can never be rewritten. This is what stops a session
+      // being edited into more XP than it earned, and it stays absolute — a
+      // mistake is corrected by appending a `correction` document that
+      // references the original, never by altering it.
+      allow update: if false;
+
+      // Deletion exists only so an athlete can erase their own account. It
+      // cannot inflate anything: XP is monotonic and `xpVoided` only grows, so
+      // removing a workout destroys history and nothing else.
+      allow delete: if isSignedIn() && isOwner(resource.data.uid);
 
       function workoutIsValid() {
         let d = incoming();
@@ -240,7 +259,23 @@ service cloud.firestore {
           // Mirrors MAX_SESSION_VOLUME in validation.ts.
           && isIntInRange(d.totalVolume, 0, 5000)
           && isIntInRange(d.totalReps, 0, 5000)
-          && (d.get('presetId', null) == null || isShortString(d.presetId, 40));
+          && (d.get('presetId', null) == null || isShortString(d.presetId, 40))
+          && d.get('kind', 'session') in ['session', 'correction']
+          && correctionIsInert(d);
+      }
+
+      // A correction is an audit record, not a session: it names the workout it
+      // retracts and is worth nothing on its own. Without this a client could
+      // write `kind: 'correction'` on a document that also granted XP.
+      function correctionIsInert(d) {
+        return d.get('kind', 'session') != 'correction' || (
+          isShortString(d.get('correctsId', ''), 64)
+          && d.get('correctsId', '').size() > 0
+          && d.xpEarned == 0
+          && d.coinsEarned == 0
+          && d.totalVolume == 0
+          && d.totalReps == 0
+        );
       }
     }
 
@@ -254,8 +289,10 @@ service cloud.firestore {
 
       allow create: if isOwner(incoming().uid) && snapshotIsValid();
 
-      // Snapshots are an append-only audit trail.
-      allow update, delete: if false;
+      // Append-only in normal operation; deletable only as part of erasing the
+      // account that owns it.
+      allow update: if false;
+      allow delete: if isSignedIn() && isOwner(resource.data.uid);
 
       function snapshotIsValid() {
         let d = incoming();
@@ -268,7 +305,7 @@ service cloud.firestore {
           && isNumInRange(d.bodyFat, 0, 60)
           && isIntInRange(d.totalReps, 0, 1000000000)
           && isIntInRange(d.streak, 0, 100000)
-          && d.source in ['assessment', 'workout', 'measurement']
+          && d.source in ['assessment', 'workout', 'measurement', 'correction']
           // `get` with a `{}` default: workout and legacy snapshots never carry
           // the key and must keep passing untouched.
           && measurementValuesAreValid(d.get('measurements', {}));

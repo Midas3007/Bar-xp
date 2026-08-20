@@ -64,7 +64,14 @@ export function normalizeProfile(uid: string, raw: unknown): Profile {
 
   const stats = safeStats(data.stats);
   const streak = safeStreak(data.streak);
-  const totalXp = Math.max(0, num(data.totalXp, 0));
+  // Two append-only counters, one honest net figure. The stored `totalXp` field
+  // keeps its exact meaning — gross lifetime XP, only ever increasing — and a
+  // correction adds to `xpVoided` rather than subtracting from it. Every
+  // document written before corrections existed lacks the field, which reads as
+  // 0, so net equals gross for every account today.
+  const grossXp = Math.max(0, num(data.totalXp, 0));
+  const xpVoided = clamp(num(data.xpVoided, 0), 0, grossXp);
+  const totalXp = Math.max(0, grossXp - xpVoided);
 
   const inventoryRaw = (data.inventory ?? {}) as Partial<Inventory>;
   const inventory: Inventory = {
@@ -73,8 +80,8 @@ export function normalizeProfile(uid: string, raw: unknown): Profile {
     unlocks: arr<string>(inventoryRaw.unlocks).filter((u) => typeof u === 'string'),
   };
 
-  // Level is always derived from XP rather than trusted from the document, so
-  // the two can never drift apart.
+  // Level is always derived from *net* XP rather than trusted from the
+  // document, so the two can never drift apart.
   const level = levelFromTotalXp(totalXp);
 
   return {
@@ -89,6 +96,8 @@ export function normalizeProfile(uid: string, raw: unknown): Profile {
     assessment: normalizeAssessment(data.assessment),
 
     level,
+    grossXp,
+    xpVoided,
     totalXp,
     coins: Math.max(0, int(data.coins, 0)),
 
@@ -272,6 +281,8 @@ export function newProfile(params: {
     assessment: null,
 
     level: 1,
+    grossXp: 0,
+    xpVoided: 0,
     totalXp: 0,
     coins: 100,
 

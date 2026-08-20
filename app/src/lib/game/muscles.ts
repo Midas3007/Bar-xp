@@ -261,6 +261,25 @@ export function mergeMuscleVolume(existing: unknown, addition: MuscleVolume): Mu
   return base;
 }
 
+/**
+ * Remove a session's contribution from the stored lifetime totals.
+ *
+ * The inverse of `mergeMuscleVolume`, and it lives beside its twin so the two
+ * cannot drift. Keys that reach zero are deleted rather than stored as 0, which
+ * is what keeps a merge-then-subtract round-trip exactly equal to `{}`.
+ */
+export function subtractMuscleVolume(existing: unknown, subtraction: MuscleVolume): MuscleVolume {
+  const base = normalizeMuscleVolume(existing);
+  for (const key of MUSCLE_KEYS) {
+    const take = num(subtraction[key], 0);
+    if (take <= 0) continue;
+    const next = round(Math.max(0, num(base[key], 0) - take), 3);
+    if (next > 0) base[key] = next;
+    else delete base[key];
+  }
+  return base;
+}
+
 /** Coerce a stored blob into a clean, finite volume map. */
 export function normalizeMuscleVolume(value: unknown): MuscleVolume {
   const raw = (value ?? {}) as Record<string, unknown>;

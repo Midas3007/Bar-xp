@@ -150,6 +150,14 @@ export interface Workout {
   totalVolume: number;
   totalReps: number;
   presetId?: string | null;
+  /**
+   * `session` for a logged workout, `correction` for the audit record that
+   * retracts one. Absent on every document written before corrections existed,
+   * which reads as `session`.
+   */
+  kind?: 'session' | 'correction';
+  /** The workout a correction retracts. Only ever set on a correction. */
+  correctsId?: string | null;
 }
 
 export interface StatsSnapshot {
@@ -166,9 +174,10 @@ export interface StatsSnapshot {
   streak: number;
   /**
    * `assessment` for the onboarding baseline and body-fat edits, `workout` for
-   * post-session snapshots, `measurement` for a body-measurement recording.
+   * post-session snapshots, `measurement` for a body-measurement recording,
+   * `correction` for the dip left by a voided session.
    */
-  source: 'assessment' | 'workout' | 'measurement';
+  source: 'assessment' | 'workout' | 'measurement' | 'correction';
   /** Only the sites entered in this sitting. Absent on documents written before slice 4. */
   measurements: MeasurementValues | null;
 }
@@ -269,6 +278,16 @@ export interface Profile {
   assessment: Assessment | null;
 
   level: number;
+  /** Gross lifetime XP exactly as stored. Append-only; never decreases. */
+  grossXp: number;
+  /** Lifetime XP retracted by session corrections. Append-only; never decreases. */
+  xpVoided: number;
+  /**
+   * `grossXp - xpVoided`. The figure the whole game uses — level, tier, charts
+   * and the leaderboard row. Every document written before corrections existed
+   * has `xpVoided` absent, which reads as 0, so this equals the stored value
+   * for every account today.
+   */
   totalXp: number;
   coins: number;
 

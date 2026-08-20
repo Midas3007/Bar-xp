@@ -5,9 +5,12 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Pause,
   ShoppingBag,
+  Timer,
   Trophy,
   User as UserIcon,
+  WifiOff,
   X,
 } from 'lucide-react';
 
@@ -15,6 +18,7 @@ import type { Profile } from '../../lib/types';
 import { useAuth } from '../../context/AuthContext';
 import { CoinPill, NeonName, TierBadge } from '../GameBits';
 import { levelProgress } from '../../lib/game/constants';
+import { formatClock, useRestTimer } from '../../context/RestTimerContext';
 
 export type ViewKey =
   | 'dashboard'
@@ -52,6 +56,18 @@ export function AppShell({
 }) {
   const { signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [online, setOnline] = useState(() => navigator.onLine !== false);
+
+  useEffect(() => {
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => {
+      window.removeEventListener('online', up);
+      window.removeEventListener('offline', down);
+    };
+  }, []);
 
   // Close the mobile drawer whenever the view changes.
   useEffect(() => {
@@ -71,6 +87,13 @@ export function AppShell({
         }}
         aria-hidden
       />
+
+      {online ? null : (
+        <div className="relative z-40 flex items-center justify-center gap-2 bg-amber-500/15 px-4 py-2 text-center text-[11px] font-medium text-amber-200 ring-1 ring-inset ring-amber-500/25">
+          <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          Offline — everything you log is saved on this device and syncs when you reconnect.
+        </div>
+      )}
 
       <div className="relative flex min-h-screen">
         {/* --- Desktop sidebar --- */}
@@ -186,6 +209,45 @@ export function AppShell({
           })}
         </div>
       </nav>
+
+      {/* The whole point of lifting the timer out of the logger: it is visible
+          and audible from wherever the athlete happens to be standing. */}
+      {view === 'workout' ? null : <RestTimerBar />}
+    </div>
+  );
+}
+
+/** Floating countdown pill, above the mobile bottom bar. */
+function RestTimerBar() {
+  const { remaining, running, done, pause, acknowledge } = useRestTimer();
+  if (!running && !done) return null;
+
+  return (
+    <div
+      className={`fixed bottom-20 right-4 z-40 flex items-center gap-3 rounded-full py-2 pl-4 pr-2 shadow-glow ring-1 backdrop-blur-xl lg:bottom-6 ${
+        done ? 'bg-vital-500/20 ring-vital-400/40' : 'bg-ink-800/95 ring-white/10'
+      }`}
+      role="status"
+    >
+      <Timer
+        className={`h-4 w-4 shrink-0 ${done ? 'text-vital-300' : 'text-forge-300'}`}
+        aria-hidden
+      />
+      <span
+        className={`font-mono text-sm font-bold tabular-nums ${
+          done ? 'text-vital-200' : 'text-slate-100'
+        }`}
+      >
+        {done ? 'Rest done' : formatClock(remaining)}
+      </span>
+      <button
+        type="button"
+        onClick={done ? acknowledge : pause}
+        className="rounded-full bg-white/5 p-1.5 text-slate-400 transition hover:text-slate-100"
+        aria-label={done ? 'Dismiss the rest alert' : 'Pause the rest timer'}
+      >
+        {done ? <X className="h-3.5 w-3.5" aria-hidden /> : <Pause className="h-3.5 w-3.5" aria-hidden />}
+      </button>
     </div>
   );
 }

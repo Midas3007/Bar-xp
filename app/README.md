@@ -133,8 +133,8 @@ A session's XP is the sum of its entries, with two adjustments:
   grinding a single movement is never the optimal play.
 - **Streak multiplier** — `+3%` per streak day, capped at `+45%`.
 
-Level is **always derived** from lifetime XP (`levelFromTotalXp`) rather than
-trusted from the document, so the two can never drift apart. The curve is
+Level is **always derived** from *net* lifetime XP (`levelFromTotalXp`) rather
+than trusted from the document, so the two can never drift apart. The curve is
 `100 · level^1.32 + 20 · level`, capped at level 100.
 
 ### Tiers
@@ -211,6 +211,97 @@ and no way for the badge list to drift out of sync with reality.
 
 ---
 
+## Not losing data
+
+### Routing
+
+Six flat destinations on the History API — `/dashboard`, `/train`, `/progress`,
+`/leaderboard`, `/shop`, `/profile` — with one `popstate` listener and no
+router dependency. Deep links and the browser back button both work against the
+hosting rewrite that was already in place, which matters most in the installed
+PWA, where `"display": "standalone"` means the system back gesture with no
+in-app history closes the app outright. `/` and any unknown path normalise onto
+`/dashboard` with `replaceState`, so the first Back press leaves the app rather
+than bouncing between two spellings of the same view.
+
+### Session drafts
+
+The in-progress session is written to `localStorage` per account on every
+change and restored on return, expiring after eighteen hours. Not Firestore: a
+draft is not a record, writing every keystroke would cost money and need its own
+collection and rules, and it would still be lost offline. Stored entries are
+re-normalised through `safe.ts` on the way back in, because `localStorage` is
+user-writable and therefore untrusted like any other input.
+
+### Offline
+
+Firestore's IndexedDB cache is enabled, which buys offline reads, offline
+queries and offline writes that replay on reconnect. The consequence that has to
+be handled: `WriteBatch.commit()` does not settle until the *server*
+acknowledges, so offline it never settles. Writes are applied to the local cache
+synchronously either way, so `commitBatch` reports success once the write is
+durable on the device and tells the caller whether the server has seen it yet —
+the Finish button completes, and a second toast says the session will sync.
+
+A hand-written service worker (`public/sw.js`, ~70 lines, no Workbox) serves the
+app shell when navigation fails and cache-firsts the content-hashed assets Vite
+emits. It never intercepts cross-origin requests: caching a Firestore or
+Identity Toolkit response would produce failures that look like data corruption.
+
+### Corrections
+
+A mistyped session — `300` where `30` was meant — used to be permanent, because
+the ledger is append-only and XP is monotonic. Neither invariant was worth
+trading away, so corrections **add** rather than rewrite:
+
+- The session is retracted by appending a `correction` document to `workouts`
+  that names the one it voids. The original is never touched.
+- The XP comes off through a second append-only counter, `xpVoided`, which can
+  never exceed `totalXp`. Level, tier, charts and the leaderboard read the
+  **difference** of two counters that only ever grow, which is free to fall.
+- Existing documents have no `xpVoided`; absent reads as 0, so every account's
+  numbers are unchanged and there is no migration.
+
+Corrections are available for 48 hours — a UX guard, not a security control,
+since the maths is unexploitable either way. **Fix numbers** voids the session
+and hands its movements back to the logger as a draft; the re-log carries
+today's date, which is the price of an append-only ledger.
+
+Reversed: XP, coins, stats, reps and muscle volume. **Not** reversed: personal
+bests, streak and goal progress — each is impossible to reconstruct honestly
+from the stored document (restoring a PR would need the full history the client
+never holds; `daysThisWeek` is a count, not a set of days), and the confirmation
+copy says so before the athlete commits. One further asymmetry is documented in
+`correction.ts`: the streak-scaled discipline bonus is applied outside
+`scoreSession` and the workout does not record the streak, so a reversal leaves
+up to 1.5 discipline behind rather than risk removing more than was granted.
+
+### Export and erasure
+
+The Profile view exports the full history as JSON (profile, sessions, stat
+snapshots) or CSV (one row per *entry*, every cell quoted, so a movement named
+`Front lever, tucked` stays in one cell). Delete-account erases the profile,
+every session, every snapshot, the leaderboard row and the sign-in itself,
+behind a typed `DELETE` confirmation. Deletes are owner-only and destroy history
+without inflating anything; the rule that actually protects the game — a logged
+session can never be rewritten — stays absolute.
+
+### The rest timer
+
+Lifted out of the logger into an app-level provider, because it used to unmount
+the moment the athlete opened the Dashboard, which is to say it stopped working
+at the one moment it exists for. It now survives navigation and reload
+(deadline-based, so a throttled background tab cannot make it drift), alerts
+with a Web Audio triple beep as well as vibration — `navigator.vibrate` alone is
+a no-op on iOS Safari, so the timer was previously silent on iPhone — carries a
+persisted mute toggle, and shows a floating pill from every view.
+
+The honest limit: a fully backgrounded browser on iOS cannot reliably play
+audio, so the alert may land on return to the app. Fixing that properly needs
+Notifications or a wake lock, which are deliberately out of scope.
+
+---
+
 ## Architecture
 
 ```
@@ -233,9 +324,14 @@ src/
       muscles.ts        Muscle groups, equipment setups, volume & balance
       aesthetics.ts     Physique trait ratings, tips, and the two grade vocabularies
       measurements.ts   Measurement sites, metric/imperial conversion, coercion
+      correction.ts     Reversal maths for voiding a logged session
+    routing.ts          ViewKey <-> path table and the History API hook
+    draft.ts            The in-progress session, in localStorage
+    export.ts           JSON and CSV export builders
   context/
-    AuthContext.tsx     Auth state, profile listener, hourly recalculation
+    AuthContext.tsx     Auth state, profile listener, hourly recalculation, erasure
     ToastContext.tsx    Toast notifications
+    RestTimerContext.tsx App-level rest timer: deadline, sound, persistence
   components/
     ExerciseDiagram.tsx Inline SVG movement figures
     ExerciseDetail.tsx  Form cues, mistakes, progression routes
@@ -297,8 +393,8 @@ have rejected:
 | Any girth measurement | 10–250 cm |
 
 The rules additionally enforce that `totalXp` is **monotonic** — it can never be
-reduced — and that `workouts` and `stats_history` documents are **immutable**
-once written.
+reduced — that `xpVoided` is monotonic and can never exceed it, and that
+`workouts` and `stats_history` documents are **immutable** once written.
 
 ### Data model
 
@@ -306,8 +402,8 @@ once written.
 | --- | --- |
 | `users/{uid}` | **Owner-only, read and write.** Holds email, body-fat readings, the assessment, personal bests and per-muscle volume. |
 | `public_profiles/{uid}` | Readable by any signed-in user. Exactly the nine fields the leaderboard renders, enforced with `hasOnly`. Mirrored from the user document on every write that changes one. |
-| `workouts/{id}` | Private to the owner. Create-only, never updated or deleted. |
-| `stats_history/{id}` | Private to the owner. Append-only audit trail, and where body measurements are recorded. |
+| `workouts/{id}` | Private to the owner. Create-only and **never updated**; deletable only by the owner, for account erasure. |
+| `stats_history/{id}` | Private to the owner. Append-only audit trail, and where body measurements are recorded. Owner-deletable for erasure. |
 
 The split matters: an earlier version let any signed-in user read whole user
 documents, on the reasoning that the client only rendered safe fields. That was
@@ -321,7 +417,7 @@ UI would not have helped; the data had to move.
 npm run test:rules
 ```
 
-Runs 58 assertions against the Firestore emulator, which executes the real
+Runs 68 assertions against the Firestore emulator, which executes the real
 rules engine — the rules are enforced, not merely inspected. Needs the Firebase
 CLI on your PATH and a JVM. Coverage includes cross-user read/write denial,
 XP monotonicity, immutability of `workouts` and `stats_history`, the anti-cheat

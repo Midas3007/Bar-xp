@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   Award,
   Check,
+  Database,
   Dumbbell,
   Pencil,
   Percent,
@@ -49,6 +50,8 @@ import {
   updateDisplayName,
 } from '../lib/data';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
+import { buildExport, bundleToCsv, downloadFile, exportFilename } from '../lib/export';
 import { arr, fmt, fmtDecimal, int, num } from '../lib/safe';
 
 export function ProfileView({ profile }: { profile: Profile }) {
@@ -127,6 +130,8 @@ export function ProfileView({ profile }: { profile: Profile }) {
       <PhysiqueLab profile={profile} />
 
       <Achievements profile={profile} />
+
+      <DataCard profile={profile} />
     </div>
   );
 }
@@ -582,4 +587,157 @@ function formatDate(timestamp: unknown): string {
   const date = new Date(ts);
   if (Number.isNaN(date.getTime())) return 'Recorded';
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* Your data                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Export and erasure.
+ *
+ * The two belong on the same card on purpose: offering to delete an account is
+ * only reasonable next to a way of keeping a copy first.
+ */
+function DataCard({ profile }: { profile: Profile }) {
+  const toast = useToast();
+  const { user, deleteAccount } = useAuth();
+  const [busy, setBusy] = useState<'json' | 'csv' | 'delete' | null>(null);
+  const [open, setOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  // Google accounts re-authenticate through a popup, so no password is asked for.
+  const needsPassword =
+    user?.providerData.some((p) => p.providerId === 'password') === true &&
+    user.providerData.every((p) => p.providerId !== 'google.com');
+
+  const runExport = async (format: 'json' | 'csv') => {
+    setBusy(format);
+    try {
+      const bundle = await buildExport(profile);
+      if (format === 'json') {
+        downloadFile(exportFilename('json'), 'application/json', JSON.stringify(bundle, null, 2));
+      } else {
+        downloadFile(exportFilename('csv'), 'text/csv', bundleToCsv(bundle));
+      }
+      toast.success('Export ready', 'Check your downloads.');
+    } catch (err) {
+      console.error('[profile] export failed', err);
+      toast.error('Could not build the export', 'Check your connection and try again.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const erase = async () => {
+    setError(null);
+    setBusy('delete');
+    try {
+      await deleteAccount(needsPassword ? password : undefined);
+    } catch (err) {
+      console.error('[profile] account deletion failed', err);
+      const code = (err as { code?: string }).code ?? '';
+      setError(
+        code === 'auth/wrong-password' || code === 'auth/invalid-credential'
+          ? 'That password did not match.'
+          : 'Could not finish deleting the account. Some data may already be gone — try again.',
+      );
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Card className="p-5">
+      <h2 className="mb-1 flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-slate-300">
+        <Database className="h-4 w-4 text-slate-500" aria-hidden />
+        Your Data
+      </h2>
+      <p className="text-xs leading-relaxed text-slate-500">
+        Everything you have logged, in a file you own. The CSV has one row per exercise entry; the
+        JSON has the whole thing including your profile and stat history.
+      </p>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button variant="secondary" size="sm" disabled={busy !== null} onClick={() => void runExport('json')}>
+          {busy === 'json' ? <Spinner className="h-3.5 w-3.5" /> : null}
+          Export JSON
+        </Button>
+        <Button variant="secondary" size="sm" disabled={busy !== null} onClick={() => void runExport('csv')}>
+          {busy === 'csv' ? <Spinner className="h-3.5 w-3.5" /> : null}
+          Export CSV
+        </Button>
+      </div>
+
+      <div className="mt-5 border-t border-white/5 pt-5">
+        {open ? (
+          <div className="space-y-3">
+            <p className="text-xs leading-relaxed text-rose-200">
+              Your profile, every logged session, every stats snapshot, your leaderboard row and
+              your sign-in are permanently removed. Export first if you want a copy.
+            </p>
+
+            <Field label="Type DELETE to confirm">
+              <Input
+                value={confirmText}
+                onChange={(e) => {
+                  setConfirmText(e.target.value);
+                  setError(null);
+                }}
+                placeholder="DELETE"
+                autoComplete="off"
+              />
+            </Field>
+
+            {needsPassword ? (
+              <Field label="Your password" error={error}>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError(null);
+                  }}
+                  autoComplete="current-password"
+                />
+              </Field>
+            ) : error ? (
+              <p className="text-xs text-rose-300">{error}</p>
+            ) : null}
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="danger"
+                size="sm"
+                disabled={busy !== null || confirmText !== 'DELETE' || (needsPassword && password === '')}
+                onClick={() => void erase()}
+              >
+                {busy === 'delete' ? <Spinner className="h-3.5 w-3.5" /> : null}
+                Delete my account
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={busy !== null}
+                onClick={() => {
+                  setOpen(false);
+                  setConfirmText('');
+                  setPassword('');
+                  setError(null);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button variant="danger" size="sm" onClick={() => setOpen(true)}>
+            Delete account
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
 }

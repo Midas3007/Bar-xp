@@ -66,6 +66,7 @@ import {
 import { deleteRoutine, logWorkout, saveRoutine, type LogWorkoutResult } from '../lib/data';
 import { validateEntry, validateRoutine, validateSession, validateSetLadder, LIMITS } from '../lib/game/validation';
 import { useToast } from '../context/ToastContext';
+import { clearDraft, loadDraft, saveDraft } from '../lib/draft';
 
 type Tab = 'log' | 'routines' | 'library';
 
@@ -98,6 +99,34 @@ export function WorkoutLoggerView({
 
   // The session card is scrolled into view after an add on small screens.
   const sessionRef = useRef<HTMLDivElement | null>(null);
+
+  /** Set once the stored draft has been consulted; guards the save effect. */
+  const restoredRef = useRef(false);
+
+  useEffect(() => {
+    const draft = loadDraft(profile.uid);
+    if (draft && draft.entries.length > 0) {
+      setEntries(draft.entries);
+      setPresetId(draft.presetId);
+      toast.info(
+        'Unfinished session restored',
+        `${draft.entries.length} movement${draft.entries.length === 1 ? '' : 's'} were still on the bar.`,
+      );
+    }
+    restoredRef.current = true;
+    // Restoring is idempotent, so StrictMode's double invocation is harmless.
+    // It cannot move into `useState`'s initialiser: `toast` is not available
+    // there, and the restore has to be announced.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.uid]);
+
+  // The `restoredRef` guard is load bearing. Without it this fires on the first
+  // render with `entries === []` and erases the draft before the restore effect
+  // can read it.
+  useEffect(() => {
+    if (!restoredRef.current) return;
+    saveDraft(profile.uid, { entries, presetId });
+  }, [entries, presetId, profile.uid]);
 
   // Stable identity so the picker's effect does not re-fire every render.
   const consumePick = useCallback(() => setPickedId(null), []);
@@ -138,6 +167,7 @@ export function WorkoutLoggerView({
   };
 
   const clearSession = () => {
+    clearDraft(profile.uid);
     setEntries([]);
     setPresetId(null);
     setSessionError(null);
@@ -259,6 +289,12 @@ export function WorkoutLoggerView({
       // which is where every reward is announced now.
       clearSession();
       setSummary(result);
+      if (result.pending) {
+        toast.info(
+          'Saved on this device',
+          'It will sync to your account as soon as you are back online.',
+        );
+      }
     } catch (error) {
       console.error('[logger] failed to save workout', error);
       setSessionError('Could not save the session. Check your connection and try again.');

@@ -32,6 +32,7 @@ import {
   baselineStats,
   ASSESSMENT_STAT_CEILING,
   newProfile,
+  normalizeProfile,
   sanitizeDisplayName,
   MAX_DISPLAY_NAME,
   UNNAMED_ATHLETE,
@@ -45,6 +46,12 @@ import {
   normalizeMeasurementValues, unitLabel,
 } from '../measurements.js';
 import { GRADE_LABELS, gradeLabel, overallAestheticScore, rateAesthetics } from '../aesthetics.js';
+import {
+  mergeMuscleVolume, sessionMuscleVolume, subtractMuscleVolume,
+} from '../muscles.js';
+import {
+  CORRECTION_WINDOW_MS, applyReversal, canCorrect, reversalOf, withinCorrectionWindow,
+} from '../correction.js';
 import {
   buildShareCardSvg, escapeXml, shareCardFilename,
   SHARE_CARD_WIDTH, SHARE_CARD_HEIGHT,
@@ -844,4 +851,175 @@ test('unitLabel names the unit the value is actually shown in', () => {
   assert.equal(unitLabel('mass', 'imperial'), 'lb');
   assert.equal(unitLabel('length', 'metric'), 'cm');
   assert.equal(unitLabel('length', 'imperial'), 'in');
+});
+
+/* -------------------------------------------------------------------------- */
+/* Corrections                                                                 */
+/* -------------------------------------------------------------------------- */
+
+const HOUR = 60 * 60 * 1000;
+
+function workoutOf(entries, overrides = {}) {
+  const scored = scoreSession(entries, resolve, 0);
+  return {
+    id: 'w1',
+    uid: 'u1',
+    day: '2026-08-20',
+    createdAt: Date.now(),
+    entries,
+    xpEarned: scored.xp,
+    coinsEarned: coinsForSession(scored.xp),
+    totalVolume: scored.totalVolume,
+    totalReps: scored.totalReps,
+    presetId: null,
+    kind: 'session',
+    correctsId: null,
+    ...overrides,
+  };
+}
+
+function profileOf(overrides = {}) {
+  return {
+    ...newProfile({ uid: 'u1', displayName: 'Test', email: 't@example.com', photoURL: '' }),
+    ...overrides,
+  };
+}
+
+test('a reversal returns exactly the stat gains the session applied', () => {
+  const entries = [entry(3, 20), entry(4, 15)];
+  const workout = workoutOf(entries);
+  assert.deepEqual(
+    reversalOf(workout, resolve).statLoss,
+    scoreSession(entries, resolve, 0).statGains,
+  );
+});
+
+test('a reversal takes back exactly the XP that was stored', () => {
+  const workout = workoutOf([entry(3, 20)]);
+  // The catalog has since been retuned. The reversal must still take back what
+  // was actually granted, not what the same reps would be worth today.
+  const retuned = (id) => (id === 'push_up' ? { ...PUSH_UP, xpPerUnit: 9 } : undefined);
+  assert.equal(reversalOf(workout, retuned).xp, workout.xpEarned);
+  assert.equal(reversalOf(workout, retuned).coins, workout.coinsEarned);
+});
+
+test('voiding cannot drive anything below zero', () => {
+  const profile = profileOf({
+    totalXp: 10,
+    grossXp: 10,
+    coins: 0,
+    totalReps: 3,
+    workoutCount: 1,
+    stats: { strength: 0, endurance: 0, aesthetics: 0, discipline: 0 },
+  });
+  const huge = {
+    xp: 100000,
+    coins: 5000,
+    totalReps: 9999,
+    statLoss: { strength: 999, endurance: 999, aesthetics: 999, discipline: 999 },
+    muscleLoss: { chest: 9999 },
+  };
+  const out = applyReversal(profile, huge);
+  for (const value of [out.xpVoided, out.totalXp, out.coins, out.totalReps, out.workoutCount]) {
+    assert.ok(Number.isFinite(value) && value >= 0, `${value} must be finite and non-negative`);
+  }
+  for (const key of Object.keys(out.stats)) {
+    assert.ok(out.stats[key] >= 0, `${key} floored at zero`);
+  }
+  assert.ok(out.level >= 1);
+  assert.deepEqual(out.muscleVolume, {});
+});
+
+test('xpVoided never exceeds gross XP', () => {
+  // The rules invariant, asserted on the client that has to satisfy it:
+  // `removable` is capped at *net*, so voided can never outrun gross.
+  const profile = profileOf({ grossXp: 500, xpVoided: 400, totalXp: 100 });
+  const out = applyReversal(profile, {
+    xp: 900,
+    coins: 0,
+    totalReps: 0,
+    statLoss: { strength: 0, endurance: 0, aesthetics: 0, discipline: 0 },
+    muscleLoss: {},
+  });
+  assert.ok(out.xpVoided <= 500, `${out.xpVoided} must not exceed gross 500`);
+  assert.equal(out.totalXp, 0);
+});
+
+test('net XP is what the level is read from', () => {
+  const fully = normalizeProfile('u1', { totalXp: 5000, xpVoided: 5000 });
+  assert.equal(fully.totalXp, 0);
+  assert.equal(fully.level, 1);
+  assert.equal(fully.grossXp, 5000);
+
+  // BACKWARD COMPATIBILITY: every live document lacks `xpVoided`, and absence
+  // must read as zero so no account's numbers move.
+  const legacy = normalizeProfile('u1', { totalXp: 5000 });
+  assert.equal(legacy.xpVoided, 0);
+  assert.equal(legacy.totalXp, 5000);
+  assert.equal(legacy.level, levelFromTotalXp(5000));
+});
+
+test('subtractMuscleVolume is the inverse of mergeMuscleVolume', () => {
+  const session = sessionMuscleVolume([entry(3, 20), entry(4, 15)]);
+  const merged = mergeMuscleVolume({}, session);
+  assert.ok(Object.keys(merged).length > 0, 'the fixture must actually move some muscles');
+  assert.deepEqual(subtractMuscleVolume(merged, session), {});
+});
+
+test('subtractMuscleVolume floors at zero', () => {
+  const out = subtractMuscleVolume({ chest: 10 }, { chest: 999, lats: 50 });
+  assert.deepEqual(out, {});
+  for (const value of Object.values(out)) {
+    assert.ok(Number.isFinite(value) && value >= 0);
+  }
+});
+
+test('the correction window closes at 48 hours', () => {
+  const now = Date.now();
+  assert.equal(withinCorrectionWindow(now - 47 * HOUR, now), true);
+  assert.equal(withinCorrectionWindow(now - 49 * HOUR, now), false);
+  assert.equal(withinCorrectionWindow(now - CORRECTION_WINDOW_MS + 1000, now), true);
+  for (const junk of [NaN, undefined, null, 0, -1, 'yesterday']) {
+    assert.equal(withinCorrectionWindow(junk, now), false, `${String(junk)} is not a timestamp`);
+  }
+  // A minute of clock skew is tolerated; an hour into the future is corrupt.
+  assert.equal(withinCorrectionWindow(now + 10 * 1000, now), true);
+  assert.equal(withinCorrectionWindow(now + HOUR, now), false);
+});
+
+test('a session already corrected cannot be corrected again', () => {
+  const workout = workoutOf([entry(3, 20)]);
+  assert.equal(canCorrect(workout, false), true);
+  assert.equal(canCorrect(workout, true), false);
+  assert.equal(canCorrect({ ...workout, kind: 'correction' }, false), false);
+});
+
+test('a reversal survives a deleted custom movement', () => {
+  // The movement was a custom one and has since been removed, so `resolve`
+  // returns undefined for every entry. The XP figure is still exact because it
+  // is read off the document, and the stat losses are finite zeros.
+  const workout = workoutOf([entry(3, 20)]);
+  const gone = () => undefined;
+  const reversal = reversalOf(workout, gone);
+  assert.equal(reversal.xp, workout.xpEarned);
+  for (const key of Object.keys(reversal.statLoss)) {
+    assert.ok(Number.isFinite(reversal.statLoss[key]), `${key} must be finite`);
+  }
+});
+
+test('a reversal never takes back more than the session granted', () => {
+  // `logWorkout` adds a streak-scaled discipline bonus outside `scoreSession`,
+  // and the workout document does not record the streak. The reversal must
+  // under-remove rather than over-remove: taking back discipline that was never
+  // granted would let repeated correct-and-relog cycles grind a stat down.
+  const entries = [entry(3, 20)];
+  const workout = workoutOf(entries);
+  const applied = scoreSession(entries, resolve, 0).statGains;
+  const removed = reversalOf(workout, resolve).statLoss;
+  for (const key of Object.keys(applied)) {
+    assert.ok(
+      removed[key] <= applied[key] + 1e-9,
+      `${key}: removed ${removed[key]} must not exceed granted ${applied[key]}`,
+    );
+  }
 });
