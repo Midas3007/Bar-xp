@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test:rules": "firebase emulators:exec --only firestore \"node firestore.rules.test.mjs\"",
-    "test:game": "node scripts/test-game.mjs"
+    "test:game": "node scripts/test-game.mjs",
+    "test:paths": "firebase emulators:exec --only firestore \"node scripts/check-write-paths.mjs\""
   },
   "dependencies": {
     "firebase": "^10.14.1",

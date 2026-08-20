@@ -541,9 +541,22 @@ user action, not a failure. Every other code maps to a plain-language message.
 
 ## Anti-cheat
 
-Client-side bounds in `lib/game/validation.ts` are **mirrored in
-`firestore.rules`**, so a hand-rolled client cannot write numbers the UI would
-have rejected:
+Client-side bounds live in `lib/game/validation.ts`. **Read the mirroring claim
+carefully, because it is only partly true**, and an accurate limitation is worth
+more than an overstated guarantee:
+
+- The **aggregate** bounds — total session volume, session XP, session coins,
+  body fat, XP monotonicity, the per-write XP and coin deltas — *are* enforced
+  in `firestore.rules`.
+- The **per-set** bounds — reps per set, seconds per hold, sets per exercise —
+  are enforced **client-side only**. Firestore rules cannot iterate a list, so
+  the contents of a workout's `entries` array cannot be inspected element by
+  element. What the rules can and do enforce is that the session totals those
+  entries roll up to stay inside a range a real session could reach.
+
+So a hand-rolled client can write an entry claiming 900 reps in one set — but it
+cannot make that session worth more XP than a legitimate one, and it cannot move
+the profile by more than one session's worth.
 
 | Bound | Limit |
 | --- | --- |
@@ -587,13 +600,38 @@ UI would not have helped; the data had to move.
 npm run test:rules
 ```
 
-Runs 97 assertions against the Firestore emulator, which executes the real
+Runs 110 assertions against the Firestore emulator, which executes the real
 rules engine — the rules are enforced, not merely inspected. Needs the Firebase
-CLI on your PATH and a JVM. Coverage includes cross-user read/write denial,
-XP monotonicity, immutability of `workouts` and `stats_history`, the anti-cheat
-bounds, and that private fields cannot be smuggled into `public_profiles`.
+CLI on your PATH and a JVM. Coverage includes cross-user read/write denial, XP
+monotonicity, immutability of `workouts` and `stats_history`, the aggregate
+anti-cheat bounds, leaderboard forgery, and that private fields cannot be
+smuggled into `public_profiles`.
 
-A logged session writes all three in **one batch**, so it can never half-commit.
+**The suite has been shown to fail.** Eight of these assertions once passed for
+the wrong reason: the emulator was never reset between tests, so an early one
+left `totalXp` high and every later negative fixture — which defaults to zero —
+was rejected by the monotonicity clause *before the field under test was ever
+evaluated*. `statsAreValid`, the coin bound, the level cap and the body-fat
+bound could all be deleted with the suite still green. Each negative test now
+resets to a known document first, and every guard was verified by removing its
+rule and confirming that specific test goes red.
+
+```bash
+npm run test:paths
+```
+
+Replays every write path in `data.ts` against the live rules. The rules suite
+proves each *rule* works; this proves the *application* can still write, which
+is a different question and the one that breaks when a rule is tightened. It
+caught two real regressions during this work — see the note on Firestore's
+1,000-expression request budget in `firestore.rules`.
+
+A logged session writes the workout, the profile and the snapshot in **one
+batch**, so it can never half-commit. The public leaderboard row is written
+*after* that batch rather than inside it: the rules cross-read the private
+document to prove the row is not forged, and a rule's `get()` inside a batch
+sees pre-batch state. A stale row is cosmetic and self-corrects; a forgeable
+leaderboard would not be.
 
 ---
 

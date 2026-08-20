@@ -102,6 +102,9 @@ export function normalizeProfile(uid: string, raw: unknown): Profile {
     xpVoided,
     totalXp,
     coins: Math.max(0, int(data.coins, 0)),
+    // Monotonic by construction: an absent or stale stored value still reads as
+    // at least the current balance, so the badge cannot un-earn itself.
+    coinsPeak: Math.max(Math.max(0, int(data.coinsPeak, 0)), Math.max(0, int(data.coins, 0))),
 
     stats,
     // Tier and identity are *derived* for display rather than trusted from the
@@ -297,6 +300,7 @@ export function newProfile(params: {
     xpVoided: 0,
     totalXp: 0,
     coins: 100,
+    coinsPeak: 100,
 
     stats: { ...EMPTY_STATS },
     tier: tierForStats(EMPTY_STATS).name,

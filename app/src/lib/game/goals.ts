@@ -246,14 +246,20 @@ export function advanceGoals(
         delta = goal.category ? (categoryVolume.get(goal.category) ?? 0) : 0;
         break;
       case 'streak':
-        // Streak goals track the absolute best rather than accumulating.
+        // Measured against the goal's own baseline below, not accumulated.
         delta = 0;
         break;
     }
 
+    // A streak goal measures how far the streak has come *since the goal was
+    // rolled*. Comparing against the absolute streak let a long-running athlete
+    // re-roll into instantly-complete goals indefinitely.
     const progress =
       goal.type === 'streak'
-        ? Math.max(num(goal.progress, 0), num(input.streak, 0))
+        ? Math.max(
+            num(goal.progress, 0),
+            Math.max(0, num(input.streak, 0) - Math.max(0, num(goal.baseline, 0))),
+          )
         : num(goal.progress, 0) + delta;
 
     const updated: Goal = { ...goal, progress: Math.min(progress, num(goal.target, 1)) };
@@ -265,9 +271,17 @@ export function advanceGoals(
     }
   }
 
+  // Freshly rolled goals are stamped with the streak the athlete already holds,
+  // so a streak goal asks for progress from here rather than handing a
+  // long-running athlete an instant completion.
   const refilled =
     completed.length > 0
-      ? [...survivors, ...rollGoals(level, survivors, ACTIVE_GOAL_SLOTS - survivors.length)]
+      ? [
+          ...survivors,
+          ...rollGoals(level, survivors, ACTIVE_GOAL_SLOTS - survivors.length).map((g) =>
+            g.type === 'streak' ? { ...g, baseline: Math.max(0, num(input.streak, 0)) } : g,
+          ),
+        ]
       : survivors;
 
   return {

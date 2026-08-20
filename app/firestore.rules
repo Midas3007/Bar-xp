@@ -75,8 +75,10 @@ service cloud.firestore {
 
     function statsAreValid(stats) {
       return stats is map
+        // No `hasAll`: the four accesses below already fail on a missing key,
+        // and this rule set is close enough to Firestore's 1,000-expression
+        // request budget that a redundant check costs a real write.
         && stats.keys().hasOnly(['strength', 'endurance', 'aesthetics', 'discipline'])
-        && stats.keys().hasAll(['strength', 'endurance', 'aesthetics', 'discipline'])
         && isNumInRange(stats.strength, 0, 100000)
         && isNumInRange(stats.endurance, 0, 100000)
         && isNumInRange(stats.aesthetics, 0, 100000)
@@ -120,16 +122,40 @@ service cloud.firestore {
         && incoming().totalXp == 0
         && isIntInRange(incoming().coins, 0, 1000);
 
-      allow update: if isOwner(uid)
-        && userFieldsAreValid()
-        // Gross lifetime XP is monotonic — it can never be reduced. A
-        // correction does not subtract from it; it adds to `xpVoided`, which is
-        // itself append-only and can never exceed what was actually earned. The
-        // net figure the game shows is therefore always the difference of two
-        // counters that only ever grow, and no write can invent XP.
-        && incoming().totalXp >= resource.data.get('totalXp', 0)
-        && incoming().get('xpVoided', 0) >= resource.data.get('xpVoided', 0)
-        && incoming().get('xpVoided', 0) <= incoming().totalXp;
+      allow update: if isOwner(uid) && userFieldsAreValid() && updateIsSane();
+
+      /**
+       * The write-rate guarantees, with `request.resource.data` and
+       * `resource.data` each bound once.
+       *
+       * Binding matters: Firestore caps a request at 1,000 evaluated
+       * expressions and this rule set runs close to it, so calling `incoming()`
+       * eight times in one condition was enough to deny a legitimate write that
+       * carried two body measurements. Measured, not assumed.
+       */
+      function updateIsSane() {
+        let d = incoming();
+        let r = resource.data;
+        return
+          // Gross lifetime XP is monotonic — it can never be reduced. A
+          // correction does not subtract from it; it adds to `xpVoided`, which
+          // is itself append-only and can never exceed what was earned. The net
+          // figure the game shows is the difference of two counters that only
+          // ever grow, so no write can invent XP.
+          d.totalXp >= r.get('totalXp', 0)
+          && d.get('xpVoided', 0) >= r.get('xpVoided', 0)
+          && d.get('xpVoided', 0) <= d.totalXp
+          // Per-write ceilings, derived from the largest session the game can
+          // actually produce rather than picked as round numbers. With
+          // MAX_SESSION_VOLUME at 5,000, the highest xpPerUnit at 8, the
+          // diminishing-returns factor at roughly 0.61 and the streak cap at
+          // 1.45, a legitimate session tops out near 35,000 XP; goal payouts add
+          // about 900. Without these, one console write could set totalXp to the
+          // 100,000,000 field bound and still be "monotonic".
+          // These move together with LIMITS in src/lib/game/validation.ts.
+          && d.totalXp - r.get('totalXp', 0) <= 60000
+          && d.coins - r.get('coins', 0) <= 6000;
+      }
 
       // Erasure is the one exception to "profiles are never deleted from the
       // client": an athlete must be able to remove their own account from
@@ -138,10 +164,28 @@ service cloud.firestore {
 
       function userFieldsAreValid() {
         let d = incoming();
+        // NOTE: there is deliberately no `hasOnly` allow-list here, unlike
+        // `public_profiles`. It was implemented and then removed, because it
+        // does not fit: Firestore caps a request at 1,000 evaluated
+        // expressions, and `keys().hasOnly(list)` costs roughly (document keys
+        // x list entries). This document carries 32 fields, so the check alone
+        // is around a thousand expressions and denied every write that also
+        // touched `measurements` — including onboarding. Measured, not assumed.
+        //
+        // The residual risk is an athlete using their own private document as
+        // free storage, bounded by Firestore's own 1 MiB document limit. It is
+        // per-account, costs no one else anything, and is not a cross-tenant
+        // hole. If the profile ever sheds fields, reinstate this.
+        let photo = d.get('photoURL', '');
         return isShortString(d.displayName, 40)
           && d.displayName.size() >= 1
           && isShortString(d.get('email', ''), 320)
-          && isShortString(d.get('photoURL', ''), 2048)
+          && isShortString(photo, 2048)
+          // Rendered as an <img> to every athlete who opens the leaderboard,
+          // so an arbitrary URL hands its host an HTTP request — IP,
+          // User-Agent, timestamp — from each of them. Restricted to the only
+          // host the sign-in providers actually serve profile images from.
+          && (photo == '' || photo.matches('^https://lh3[.]googleusercontent[.]com/.*'))
           && d.onboarded is bool
           && isIntInRange(d.level, 1, 100)
           && isNumInRange(d.totalXp, 0, 100000000)
@@ -233,15 +277,29 @@ service cloud.firestore {
 
       allow read: if isSignedIn();
 
-      allow create, update: if isOwner(uid) && publicProfileIsValid();
+      allow create, update: if isOwner(uid) && publicProfileIsValid(uid);
 
       // Owner-only, so an athlete erasing their account takes their leaderboard
       // row with it.
       allow delete: if isOwner(uid);
 
-      function publicProfileIsValid() {
+      function publicProfileIsValid(uid) {
         let d = incoming();
-        // `hasOnly` is the important part — it makes it impossible to smuggle a
+        // The row must agree with the document it claims to mirror. Validating
+        // only its own shape let anyone `setDoc` their way to the top of the
+        // leaderboard without ever touching their real profile. One extra
+        // document read, on a path that fires about once per logged session.
+        //
+        // `totalXp` compares against *net*: the user document stores gross
+        // lifetime XP and a correction moves the difference into `xpVoided`,
+        // so comparing against the raw field would reject every athlete who has
+        // ever corrected a session.
+        //
+        // This is also why the mirror is written after its batch rather than
+        // inside it — a rule's `get()` sees pre-batch state. See
+        // `syncPublicProfile` in src/lib/data.ts.
+        let u = get(/databases/$(database)/documents/users/$(uid)).data;
+        // `hasOnly` is the other half — it makes it impossible to smuggle a
         // private field into the public collection later by accident.
         return d.keys().hasOnly([
               'displayName', 'photoURL', 'level', 'totalXp',
@@ -251,6 +309,12 @@ service cloud.firestore {
           && isShortString(d.displayName, 40)
           && d.displayName.size() >= 1
           && isShortString(d.get('photoURL', ''), 2048)
+          // Rendered as an <img> to every athlete who opens the leaderboard,
+          // so an arbitrary URL hands its host an HTTP request — IP,
+          // User-Agent, timestamp — from each of them. Restricted to the only
+          // host the sign-in providers actually serve profile images from.
+          && (d.get('photoURL', '') == ''
+              || d.photoURL.matches('^https://lh3[.]googleusercontent[.]com/.*'))
           && isIntInRange(d.level, 1, 100)
           && isNumInRange(d.totalXp, 0, 100000000)
           && isShortString(d.tier, 24)
@@ -265,7 +329,16 @@ service cloud.firestore {
           && isNumInRange(d.get('seasonXp', 0), 0, 100000000)
           && isShortString(d.get('lastSeasonId', ''), 16)
           && isNumInRange(d.get('lastSeasonXp', 0), 0, 100000000)
-          && isTimestampMs(d.get('updatedAt', 0));
+          && isTimestampMs(d.get('updatedAt', 0))
+          // --- and must match the private document ---
+          && d.totalXp == u.totalXp - u.get('xpVoided', 0)
+          && d.level == u.level
+          && d.tier == u.tier
+          && d.displayName == u.displayName
+          && d.streak == u.streak.current
+          // A cosmetic you do not own cannot be worn.
+          && (d.get('activeCosmetic', null) == null
+              || d.activeCosmetic in u.inventory.cosmetics);
       }
     }
 
@@ -298,8 +371,12 @@ service cloud.firestore {
           && d.entries is list
           && d.entries.size() >= 1
           && d.entries.size() <= 12
-          && isIntInRange(d.xpEarned, 0, 1000000)
-          && isIntInRange(d.coinsEarned, 0, 1000000)
+          // Rules cannot iterate a list, so the per-set bounds in validation.ts
+          // are enforced client-side only; what is enforceable here is the
+          // aggregate a real session could reach. These were a million against
+          // a realistic maximum near 35,000.
+          && isIntInRange(d.xpEarned, 0, 60000)
+          && isIntInRange(d.coinsEarned, 0, 6000)
           // Mirrors MAX_SESSION_VOLUME in validation.ts.
           && isIntInRange(d.totalVolume, 0, 5000)
           && isIntInRange(d.totalReps, 0, 5000)

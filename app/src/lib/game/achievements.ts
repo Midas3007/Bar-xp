@@ -173,7 +173,9 @@ const THRESHOLDS: Threshold[] = [
     description: 'Bank 5,000 Bar Coins at once.',
     icon: 'sparkles',
     target: 5000,
-    value: (p) => int(p.coins, 0),
+    // The high-water mark, not the current balance: spending what you earned
+    // must not take the badge away again.
+    value: (p) => Math.max(int(p.coinsPeak, 0), int(p.coins, 0)),
     unit: 'coins',
   },
   {

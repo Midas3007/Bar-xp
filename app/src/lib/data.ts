@@ -117,13 +117,27 @@ export async function syncFriendCard(profile: Profile): Promise<void> {
 }
 
 /**
- * Mirror the public fields. Called after any write that can change one of
- * them; failures are logged rather than thrown, since a stale leaderboard row
- * is never worth failing the user's actual action over.
+ * Mirror the leaderboard row.
+ *
+ * Deliberately written *after* the batch that updates the user document, never
+ * inside it. The rules now cross-read the private document to prove the public
+ * row is not inflated, and a rule's `get()` inside a batch sees the *pre-batch*
+ * state — so a mirror batched alongside its own source would be compared
+ * against the old figures and rejected every time.
+ *
+ * Failures are logged and swallowed: a stale leaderboard row is a cosmetic
+ * problem, and it corrects itself on the next write. Losing a logged session
+ * because the mirror failed would not be cosmetic.
  */
-export async function syncPublicProfile(profile: Profile): Promise<void> {
+export async function syncPublicProfile(
+  profile: Profile,
+  overrides: Record<string, unknown> = {},
+): Promise<void> {
   try {
-    await setDoc(publicProfileRef(profile.uid), publicProfileFrom(profile));
+    await setDoc(publicProfileRef(profile.uid), {
+      ...publicProfileFrom(profile),
+      ...overrides,
+    });
   } catch (error) {
     console.error('[data] failed to sync public profile', error);
   }
@@ -343,13 +357,8 @@ export async function completeAssessment(
     ...(hasMeasurements ? { measurements: values } : {}),
   });
 
-  batch.set(publicProfileRef(profile.uid), {
-    ...publicProfileFrom(profile),
-    tier,
-    updatedAt: now,
-  });
-
   await commitBatch(batch);
+  await syncPublicProfile(profile, { tier, updatedAt: now });
   return { stats, tier };
 }
 
@@ -519,6 +528,10 @@ export async function logWorkout(
     totalXp: grossAfter,
     level: newLevel,
     coins: Math.max(0, int(profile.coins, 0)) + coinsEarned,
+    coinsPeak: Math.max(
+      Math.max(0, int(profile.coinsPeak, 0)),
+      Math.max(0, int(profile.coins, 0)) + coinsEarned,
+    ),
     stats,
     tier: tierAfter.name,
     identity: identityAfter.label,
@@ -534,21 +547,6 @@ export async function logWorkout(
     updatedAt: now,
   });
 
-  // Public leaderboard row rides along in the same batch, so a session can
-  // never leave the leaderboard showing stale XP.
-  batch.set(publicProfileRef(profile.uid), {
-    ...publicProfileFrom(profile),
-    level: newLevel,
-    totalXp: newTotalXp,
-    tier: tierAfter.name,
-    streak: streakAfter.current,
-    seasonId: season.id,
-    seasonXp: season.xp,
-    ...(rolled.changed && rolled.history[0]
-      ? { lastSeasonId: rolled.history[0].id, lastSeasonXp: rolled.history[0].xp }
-      : {}),
-    updatedAt: now,
-  });
 
   // The profile as the batch will leave it. Achievements are derived, so the
   // only way to know what this session unlocked is to score both sides — and
@@ -593,6 +591,20 @@ export async function logWorkout(
   });
 
   const acknowledged = await commitBatch(batch);
+
+  // After the batch, never inside it — see `syncPublicProfile`.
+  await syncPublicProfile(profile, {
+    level: newLevel,
+    totalXp: newTotalXp,
+    tier: tierAfter.name,
+    streak: streakAfter.current,
+    seasonId: season.id,
+    seasonXp: season.xp,
+    ...(rolled.changed && rolled.history[0]
+      ? { lastSeasonId: rolled.history[0].id, lastSeasonXp: rolled.history[0].xp }
+      : {}),
+    updatedAt: now,
+  });
 
   return {
     pending: !acknowledged,
@@ -749,14 +761,6 @@ export async function voidWorkout(
     updatedAt: now,
   });
 
-  batch.set(publicProfileRef(profile.uid), {
-    ...publicProfileFrom(profile),
-    level: corrected.level,
-    totalXp: corrected.totalXp,
-    tier: corrected.tier,
-    updatedAt: now,
-  });
-
   // A snapshot so the charts show the dip honestly rather than a mystery flat
   // spot between two readings.
   const snapshotRef = doc(collection(db, COLLECTIONS.statsHistory));
@@ -775,6 +779,13 @@ export async function voidWorkout(
   });
 
   const acknowledged = await commitBatch(batch);
+
+  await syncPublicProfile(profile, {
+    level: corrected.level,
+    totalXp: corrected.totalXp,
+    tier: corrected.tier,
+    updatedAt: now,
+  });
 
   return {
     xpRemoved: Math.max(0, num(profile.totalXp, 0) - corrected.totalXp),
@@ -845,7 +856,6 @@ export async function updateBodyFat(profile: Profile, bodyFat: number): Promise<
   const batch = writeBatch(db);
 
   batch.update(userDocRef(profile.uid), { bodyFat: value, stats, tier, updatedAt: now });
-  batch.set(publicProfileRef(profile.uid), { ...publicProfileFrom(profile), tier, updatedAt: now });
 
   const snapshotRef = doc(collection(db, COLLECTIONS.statsHistory));
   batch.set(snapshotRef, {
@@ -863,6 +873,7 @@ export async function updateBodyFat(profile: Profile, bodyFat: number): Promise<
   });
 
   await commitBatch(batch);
+  await syncPublicProfile(profile, { tier, updatedAt: now });
 }
 
 /**

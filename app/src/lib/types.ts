@@ -210,6 +210,16 @@ export interface Goal {
   rewardXp: number;
   rewardCoins: number;
   createdAt: number;
+  /**
+   * The streak the athlete already held when this goal was rolled.
+   *
+   * Streak goals measure *improvement* from here. Without it, an athlete on a
+   * 30-day run rolled "hold a 7-day streak" and completed it on their next
+   * session without the streak moving, then rolled another. Absent on goals
+   * written before this existed, which reads as 0 — the old behaviour, so an
+   * in-flight goal never silently gets harder.
+   */
+  baseline?: number;
   completedAt?: number | null;
 }
 
@@ -305,6 +315,14 @@ export interface Profile {
    */
   totalXp: number;
   coins: number;
+  /**
+   * The highest balance ever held.
+   *
+   * The Wealthy badge used to read the current balance, so buying anything
+   * un-earned it — which is not what an achievement is. Derived upward on read,
+   * so it can never fall, and persisted by the writes that move `coins`.
+   */
+  coinsPeak: number;
 
   stats: Stats;
   /** Derived from `stats` — always consistent with the rank bar. */

@@ -24,6 +24,7 @@ import {
 import {
   normalizeReps, entryReps, entryVolume, bestSet, formatSetLadder,
 } from '../sets.js';
+import { ensureGoals, advanceGoals } from '../goals.js';
 import {
   normalizeRoutines, upsertRoutine, removeRoutine, loadRoutine, routineVolume,
   routineItemsFromEntries, buildRoutine,
@@ -40,7 +41,7 @@ import {
 import {
   LIMITS, validateSetLadder, validateRoutine, validateSession, validateMeasurements,
 } from '../validation.js';
-import { newlyEarned, isTierAchievement } from '../achievements.js';
+import { newlyEarned, isTierAchievement, achievementsFor } from '../achievements.js';
 import {
   MEASUREMENT_BOUNDS, displayFromMetric, metricFromDisplay,
   normalizeMeasurementValues, unitLabel,
@@ -49,13 +50,13 @@ import {
   GRADE_LABELS, GRADE_META, gradeLabel, measuredVTaper, overallAestheticScore,
   overallGrade, rateAesthetics,
 } from '../aesthetics.js';
-import { SHOP_ITEMS } from '../shop.js';
+import { SHOP_ITEMS, purchaseState } from '../shop.js';
 import {
   normalizeThemePreference, resolveTheme, THEME_PREFERENCES,
 } from '../../theme.js';
 import {
   mergeMuscleVolume, sessionMuscleVolume, subtractMuscleVolume,
-  MUSCLE_META, MUSCLE_GRADE_META, muscleHex,
+  MUSCLE_META, MUSCLE_GRADE_META, muscleHex, rateMuscles,
 } from '../muscles.js';
 import {
   CORRECTION_WINDOW_MS, applyReversal, canCorrect, reversalOf, withinCorrectionWindow,
@@ -1630,4 +1631,168 @@ test('every offered theme preference round-trips', () => {
     assert.ok(['light', 'dark'].includes(resolveTheme(pref, true)));
     assert.ok(['light', 'dark'].includes(resolveTheme(pref, false)));
   }
+});
+
+/* -------------------------------------------------------------------------- */
+/* Goals, achievements, muscles, shop                                          */
+/* -------------------------------------------------------------------------- */
+
+const GOAL_INPUT = {
+  entries: [entry(3, 20)],
+  resolve,
+  totalReps: 60,
+  xpEarned: 120,
+  streak: 0,
+};
+
+test('goals roll to fill three slots and respect the level filter', () => {
+  const rolled = ensureGoals(1, []);
+  assert.equal(rolled.length, 3);
+  for (const g of rolled) assert.ok(g.target > 0, 'every goal has a real target');
+  const ids = new Set(rolled.map((g) => g.id));
+  assert.equal(ids.size, 3, 'no duplicate goals in one hand');
+});
+
+test('a completed goal pays out and is replaced', () => {
+  const goals = ensureGoals(1, []).map((g) => ({ ...g, type: 'workouts', target: 1, progress: 0 }));
+  const out = advanceGoals(goals, 1, GOAL_INPUT);
+  assert.equal(out.completed.length, 3);
+  assert.equal(out.goals.length, 3, 'the hand is refilled');
+  assert.ok(out.rewardXp > 0 && out.rewardCoins > 0);
+});
+
+/**
+ * REGRESSION: a streak goal must measure improvement, not the absolute streak.
+ *
+ * `advanceGoals` compared against `input.streak` directly, so an athlete on a
+ * 30-day run rolled "hold a 7-day streak" and completed it on their very next
+ * session without the streak moving at all — then rolled another, and another.
+ */
+test('REGRESSION: a long streak does not instantly complete a fresh streak goal', () => {
+  const goal = {
+    id: 'streak_test',
+    type: 'streak',
+    title: 'Hold a 7-day streak',
+    target: 7,
+    progress: 0,
+    rewardXp: 100,
+    rewardCoins: 50,
+    createdAt: Date.now(),
+    baseline: 30,
+  };
+  const out = advanceGoals([goal], 1, { ...GOAL_INPUT, streak: 30 });
+  // Assert on this goal, never on `completed.length`: the hand is refilled from
+  // a random roll and a filler goal can complete in the same pass.
+  assert.ok(
+    !out.completed.some((g) => g.id === 'streak_test'),
+    'standing still cannot complete a streak goal',
+  );
+  const survivor = out.goals.find((g) => g.id === 'streak_test');
+  assert.ok(survivor, 'the goal survives');
+  assert.equal(survivor.progress, 0);
+});
+
+test('a streak goal completes once the streak actually grows', () => {
+  const goal = {
+    id: 'streak_test',
+    type: 'streak',
+    title: 'Hold a 7-day streak',
+    target: 7,
+    progress: 0,
+    rewardXp: 100,
+    rewardCoins: 50,
+    createdAt: Date.now(),
+    baseline: 30,
+  };
+  const out = advanceGoals([goal], 1, { ...GOAL_INPUT, streak: 37 });
+  assert.ok(
+    out.completed.some((g) => g.id === 'streak_test'),
+    'seven more days is the goal met',
+  );
+});
+
+test('a streak goal written before baselines existed still works', () => {
+  // Legacy goals carry no baseline; treating it as 0 keeps the old behaviour
+  // rather than silently changing what an in-flight goal requires.
+  const legacy = {
+    id: 'legacy', type: 'streak', title: 'Hold a 3-day streak', target: 3,
+    progress: 0, rewardXp: 50, rewardCoins: 20, createdAt: Date.now(),
+  };
+  const out = advanceGoals([legacy], 1, { ...GOAL_INPUT, streak: 5 });
+  assert.ok(out.completed.some((g) => g.id === 'legacy'));
+});
+
+test('achievements derive from the profile and never need storing', () => {
+  const empty = profileOf();
+  const earned = achievementsFor(empty).filter((a) => a.earned);
+  assert.equal(earned.length, 0, 'a fresh profile has earned nothing');
+
+  const busy = profileOf({ workoutCount: 10, totalReps: 1200, level: 12 });
+  const ids = achievementsFor(busy).filter((a) => a.earned).map((a) => a.id);
+  assert.ok(ids.includes('first_session'));
+  assert.ok(ids.includes('sessions_10'));
+  assert.ok(ids.includes('reps_1000'));
+  assert.ok(ids.includes('level_10'));
+});
+
+/**
+ * REGRESSION: the Wealthy badge un-earned itself.
+ *
+ * It scored current balance, so buying anything took the badge away again —
+ * which is not what an achievement is. It now reads a high-water mark.
+ */
+test('REGRESSION: banking coins then spending them keeps the Wealthy badge', () => {
+  const rich = profileOf({ coins: 6000, coinsPeak: 6000 });
+  assert.ok(achievementsFor(rich).find((a) => a.id === 'coins_5000').earned);
+
+  const spent = profileOf({ coins: 10, coinsPeak: 6000 });
+  assert.ok(
+    achievementsFor(spent).find((a) => a.id === 'coins_5000').earned,
+    'spending what you earned cannot un-earn the badge',
+  );
+});
+
+test('a profile that never banked 5,000 does not get the badge', () => {
+  const modest = profileOf({ coins: 400, coinsPeak: 400 });
+  assert.ok(!achievementsFor(modest).find((a) => a.id === 'coins_5000').earned);
+});
+
+test('muscle volume accumulates and rates relative to the best-trained muscle', () => {
+  const session = sessionMuscleVolume([entry(3, 20)]);
+  const merged = mergeMuscleVolume(mergeMuscleVolume({}, session), session);
+  for (const key of Object.keys(session)) {
+    assert.ok(Math.abs(merged[key] - session[key] * 2) < 1e-6, `${key} doubled`);
+  }
+});
+
+test('an untrained muscle is reported as untrained, not as balanced', () => {
+  const ratings = rateMuscles({ chest: 500, lats: 400 });
+  const legs = ratings.find((r) => r.muscle === 'quads');
+  assert.ok(legs, 'every muscle appears in the ratings');
+  assert.equal(legs.grade, 'untrained', 'never trained is not the same as balanced');
+});
+
+test('the shop reports affordability, ownership and stack caps', () => {
+  const broke = profileOf({ coins: 0 });
+  for (const item of SHOP_ITEMS) {
+    assert.equal(purchaseState(item, broke), 'unaffordable', `${item.id} at zero coins`);
+  }
+
+  const rich = profileOf({ coins: 100000 });
+  assert.ok(
+    SHOP_ITEMS.some((i) => purchaseState(i, rich) === 'available'),
+    'something is buyable when rich',
+  );
+
+  const owned = profileOf({
+    coins: 100000,
+    inventory: { streakShields: 5, cosmetics: ['neon_name'], unlocks: [] },
+  });
+  const cosmetic = SHOP_ITEMS.find((i) => i.id === 'neon_name');
+  assert.equal(purchaseState(cosmetic, owned), 'owned', 'a cosmetic cannot be bought twice');
+
+  const shield = SHOP_ITEMS.find((i) => i.kind === 'consumable');
+  assert.equal(purchaseState(shield, owned), 'maxed', 'a full stack cannot be topped up');
+
+  assert.equal(purchaseState(cosmetic, null), 'unaffordable', 'no profile, no purchase');
 });
