@@ -7,6 +7,8 @@ import { LIMITS } from './validation';
 import { normalizeMuscleVolume } from './muscles';
 import { normalizeRoutines } from './routines';
 import { normalizeMeasurements } from './measurements';
+import { safeSeason, safeSeasonHistory, seasonIdFor } from './season';
+import { RECENT_DAYS_KEPT } from './friends';
 
 /** The placeholder shown when an athlete has no usable name. */
 export const UNNAMED_ATHLETE = 'Unnamed Athlete';
@@ -133,6 +135,16 @@ export function normalizeProfile(uid: string, raw: unknown): Profile {
     workoutCount: Math.max(0, int(data.workoutCount, 0)),
     totalReps: Math.max(0, int(data.totalReps, 0)),
     muscleVolume: normalizeMuscleVolume(data.muscleVolume) as Record<string, number>,
+
+    // All three are absent on every document written before seasons existed.
+    // `safeSeason` returns id '', which `rolloverSeason` then initialises
+    // without inventing a placement for a season that never had a counter.
+    season: safeSeason(data.season),
+    seasonHistory: safeSeasonHistory(data.seasonHistory),
+    recentDays: arr<unknown>(data.recentDays)
+      .map((d) => str(d, ''))
+      .filter((d) => d !== '')
+      .slice(0, RECENT_DAYS_KEPT),
   };
 }
 
@@ -308,5 +320,9 @@ export function newProfile(params: {
     workoutCount: 0,
     totalReps: 0,
     muscleVolume: {},
+
+    season: { id: seasonIdFor(), xp: 0, sessions: 0, startedAt: now },
+    seasonHistory: [],
+    recentDays: [],
   };
 }

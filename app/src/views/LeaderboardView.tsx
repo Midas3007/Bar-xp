@@ -1,15 +1,40 @@
-import { useEffect, useState } from 'react';
-import { Crown, Flame, Medal, Trophy } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Flame, Swords, Trophy, UserPlus, Users } from 'lucide-react';
 
 import type { LeaderboardRow, Profile } from '../lib/types';
-import { Card, CardHeader, EmptyState, SkeletonBlock } from '../components/ui/Primitives';
-import { NeonName, TierBadge } from '../components/GameBits';
+import { Button, Card, CardHeader, EmptyState, SkeletonBlock } from '../components/ui/Primitives';
+import { LeaderRow } from '../components/social/LeaderRow';
+import { FriendsPanel } from '../components/social/FriendsPanel';
+import { ChallengesPanel } from '../components/social/ChallengesPanel';
+import { SeasonPanel } from '../components/social/SeasonPanel';
 import { fetchLeaderboard } from '../lib/data';
+import { EMPTY_GRAPH, fetchFriendGraph, sendFriendRequest, type FriendGraph } from '../lib/social';
+import { useToast } from '../context/ToastContext';
 import { fmt } from '../lib/safe';
 
+type Tab = 'global' | 'friends' | 'season' | 'challenges';
+
+const TABS: Array<{ key: Tab; label: string; icon: typeof Trophy }> = [
+  { key: 'global', label: 'Global', icon: Trophy },
+  { key: 'friends', label: 'Friends', icon: Users },
+  { key: 'season', label: 'Season', icon: Flame },
+  { key: 'challenges', label: 'Challenges', icon: Swords },
+];
+
+/**
+ * The competitive shell.
+ *
+ * Owns the friend graph so the panels below stay dumb, and so one reload
+ * refreshes every tab that depends on it.
+ */
 export function LeaderboardView({ profile }: { profile: Profile }) {
+  const toast = useToast();
+  const [tab, setTab] = useState<Tab>('global');
+
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [graph, setGraph] = useState<FriendGraph>(EMPTY_GRAPH);
+  const [graphLoaded, setGraphLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -23,7 +48,7 @@ export function LeaderboardView({ profile }: { profile: Profile }) {
         if (!active) return;
         setRows([]);
         setError(
-          'Could not load the leaderboard. It requires read access to the users collection — check your Firestore rules.',
+          'Could not load the leaderboard. It reads the public profile projection — check your Firestore rules.',
         );
       });
 
@@ -32,159 +57,141 @@ export function LeaderboardView({ profile }: { profile: Profile }) {
     };
   }, [profile.totalXp]);
 
+  const reloadGraph = useCallback(() => {
+    fetchFriendGraph(profile.uid)
+      .then((next) => {
+        setGraph(next);
+        setGraphLoaded(true);
+      })
+      .catch((err) => {
+        console.error('[leaderboard] failed to load friend graph', err);
+        setGraphLoaded(true);
+      });
+  }, [profile.uid]);
+
+  useEffect(() => {
+    reloadGraph();
+  }, [reloadGraph]);
+
   const myRank = rows?.findIndex((row) => row.uid === profile.uid) ?? -1;
+  const meRow = rows?.find((row) => row.uid === profile.uid) ?? null;
+
+  const friendSet = new Set(graph.friendUids);
+  const requestedSet = new Set(graph.outgoing.map((r) => r.to));
+
+  const addFriend = async (uid: string) => {
+    try {
+      await sendFriendRequest(profile.uid, uid);
+      toast.success('Request sent');
+      reloadGraph();
+    } catch (err) {
+      console.error('[leaderboard] friend request failed', err);
+      toast.error('Could not send that request', 'Check your connection and try again.');
+    }
+  };
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
-        <h1 className="font-display text-2xl font-bold tracking-tight text-slate-50">
-          Global Leaderboard
-        </h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-slate-50">Compete</h1>
         <p className="mt-1.5 text-sm text-slate-500">
-          Every athlete on Bar XP, ranked by lifetime XP.
-          {myRank >= 0 ? ` You are #${fmt(myRank + 1)}.` : ''}
+          Lifetime rank, your friends, this season, and whatever you have bet on.
+          {tab === 'global' && myRank >= 0 ? ` You are #${fmt(myRank + 1)} overall.` : ''}
         </p>
       </div>
 
-      <Card>
-        <CardHeader
-          title="Top 50"
-          subtitle="Updated whenever your own XP changes."
-          icon={<Trophy className="h-4 w-4" aria-hidden />}
-        />
+      <div className="flex gap-1 overflow-x-auto rounded-xl bg-ink-900 p-1 ring-1 ring-inset ring-white/5">
+        {TABS.map((item) => {
+          const Icon = item.icon;
+          const active = tab === item.key;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setTab(item.key)}
+              aria-pressed={active}
+              className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium transition ${
+                active
+                  ? 'bg-forge-500/20 text-forge-200 ring-1 ring-inset ring-forge-400/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" aria-hidden />
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
 
-        {rows === null ? (
-          <div className="space-y-2 p-5">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <SkeletonBlock key={i} className="h-14" />
-            ))}
-          </div>
-        ) : rows.length === 0 ? (
-          <EmptyState
-            icon={<Trophy className="h-8 w-8" aria-hidden />}
-            title={error ? 'Leaderboard unavailable' : 'No athletes yet'}
-            message={
-              error ??
-              'Nobody has logged any XP. Be the first name on the board.'
-            }
+      {tab === 'global' ? (
+        <Card>
+          <CardHeader
+            title="Top 50"
+            subtitle="Every athlete on Bar XP, ranked by lifetime XP."
+            icon={<Trophy className="h-4 w-4" aria-hidden />}
           />
-        ) : (
-          <ul className="divide-y divide-white/5">
-            {rows.map((row, index) => {
-              const isMe = row.uid === profile.uid;
-              return (
-                <li
-                  key={row.uid}
-                  className={`flex items-center gap-3 p-4 transition sm:gap-4 ${
-                    isMe ? 'bg-forge-500/[0.07] ring-1 ring-inset ring-forge-500/20' : ''
-                  }`}
-                >
-                  <RankMark rank={index + 1} />
 
-                  <RowAvatar row={row} />
+          {rows === null ? (
+            <div className="space-y-2 p-5">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <SkeletonBlock key={i} className="h-14" />
+              ))}
+            </div>
+          ) : rows.length === 0 ? (
+            <EmptyState
+              icon={<Trophy className="h-8 w-8" aria-hidden />}
+              title={error ? 'Leaderboard unavailable' : 'No athletes yet'}
+              message={error ?? 'Nobody has logged any XP. Be the first name on the board.'}
+            />
+          ) : (
+            <ul className="divide-y divide-white/5">
+              {rows.map((row, index) => {
+                const isMe = row.uid === profile.uid;
+                const addable =
+                  graphLoaded && !isMe && !friendSet.has(row.uid) && !requestedSet.has(row.uid);
+                return (
+                  <LeaderRow
+                    key={row.uid}
+                    row={row}
+                    rank={index + 1}
+                    isMe={isMe}
+                    scoreValue={row.totalXp}
+                    scoreLabel="XP"
+                    action={
+                      addable ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void addFriend(row.uid)}
+                          aria-label={`Add ${row.displayName} as a friend`}
+                        >
+                          <UserPlus className="h-3.5 w-3.5" aria-hidden />
+                        </Button>
+                      ) : null
+                    }
+                  />
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+      ) : null}
 
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-display text-sm font-semibold">
-                      {/* Cosmetics from other users' documents are only honoured
-                          when that user genuinely owns them. */}
-                      <NeonName
-                        name={row.displayName}
-                        activeCosmetic={row.activeCosmetic}
-                        ownedCosmetics={row.cosmetics}
-                      />
-                      {isMe ? (
-                        <span className="ml-2 text-[11px] font-medium text-forge-400">you</span>
-                      ) : null}
-                    </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <TierBadge tierName={row.tier} size="sm" />
-                      <span className="text-[11px] text-slate-500">Lv {fmt(row.level)}</span>
-                      {row.streak > 0 ? (
-                        <span className="flex items-center gap-1 text-[11px] text-ember-400/80">
-                          <Flame className="h-3 w-3" aria-hidden />
-                          {fmt(row.streak)}w
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
+      {tab === 'friends' ? (
+        <FriendsPanel profile={profile} graph={graph} meRow={meRow} onReload={reloadGraph} />
+      ) : null}
 
-                  <div className="shrink-0 text-right">
-                    <p className="font-mono text-sm font-bold text-forge-300">
-                      {fmt(row.totalXp)}
-                    </p>
-                    <p className="text-[11px] text-slate-600">XP</p>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
+      {tab === 'season' ? (
+        <SeasonPanel profile={profile} graph={graph} meRow={meRow} />
+      ) : null}
+
+      {tab === 'challenges' ? <ChallengesPanel profile={profile} graph={graph} /> : null}
 
       <p className="text-center text-xs leading-relaxed text-slate-600">
-        Only your name, rank, level, streak and XP are public. Workouts and personal bests stay
+        Only your name, rank, level, streak and XP are public. Friends additionally see your core
+        stats, volume and training days. Workouts, personal bests and anything about your body stay
         private to your account.
       </p>
-    </div>
-  );
-}
-
-function RankMark({ rank }: { rank: number }) {
-  if (rank === 1) {
-    return (
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-yellow-500 to-amber-400 text-ink-950 shadow-glow-ember">
-        <Crown className="h-4 w-4" aria-hidden />
-      </span>
-    );
-  }
-  if (rank === 2 || rank === 3) {
-    return (
-      <span
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-950 ${
-          rank === 2
-            ? 'bg-gradient-to-br from-slate-300 to-slate-400'
-            : 'bg-gradient-to-br from-amber-700 to-amber-600'
-        }`}
-      >
-        <Medal className="h-4 w-4" aria-hidden />
-      </span>
-    );
-  }
-  return (
-    <span className="flex h-8 w-8 shrink-0 items-center justify-center font-mono text-xs font-semibold text-slate-600">
-      {fmt(rank)}
-    </span>
-  );
-}
-
-function RowAvatar({ row }: { row: LeaderboardRow }) {
-  const initials = (row.displayName || 'A')
-    .split(' ')
-    .map((part) => part.charAt(0))
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-
-  if (row.photoURL) {
-    return (
-      <img
-        src={row.photoURL}
-        alt=""
-        width={36}
-        height={36}
-        className="hidden h-9 w-9 shrink-0 rounded-full ring-1 ring-white/10 sm:block"
-        referrerPolicy="no-referrer"
-      />
-    );
-  }
-
-  return (
-    <div
-      className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-ink-700 to-ink-600 font-display text-[11px] font-bold text-slate-400 ring-1 ring-white/10 sm:flex"
-      aria-hidden
-    >
-      {initials || 'A'}
     </div>
   );
 }

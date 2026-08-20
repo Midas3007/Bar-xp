@@ -17,11 +17,12 @@ import {
   assertFails,
   assertSucceeds,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { doc, deleteDoc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, writeBatch } from 'firebase/firestore';
 
 const PROJECT_ID = 'barxp-rules-test';
 const ALICE = 'alice';
 const BOB = 'bob';
+const CAROL = 'carol';
 
 let passed = 0;
 let failed = 0;
@@ -87,6 +88,45 @@ function publicDoc(overrides = {}) {
   };
 }
 
+function friendCardDoc(overrides = {}) {
+  return {
+    displayName: 'Alice',
+    photoURL: '',
+    level: 3,
+    totalXp: 4200,
+    tier: 'Bronze',
+    stats: { strength: 10, endurance: 10, aesthetics: 10, discipline: 10 },
+    totalReps: 900,
+    workoutCount: 12,
+    streak: 2,
+    bestStreak: 5,
+    seasonId: '2026-S3',
+    seasonXp: 800,
+    recentDays: ['2026-08-19', '2026-08-17'],
+    updatedAt: Date.now(),
+    ...overrides,
+  };
+}
+
+function challengeDoc(overrides = {}) {
+  return {
+    createdBy: ALICE,
+    members: [ALICE, BOB],
+    templateId: 'sessions_week',
+    title: 'Most sessions this week',
+    metric: 'sessions',
+    window: 'week',
+    exerciseId: null,
+    startDay: '2026-08-17',
+    endDay: '2026-08-23',
+    endsAt: Date.now() + 86400000,
+    status: 'pending',
+    createdAt: Date.now(),
+    respondedAt: null,
+    ...overrides,
+  };
+}
+
 function workoutDoc(uid, overrides = {}) {
   return {
     uid,
@@ -132,6 +172,7 @@ const testEnv = await initializeTestEnvironment({
 
 const alice = testEnv.authenticatedContext(ALICE).firestore();
 const bob = testEnv.authenticatedContext(BOB).firestore();
+const carol = testEnv.authenticatedContext(CAROL).firestore();
 const anon = testEnv.unauthenticatedContext().firestore();
 
 /* -------------------------------------------------------------------------- */
@@ -578,6 +619,262 @@ await test('rejects an out-of-range measurement on a snapshot', async () => {
       snapshotDoc(ALICE, { source: 'measurement', measurements: { waist: 900 } }),
     ),
   );
+});
+
+
+/* -------------------------------------------------------------------------- */
+/* Social                                                                      */
+/* -------------------------------------------------------------------------- */
+
+/** Every social test needs real public rows to point at. */
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  for (const uid of [ALICE, BOB, CAROL]) {
+    await setDoc(doc(db, 'public_profiles', uid), publicDoc({ displayName: uid }));
+  }
+});
+
+section('friend_requests — existence is the pending state');
+
+await test('the sender can create their own request', async () => {
+  await assertSucceeds(
+    setDoc(doc(alice, 'friend_requests', `${ALICE}__${BOB}`), {
+      from: ALICE,
+      to: BOB,
+      createdAt: Date.now(),
+    }),
+  );
+});
+
+await test('both parties can read it, a stranger cannot', async () => {
+  await assertSucceeds(getDoc(doc(alice, 'friend_requests', `${ALICE}__${BOB}`)));
+  await assertSucceeds(getDoc(doc(bob, 'friend_requests', `${ALICE}__${BOB}`)));
+  await assertFails(getDoc(doc(carol, 'friend_requests', `${ALICE}__${BOB}`)));
+});
+
+await test('you cannot forge a request from someone else', async () => {
+  // This is the forgery that would otherwise let you accept on their behalf.
+  await assertFails(
+    setDoc(doc(alice, 'friend_requests', `${BOB}__${ALICE}`), {
+      from: BOB,
+      to: ALICE,
+      createdAt: Date.now(),
+    }),
+  );
+});
+
+await test('the document id must match from__to', async () => {
+  await assertFails(
+    setDoc(doc(alice, 'friend_requests', 'something_else'), {
+      from: ALICE,
+      to: BOB,
+      createdAt: Date.now(),
+    }),
+  );
+});
+
+await test('you cannot request yourself, or a non-existent athlete', async () => {
+  await assertFails(
+    setDoc(doc(alice, 'friend_requests', `${ALICE}__${ALICE}`), {
+      from: ALICE,
+      to: ALICE,
+      createdAt: Date.now(),
+    }),
+  );
+  await assertFails(
+    setDoc(doc(alice, 'friend_requests', `${ALICE}__ghost`), {
+      from: ALICE,
+      to: 'ghost',
+      createdAt: Date.now(),
+    }),
+  );
+});
+
+await test('a request cannot be edited', async () => {
+  await assertFails(updateDoc(doc(alice, 'friend_requests', `${ALICE}__${BOB}`), { to: CAROL }));
+});
+
+section('friendships — acceptance is proved by the opposite request');
+
+await test('you cannot accept your own request', async () => {
+  // Alice sent it, so only Bob can turn it into a friendship. Without this the
+  // whole consent model collapses.
+  await assertFails(
+    setDoc(doc(alice, 'friendships', `${ALICE}__${BOB}`), {
+      members: [ALICE, BOB],
+      createdAt: Date.now(),
+    }),
+  );
+});
+
+await test('a friendship at a non-canonical id is denied', async () => {
+  await assertFails(
+    setDoc(doc(bob, 'friendships', `${BOB}__${ALICE}`), {
+      members: [ALICE, BOB],
+      createdAt: Date.now(),
+    }),
+  );
+});
+
+await test('the recipient can accept, deleting the request in the same batch', async () => {
+  // Rules `exists()` inside a batch sees the pre-batch state, so the friendship
+  // check passes even though this batch removes the request it checks for.
+  const batch = writeBatch(bob);
+  batch.set(doc(bob, 'friendships', `${ALICE}__${BOB}`), {
+    members: [ALICE, BOB],
+    createdAt: Date.now(),
+  });
+  batch.delete(doc(bob, 'friend_requests', `${ALICE}__${BOB}`));
+  await assertSucceeds(batch.commit());
+});
+
+await test('members can read the friendship, a stranger cannot', async () => {
+  await assertSucceeds(getDoc(doc(alice, 'friendships', `${ALICE}__${BOB}`)));
+  await assertSucceeds(getDoc(doc(bob, 'friendships', `${ALICE}__${BOB}`)));
+  await assertFails(getDoc(doc(carol, 'friendships', `${ALICE}__${BOB}`)));
+});
+
+await test('a friendship cannot be edited', async () => {
+  await assertFails(
+    updateDoc(doc(alice, 'friendships', `${ALICE}__${BOB}`), { members: [ALICE, CAROL] }),
+  );
+});
+
+section('friend_cards — the consent-gated projection');
+
+await test('the owner can write their own card', async () => {
+  await assertSucceeds(setDoc(doc(alice, 'friend_cards', ALICE), friendCardDoc()));
+});
+
+await test('a friend can read it; a stranger cannot', async () => {
+  await assertSucceeds(getDoc(doc(bob, 'friend_cards', ALICE)));
+  await assertFails(getDoc(doc(carol, 'friend_cards', ALICE)));
+});
+
+await test('a friend cannot write your card', async () => {
+  await assertFails(setDoc(doc(bob, 'friend_cards', ALICE), friendCardDoc({ totalXp: 999999 })));
+});
+
+await test('private fields cannot be smuggled into a friend card', async () => {
+  // `hasOnly` is the guard, and it is the same allow-list FRIEND_CARD_FIELDS
+  // declares on the client.
+  for (const extra of [
+    { email: 'alice@example.com' },
+    { bodyFat: 12 },
+    { personalBests: {} },
+    { measurements: { waist: 82 } },
+  ]) {
+    await assertFails(setDoc(doc(alice, 'friend_cards', ALICE), friendCardDoc(extra)));
+  }
+});
+
+section('challenges — between friends, with no stored result');
+
+await test('a friend can create a challenge', async () => {
+  await assertSucceeds(setDoc(doc(alice, 'challenges', 'ch1'), challengeDoc()));
+});
+
+await test('a challenge against a non-friend is denied', async () => {
+  await assertFails(
+    setDoc(doc(alice, 'challenges', 'ch2'), challengeDoc({ members: [ALICE, CAROL] })),
+  );
+});
+
+await test('a challenge cannot be created already active', async () => {
+  await assertFails(setDoc(doc(alice, 'challenges', 'ch3'), challengeDoc({ status: 'active' })));
+});
+
+await test('members can read it, a stranger cannot', async () => {
+  await assertSucceeds(getDoc(doc(bob, 'challenges', 'ch1')));
+  await assertFails(getDoc(doc(carol, 'challenges', 'ch1')));
+});
+
+await test('the creator cannot accept their own challenge', async () => {
+  await assertFails(
+    updateDoc(doc(alice, 'challenges', 'ch1'), { status: 'active', respondedAt: Date.now() }),
+  );
+});
+
+await test('the response cannot smuggle in other fields', async () => {
+  await assertFails(
+    updateDoc(doc(bob, 'challenges', 'ch1'), {
+      status: 'active',
+      respondedAt: Date.now(),
+      metric: 'xp',
+    }),
+  );
+  await assertFails(
+    updateDoc(doc(bob, 'challenges', 'ch1'), {
+      status: 'active',
+      respondedAt: Date.now(),
+      endsAt: Date.now() + 999999999,
+    }),
+  );
+});
+
+await test('the invited member can accept', async () => {
+  await assertSucceeds(
+    updateDoc(doc(bob, 'challenges', 'ch1'), { status: 'active', respondedAt: Date.now() }),
+  );
+});
+
+await test('a challenge can only be responded to once', async () => {
+  await assertFails(
+    updateDoc(doc(bob, 'challenges', 'ch1'), { status: 'declined', respondedAt: Date.now() }),
+  );
+});
+
+section('challenge scores — the document id is the rule');
+
+await test('you can write your own score', async () => {
+  await assertSucceeds(
+    setDoc(doc(bob, 'challenges', 'ch1', 'scores', BOB), {
+      uid: BOB,
+      value: 12,
+      sessions: 3,
+      updatedAt: Date.now(),
+    }),
+  );
+});
+
+await test('you cannot write your opponent\u2019s score', async () => {
+  // Nothing enforces that a score is *true* — it is self-reported by design.
+  // What is enforced is that it is self-reported by the right self.
+  await assertFails(
+    setDoc(doc(bob, 'challenges', 'ch1', 'scores', ALICE), {
+      uid: ALICE,
+      value: 0,
+      sessions: 0,
+      updatedAt: Date.now(),
+    }),
+  );
+});
+
+await test('the score uid must match the document id', async () => {
+  await assertFails(
+    setDoc(doc(alice, 'challenges', 'ch1', 'scores', ALICE), {
+      uid: BOB,
+      value: 5,
+      sessions: 1,
+      updatedAt: Date.now(),
+    }),
+  );
+});
+
+await test('members can read scores, a stranger cannot', async () => {
+  await assertSucceeds(getDoc(doc(alice, 'challenges', 'ch1', 'scores', BOB)));
+  await assertFails(getDoc(doc(carol, 'challenges', 'ch1', 'scores', BOB)));
+});
+
+await test('scores cannot be deleted', async () => {
+  await assertFails(deleteDoc(doc(bob, 'challenges', 'ch1', 'scores', BOB)));
+});
+
+section('friendship teardown');
+
+await test('either member can remove the friendship', async () => {
+  await assertFails(deleteDoc(doc(carol, 'friendships', `${ALICE}__${BOB}`)));
+  await assertSucceeds(deleteDoc(doc(alice, 'friendships', `${ALICE}__${BOB}`)));
 });
 
 section('everything else is denied');

@@ -1,3 +1,6 @@
+import type { SeasonRecord, SeasonState } from './game/season';
+import type { ChallengeMetric, ChallengeStatus, ChallengeWindow } from './game/challenges';
+
 /** Shared domain types for the Bar XP RPG layer. */
 
 export type StatKey = 'strength' | 'endurance' | 'aesthetics' | 'discipline';
@@ -326,6 +329,13 @@ export interface Profile {
   totalReps: number;
   /** Lifetime work per muscle group, accumulated on every logged session. */
   muscleVolume: Record<string, number>;
+
+  /** Current competitive season counters. Resets quarterly; nothing above it does. */
+  season: SeasonState;
+  /** Permanent record of finished seasons, newest first. Capped at 24 entries. */
+  seasonHistory: SeasonRecord[];
+  /** Distinct training days, newest first, capped at 14. Drives the activity strip. */
+  recentDays: string[];
 }
 
 export interface LeaderboardRow {
@@ -338,4 +348,57 @@ export interface LeaderboardRow {
   streak: number;
   activeCosmetic: string | null;
   cosmetics: string[];
+  /** Season fields, so one row type serves the global, friends and season ladders. */
+  seasonId: string;
+  seasonXp: number;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Social                                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A pending friend request.
+ *
+ * Deliberately has no `status` field: its existence *is* "pending". Accepting
+ * creates the friendship and deletes the request; declining or cancelling
+ * deletes it. State you do not store is state nobody can forge.
+ */
+export interface FriendRequest {
+  /** `${from}__${to}` */
+  id: string;
+  from: string;
+  to: string;
+  createdAt: number;
+}
+
+export interface Friendship {
+  /** The two uids sorted ascending and joined with `__`. */
+  id: string;
+  members: string[];
+  createdAt: number;
+}
+
+export interface Challenge {
+  id: string;
+  createdBy: string;
+  members: string[];
+  templateId: string;
+  title: string;
+  metric: ChallengeMetric;
+  window: ChallengeWindow;
+  exerciseId: string | null;
+  startDay: string;
+  endDay: string;
+  endsAt: number;
+  status: ChallengeStatus;
+  createdAt: number;
+  respondedAt: number | null;
+}
+
+export interface ChallengeScore {
+  uid: string;
+  value: number;
+  sessions: number;
+  updatedAt: number;
 }

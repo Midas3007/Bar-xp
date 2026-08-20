@@ -82,4 +82,11 @@ export const COLLECTIONS = {
   workouts: 'workouts',
   statsHistory: 'stats_history',
   publicProfiles: 'public_profiles',
+  friendRequests: 'friend_requests',
+  friendships: 'friendships',
+  friendCards: 'friend_cards',
+  challenges: 'challenges',
 } as const;
+
+/** Subcollection under `challenges/{id}`, one document per athlete. */
+export const CHALLENGE_SCORES = 'scores';

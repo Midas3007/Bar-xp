@@ -38,7 +38,7 @@ const NAV: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { key: 'workout', label: 'Train', icon: Dumbbell },
   { key: 'progress', label: 'Progress', icon: BarChart3 },
-  { key: 'leaderboard', label: 'Leaderboard', icon: Trophy },
+  { key: 'leaderboard', label: 'Compete', icon: Trophy },
   { key: 'shop', label: 'Shop', icon: ShoppingBag },
   { key: 'profile', label: 'Profile', icon: UserIcon },
 ];

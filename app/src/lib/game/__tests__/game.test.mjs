@@ -53,6 +53,16 @@ import {
   CORRECTION_WINDOW_MS, applyReversal, canCorrect, reversalOf, withinCorrectionWindow,
 } from '../correction.js';
 import {
+  FRIEND_CARD_FIELDS, friendCardFrom, otherMember, pairKey, pushRecentDay, requestId, searchKey,
+} from '../friends.js';
+import {
+  EMPTY_SEASON, MAX_SEASON_HISTORY, accrueSeason, daysLeftInSeason, mergeSeasonStandings,
+  placementIn, rolloverSeason, seasonIdFor, seasonWindowById, seasonWindowFor,
+} from '../season.js';
+import {
+  CHALLENGE_TEMPLATES, challengeState, challengeWindowDays, resolveChallenge, scoreChallenge,
+} from '../challenges.js';
+import {
   buildShareCardSvg, escapeXml, shareCardFilename,
   SHARE_CARD_WIDTH, SHARE_CARD_HEIGHT,
 } from '../../share/shareCard.js';
@@ -1022,4 +1032,386 @@ test('a reversal never takes back more than the session granted', () => {
       `${key}: removed ${removed[key]} must not exceed granted ${applied[key]}`,
     );
   }
+});
+
+/* -------------------------------------------------------------------------- */
+/* Seasons                                                                     */
+/* -------------------------------------------------------------------------- */
+
+test('season ids sit on the quarter boundaries', () => {
+  assert.equal(seasonIdFor(new Date(2026, 0, 1)), '2026-S1');
+  assert.equal(seasonIdFor(new Date(2026, 2, 31)), '2026-S1');
+  assert.equal(seasonIdFor(new Date(2026, 3, 1)), '2026-S2');
+  assert.equal(seasonIdFor(new Date(2026, 8, 30)), '2026-S3');
+  assert.equal(seasonIdFor(new Date(2026, 9, 1)), '2026-S4');
+  // Across the year boundary.
+  assert.equal(seasonIdFor(new Date(2025, 11, 31)), '2025-S4');
+  assert.equal(seasonIdFor(new Date(2026, 0, 1)), '2026-S1');
+});
+
+test('seasonWindowById round-trips seasonIdFor', () => {
+  for (const date of [new Date(2026, 0, 15), new Date(2024, 5, 2), new Date(2027, 11, 9)]) {
+    const id = seasonIdFor(date);
+    const window = seasonWindowById(id);
+    assert.equal(window.id, id);
+    assert.deepEqual(window, seasonWindowFor(date));
+  }
+  for (const junk of ['', '2026-S5', '2026S1', 'nope', null, 42]) {
+    assert.equal(seasonWindowById(junk), null);
+  }
+});
+
+test('the first season ends on the right day, leap year included', () => {
+  // February is exactly why endDay is computed rather than tabulated.
+  assert.equal(seasonWindowById('2024-S1').endDay, '2024-03-31');
+  assert.equal(seasonWindowById('2024-S1').startDay, '2024-01-01');
+  assert.equal(seasonWindowById('2026-S2').endDay, '2026-06-30');
+  assert.equal(seasonWindowById('2026-S4').endDay, '2026-12-31');
+  assert.ok(daysLeftInSeason() >= 0);
+});
+
+test('rolloverSeason leaves an unfinished season alone', () => {
+  const state = { id: '2026-S3', xp: 500, sessions: 4, startedAt: 1 };
+  const out = rolloverSeason(state, [], '2026-S3', 1000);
+  assert.equal(out.changed, false);
+  assert.deepEqual(out.season, state);
+  assert.deepEqual(out.history, []);
+});
+
+test('a profile with no season is initialised without inventing history', () => {
+  // Every live document is in this state, and none of them ever competed in a
+  // season, so handing them a placement would be a fabrication.
+  const out = rolloverSeason(EMPTY_SEASON, [], '2026-S3', 1000);
+  assert.equal(out.changed, true);
+  assert.deepEqual(out.season, { id: '2026-S3', xp: 0, sessions: 0, startedAt: 1000 });
+  assert.deepEqual(out.history, []);
+});
+
+test('an elapsed season is recorded as pending and the counter resets', () => {
+  const out = rolloverSeason(
+    { id: '2026-S2', xp: 900, sessions: 11, startedAt: 1 },
+    [],
+    '2026-S3',
+    5000,
+  );
+  assert.equal(out.changed, true);
+  assert.deepEqual(out.season, { id: '2026-S3', xp: 0, sessions: 0, startedAt: 5000 });
+  assert.equal(out.history.length, 1);
+  assert.deepEqual(out.history[0], {
+    id: '2026-S2',
+    xp: 900,
+    sessions: 11,
+    rank: 0,
+    entrants: 0,
+    pending: true,
+    endedAt: 5000,
+  });
+});
+
+test('a season with no XP leaves no history entry', () => {
+  const out = rolloverSeason({ id: '2026-S2', xp: 0, sessions: 0, startedAt: 1 }, [], '2026-S3');
+  assert.equal(out.changed, true);
+  assert.deepEqual(out.history, []);
+});
+
+test('season history dedupes by id, sorts newest first and caps at 24', () => {
+  const many = Array.from({ length: 40 }, (_, i) => ({
+    id: `20${String(10 + i).padStart(2, '0')}-S1`,
+    xp: 10,
+    sessions: 1,
+    rank: 0,
+    entrants: 0,
+    pending: false,
+    endedAt: i,
+  }));
+  const withDuplicate = [...many, { ...many[0], xp: 999 }];
+  const out = rolloverSeason({ id: '2050-S1', xp: 5, sessions: 1, startedAt: 1 }, withDuplicate, '2050-S2');
+  assert.equal(out.history.length, MAX_SEASON_HISTORY);
+  assert.equal(new Set(out.history.map((r) => r.id)).size, out.history.length);
+  for (let i = 1; i < out.history.length; i += 1) {
+    assert.ok(out.history[i - 1].id > out.history[i].id, 'newest first');
+  }
+});
+
+/**
+ * DESIGN INVARIANT: a season resets a scoreboard, not a character.
+ *
+ * If a future change makes rollover return `totalXp`, `stats`, `coins` or
+ * anything else, this fails — which is the point of asserting the shape rather
+ * than trusting the reviewer to remember.
+ */
+test('rolloverSeason returns only season fields', () => {
+  const out = rolloverSeason({ id: '2026-S1', xp: 100, sessions: 2, startedAt: 1 }, [], '2026-S2');
+  assert.deepEqual(Object.keys(out).sort(), ['changed', 'history', 'season']);
+  assert.deepEqual(Object.keys(out.season).sort(), ['id', 'sessions', 'startedAt', 'xp']);
+});
+
+test('accrueSeason adds XP and counts the session', () => {
+  const out = accrueSeason({ id: '2026-S3', xp: 100, sessions: 2, startedAt: 7 }, 50, 9);
+  assert.deepEqual(out, { id: '2026-S3', xp: 150, sessions: 3, startedAt: 7 });
+  // Hostile input cannot produce NaN.
+  const junk = accrueSeason(EMPTY_SEASON, 'lots', 9);
+  assert.ok(Number.isFinite(junk.xp) && junk.xp >= 0);
+});
+
+test('standings union keeps the higher XP for a duplicate uid', () => {
+  const merged = mergeSeasonStandings(
+    [{ uid: 'a', displayName: 'A', xp: 100 }, { uid: 'b', displayName: 'B', xp: 400 }],
+    [{ uid: 'a', displayName: 'A', xp: 250 }, { uid: 'c', displayName: 'C', xp: 50 }],
+  );
+  assert.deepEqual(merged.map((s) => s.uid), ['b', 'a', 'c']);
+  assert.equal(merged.find((s) => s.uid === 'a').xp, 250);
+});
+
+test('standings survive hostile input', () => {
+  const merged = mergeSeasonStandings(
+    [null, 42, { uid: '', xp: 5 }, { uid: 'a', xp: NaN }],
+    'nonsense',
+  );
+  for (const s of merged) assert.ok(Number.isFinite(s.xp) && s.uid !== '');
+});
+
+test('equal season XP shares a rank', () => {
+  const standings = [
+    { uid: 'a', displayName: 'A', xp: 500 },
+    { uid: 'b', displayName: 'B', xp: 300 },
+    { uid: 'c', displayName: 'C', xp: 300 },
+    { uid: 'd', displayName: 'D', xp: 100 },
+  ];
+  assert.deepEqual(placementIn(standings, 'a'), { rank: 1, entrants: 4 });
+  assert.deepEqual(placementIn(standings, 'b'), { rank: 2, entrants: 4 });
+  assert.deepEqual(placementIn(standings, 'c'), { rank: 2, entrants: 4 });
+  assert.deepEqual(placementIn(standings, 'd'), { rank: 4, entrants: 4 });
+  assert.deepEqual(placementIn(standings, 'nobody'), { rank: 0, entrants: 4 });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Challenges                                                                  */
+/* -------------------------------------------------------------------------- */
+
+test('the week window is Monday to Sunday, matching the streak model', () => {
+  const wednesday = new Date(2026, 7, 19);
+  const window = challengeWindowDays('week', wednesday);
+  assert.equal(window.startDay, weekKey(wednesday));
+  assert.equal(window.startDay, '2026-08-17');
+  assert.equal(window.endDay, '2026-08-23');
+  assert.ok(window.endsAt > wednesday.getTime());
+});
+
+test('the month window covers the whole calendar month', () => {
+  assert.deepEqual(
+    { ...challengeWindowDays('month', new Date(2026, 7, 19)), endsAt: 0 },
+    { startDay: '2026-08-01', endDay: '2026-08-31', endsAt: 0 },
+  );
+  // February, and a leap February.
+  assert.equal(challengeWindowDays('month', new Date(2026, 1, 10)).endDay, '2026-02-28');
+  assert.equal(challengeWindowDays('month', new Date(2024, 1, 10)).endDay, '2024-02-29');
+});
+
+const chWorkout = (day, overrides = {}) => ({
+  id: day,
+  uid: 'u1',
+  day,
+  createdAt: 0,
+  entries: [],
+  xpEarned: 0,
+  coinsEarned: 0,
+  totalVolume: 0,
+  totalReps: 0,
+  presetId: null,
+  kind: 'session',
+  correctsId: null,
+  ...overrides,
+});
+
+test('sessions count distinct days, not documents', () => {
+  // Splitting one session into five logs must not win a challenge, for the same
+  // reason the streak counts distinct days.
+  const sameDay = [chWorkout('2026-08-18'), chWorkout('2026-08-18')];
+  const twoDays = [chWorkout('2026-08-18'), chWorkout('2026-08-19')];
+  assert.equal(scoreChallenge('sessions', null, sameDay, '2026-08-17', '2026-08-23').value, 1);
+  assert.equal(scoreChallenge('sessions', null, twoDays, '2026-08-17', '2026-08-23').value, 2);
+});
+
+test('volume and XP sum, and out-of-window days are ignored', () => {
+  const workouts = [
+    chWorkout('2026-08-18', { totalVolume: 100, xpEarned: 40 }),
+    chWorkout('2026-08-19', { totalVolume: 50, xpEarned: 20 }),
+    chWorkout('2026-09-01', { totalVolume: 999, xpEarned: 999 }),
+    chWorkout('2026-07-31', { totalVolume: 999, xpEarned: 999 }),
+  ];
+  assert.equal(scoreChallenge('volume', null, workouts, '2026-08-01', '2026-08-31').value, 150);
+  assert.equal(scoreChallenge('xp', null, workouts, '2026-08-01', '2026-08-31').value, 60);
+});
+
+test('exercise volume filters to the named movement', () => {
+  const workouts = [
+    chWorkout('2026-08-18', {
+      entries: [
+        { exerciseId: 'pull_up', exerciseName: 'Pull-up', unit: 'reps', sets: 3, amount: 8, volume: 24, xp: 24 },
+        { exerciseId: 'push_up', exerciseName: 'Push-up', unit: 'reps', sets: 3, amount: 20, volume: 60, xp: 60 },
+      ],
+    }),
+    chWorkout('2026-09-05', {
+      entries: [
+        { exerciseId: 'pull_up', exerciseName: 'Pull-up', unit: 'reps', sets: 5, amount: 10, volume: 50, xp: 50 },
+      ],
+    }),
+  ];
+  const out = scoreChallenge('exercise_volume', 'pull_up', workouts, '2026-08-01', '2026-08-31');
+  assert.equal(out.value, 24, 'push-ups and September are both excluded');
+});
+
+test('challenge scoring is finite for junk entries', () => {
+  const workouts = [
+    chWorkout('2026-08-18', {
+      totalVolume: NaN,
+      xpEarned: undefined,
+      entries: [
+        { exerciseId: 'pull_up', volume: 'lots' },
+        { exerciseId: 'pull_up', volume: Infinity },
+        null,
+      ],
+    }),
+    null,
+    { day: '2026-08-19' },
+  ];
+  for (const metric of ['sessions', 'volume', 'xp', 'exercise_volume']) {
+    const out = scoreChallenge(metric, 'pull_up', workouts, '2026-08-01', '2026-08-31');
+    assert.ok(Number.isFinite(out.value) && out.value >= 0, `${metric} produced ${out.value}`);
+    assert.ok(Number.isFinite(out.sessions));
+  }
+});
+
+test('a correction record is not training', () => {
+  const workouts = [
+    chWorkout('2026-08-18', { totalVolume: 100 }),
+    chWorkout('2026-08-20', { kind: 'correction', totalVolume: 0 }),
+  ];
+  assert.equal(scoreChallenge('sessions', null, workouts, '2026-08-01', '2026-08-31').value, 1);
+});
+
+const challengeOf = (overrides = {}) => ({
+  id: 'c1',
+  createdBy: 'a',
+  members: ['a', 'b'],
+  templateId: 'sessions_week',
+  title: 'Most sessions this week',
+  metric: 'sessions',
+  window: 'week',
+  exerciseId: null,
+  startDay: '2026-08-17',
+  endDay: '2026-08-23',
+  endsAt: 1000,
+  status: 'active',
+  createdAt: 0,
+  respondedAt: 1,
+  ...overrides,
+});
+
+test('a challenge is unresolved until it ends', () => {
+  const scores = { a: { uid: 'a', value: 5, sessions: 5, updatedAt: 0 }, b: { uid: 'b', value: 2, sessions: 2, updatedAt: 0 } };
+  assert.equal(challengeState(challengeOf(), 500), 'active');
+  assert.deepEqual(resolveChallenge(challengeOf(), scores, 500), {
+    ended: false,
+    winner: null,
+    tie: false,
+  });
+});
+
+test('the higher score wins once it has ended', () => {
+  const scores = { a: { uid: 'a', value: 5, sessions: 5, updatedAt: 0 }, b: { uid: 'b', value: 2, sessions: 2, updatedAt: 0 } };
+  assert.equal(challengeState(challengeOf(), 2000), 'ended');
+  assert.deepEqual(resolveChallenge(challengeOf(), scores, 2000), {
+    ended: true,
+    winner: 'a',
+    tie: false,
+  });
+});
+
+test('a tie is a tie, and is not broken on a secondary metric', () => {
+  const scores = { a: { uid: 'a', value: 4, sessions: 9, updatedAt: 0 }, b: { uid: 'b', value: 4, sessions: 1, updatedAt: 0 } };
+  const out = resolveChallenge(challengeOf(), scores, 2000);
+  assert.equal(out.tie, true);
+  assert.equal(out.winner, null);
+});
+
+test('a declined or unanswered challenge never resolves', () => {
+  assert.equal(challengeState(challengeOf({ status: 'declined' }), 2000), 'declined');
+  assert.equal(challengeState(challengeOf({ status: 'pending' }), 2000), 'expired');
+  assert.equal(challengeState(challengeOf({ status: 'pending' }), 500), 'pending');
+  assert.equal(resolveChallenge(challengeOf({ status: 'declined' }), {}, 2000).ended, false);
+});
+
+test('every template names a real metric and window', () => {
+  for (const t of CHALLENGE_TEMPLATES) {
+    assert.ok(['sessions', 'volume', 'xp', 'exercise_volume'].includes(t.metric));
+    assert.ok(['week', 'month'].includes(t.window));
+    assert.ok(t.title.length > 0 && t.unit.length > 0);
+    if (t.metric === 'exercise_volume') assert.ok(t.exerciseId, `${t.id} needs an exerciseId`);
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+/* Friends                                                                     */
+/* -------------------------------------------------------------------------- */
+
+test('pairKey is symmetric and sorted; requestId is directional', () => {
+  assert.equal(pairKey('alice', 'bob'), 'alice__bob');
+  assert.equal(pairKey('bob', 'alice'), 'alice__bob');
+  assert.equal(pairKey('zeta', 'alpha'), 'alpha__zeta');
+  assert.equal(requestId('bob', 'alice'), 'bob__alice');
+  assert.notEqual(requestId('bob', 'alice'), requestId('alice', 'bob'));
+});
+
+test('otherMember finds the person who is not you', () => {
+  assert.equal(otherMember(['a', 'b'], 'a'), 'b');
+  assert.equal(otherMember(['a', 'b'], 'b'), 'a');
+  assert.equal(otherMember(['a', 'b'], 'c'), '');
+  assert.equal(otherMember(null, 'a'), '');
+});
+
+test('pushRecentDay dedupes and caps, newest first', () => {
+  assert.deepEqual(pushRecentDay(['2026-08-19'], '2026-08-20'), ['2026-08-20', '2026-08-19']);
+  assert.deepEqual(pushRecentDay(['2026-08-20', '2026-08-19'], '2026-08-20'), [
+    '2026-08-20',
+    '2026-08-19',
+  ]);
+  const long = Array.from({ length: 30 }, (_, i) => `2026-07-${String(i + 1).padStart(2, '0')}`);
+  assert.equal(pushRecentDay(long, '2026-08-20').length, 14);
+  assert.deepEqual(pushRecentDay(null, '2026-08-20'), ['2026-08-20']);
+});
+
+test('searchKey lowercases, trims and caps', () => {
+  assert.equal(searchKey('  Alex Smith '), 'alex smith');
+  assert.equal(searchKey('X'.repeat(80)).length, 40);
+  assert.equal(searchKey(null), '');
+});
+
+/**
+ * DESIGN INVARIANT: the friend card is an allow-list, not a filtered profile.
+ *
+ * A field added to `Profile` later must not be able to reach another athlete by
+ * default, and the keys here must match the `hasOnly` list in firestore.rules.
+ */
+test('the friend card carries exactly FRIEND_CARD_FIELDS and nothing private', () => {
+  const profile = {
+    ...newProfile({ uid: 'u1', displayName: 'Test', email: 'secret@example.com', photoURL: '' }),
+    bodyFat: 14,
+    personalBests: { pull_up: { value: 20 } },
+    muscleVolume: { chest: 900 },
+    coins: 5000,
+    measurements: { values: { waist: 80 }, recordedAt: 1 },
+    recentDays: ['2026-08-20'],
+  };
+  const card = friendCardFrom(profile, 123);
+
+  assert.deepEqual(Object.keys(card).sort(), [...FRIEND_CARD_FIELDS].sort());
+  for (const forbidden of [
+    'email', 'bodyFat', 'assessment', 'personalBests', 'customExercises', 'goals',
+    'muscleVolume', 'coins', 'inventory', 'measurements', 'routines', 'uid',
+  ]) {
+    assert.ok(!(forbidden in card), `${forbidden} must never reach a friend card`);
+  }
+  assert.equal(card.updatedAt, 123);
 });

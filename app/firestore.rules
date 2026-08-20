@@ -4,10 +4,18 @@ rules_version = '2';
 //  Bar XP — Firestore security rules
 //
 //  Model:
-//    users/{uid}          A user's own document. Owner-write, authenticated-read
-//                         (the global leaderboard needs to read other rows).
-//    workouts/{id}        Private to the owner. Immutable once written.
-//    stats_history/{id}   Private to the owner. Immutable once written.
+//    users/{uid}            A user's own document. Owner-only, read and write.
+//    public_profiles/{uid}  The leaderboard projection. Readable by any signed-in
+//                           athlete; exactly the allow-listed fields, enforced
+//                           with hasOnly.
+//    friend_cards/{uid}     The richer projection — core stats, volume, streak,
+//                           training days — readable only by an accepted friend.
+//    workouts/{id}          Private to the owner. Never updated.
+//    stats_history/{id}     Private to the owner. Append-only.
+//    friend_requests/{id}   `{from}__{to}`. No mutable state: existence IS pending.
+//    friendships/{pairId}   `{a}__{b}` sorted. One address per pair, no duplicates.
+//    challenges/{id}        Between two friends. Only the invitee may respond.
+//      └ scores/{uid}       One document per athlete, named after them.
 //
 //  The anti-cheat bounds mirror `src/lib/game/validation.ts` so a hand-rolled
 //  client cannot write numbers the UI would have rejected.
@@ -53,6 +61,16 @@ service cloud.firestore {
     // Milliseconds since epoch, loosely bounded to catch garbage.
     function isTimestampMs(value) {
       return value is number && value >= 0 && value <= 4102444800000;
+    }
+
+    // The single canonical address for a pair of athletes, so a friendship is
+    // checkable from a rule without a query and duplicates are impossible.
+    function pairKey(a, b) {
+      return a < b ? a + '__' + b : b + '__' + a;
+    }
+
+    function friendshipExists(a, b) {
+      return exists(/databases/$(database)/documents/friendships/$(pairKey(a, b)));
     }
 
     function statsAreValid(stats) {
@@ -154,12 +172,29 @@ service cloud.firestore {
           // a plain `d.routines` would reject every write from an account that
           // has never saved one.
           && d.get('routines', []) is list && d.get('routines', []).size() <= 12
+          // Season counters. All three are absent on every live document, so
+          // each clause has to tolerate absence — an update validates the
+          // *merged* document, not the patch.
+          && seasonIsValid(d)
+          && (!('seasonHistory' in d) || (d.seasonHistory is list && d.seasonHistory.size() <= 24))
+          && (!('recentDays' in d) || (d.recentDays is list && d.recentDays.size() <= 20))
           && d.personalBests is map && d.personalBests.size() <= 200
           // Per-muscle lifetime volume. Bounded so it cannot be used as storage.
           && d.get('muscleVolume', {}) is map
           && d.get('muscleVolume', {}).size() <= 20
           && isTimestampMs(d.get('createdAt', 0))
           && isTimestampMs(d.get('updatedAt', 0));
+      }
+
+      function seasonIsValid(d) {
+        return !('season' in d) || (
+          d.season is map
+          && d.season.keys().hasOnly(['id', 'xp', 'sessions', 'startedAt'])
+          && isShortString(d.season.id, 16)
+          && isNumInRange(d.season.xp, 0, 100000000)
+          && isIntInRange(d.season.sessions, 0, 100000)
+          && isTimestampMs(d.season.get('startedAt', 0))
+        );
       }
 
       function measurementsAreValid(m) {
@@ -211,6 +246,7 @@ service cloud.firestore {
         return d.keys().hasOnly([
               'displayName', 'photoURL', 'level', 'totalXp',
               'tier', 'streak', 'activeCosmetic', 'cosmetics', 'updatedAt',
+              'searchName', 'seasonId', 'seasonXp', 'lastSeasonId', 'lastSeasonXp',
             ])
           && isShortString(d.displayName, 40)
           && d.displayName.size() >= 1
@@ -221,6 +257,14 @@ service cloud.firestore {
           && isIntInRange(d.streak, 0, 100000)
           && (d.get('activeCosmetic', null) == null || isShortString(d.activeCosmetic, 40))
           && d.cosmetics is list && d.cosmetics.size() <= 20
+          // Every new field reads through `get` with a default, so a browser
+          // still running the previous bundle keeps writing its nine-field row
+          // successfully through the rollout.
+          && isShortString(d.get('searchName', ''), 40)
+          && isShortString(d.get('seasonId', ''), 16)
+          && isNumInRange(d.get('seasonXp', 0), 0, 100000000)
+          && isShortString(d.get('lastSeasonId', ''), 16)
+          && isNumInRange(d.get('lastSeasonXp', 0), 0, 100000000)
           && isTimestampMs(d.get('updatedAt', 0));
       }
     }
@@ -309,6 +353,196 @@ service cloud.firestore {
           // `get` with a `{}` default: workout and legacy snapshots never carry
           // the key and must keep passing untouched.
           && measurementValuesAreValid(d.get('measurements', {}));
+      }
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* friend_requests                                                        */
+    /*                                                                        */
+    /* A request has no mutable state: its existence is "pending". Accepting   */
+    /* creates the friendship and deletes the request; declining or            */
+    /* cancelling deletes it. With nothing to update, there is nothing to      */
+    /* forge.                                                                 */
+    /* --------------------------------------------------------------------- */
+
+    match /friend_requests/{requestId} {
+
+      allow read: if isSignedIn()
+        && (request.auth.uid == resource.data.from || request.auth.uid == resource.data.to);
+
+      allow create: if isOwner(incoming().from)
+        && incoming().keys().hasOnly(['from', 'to', 'createdAt'])
+        && incoming().to is string
+        && incoming().to.size() > 0
+        && incoming().to != incoming().from
+        && requestId == incoming().from + '__' + incoming().to
+        && isTimestampMs(incoming().createdAt)
+        // You can only request a real athlete...
+        && exists(/databases/$(database)/documents/public_profiles/$(incoming().to))
+        // ...and only one you are not already friends with.
+        && !friendshipExists(incoming().from, incoming().to);
+
+      // Nothing about a request is editable.
+      allow update: if false;
+
+      // Either party may make it go away: the sender cancels, the recipient declines.
+      allow delete: if isSignedIn()
+        && (request.auth.uid == resource.data.from || request.auth.uid == resource.data.to);
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* friendships                                                            */
+    /*                                                                        */
+    /* The document id is the canonical sorted pair, so a pair has exactly one */
+    /* address and duplicates are impossible. Creating one requires a pending  */
+    /* request *from the other member to you* — and since a request can only   */
+    /* be created by its sender, you cannot manufacture your own invitation.   */
+    /* That one `exists` is the hinge of the whole design.                     */
+    /* --------------------------------------------------------------------- */
+
+    match /friendships/{pairId} {
+
+      allow read: if isSignedIn() && request.auth.uid in resource.data.members;
+
+      allow create: if isSignedIn()
+        && incoming().keys().hasOnly(['members', 'createdAt'])
+        && incoming().members is list
+        && incoming().members.size() == 2
+        && incoming().members[0] != incoming().members[1]
+        && request.auth.uid in incoming().members
+        && pairId == pairKey(incoming().members[0], incoming().members[1])
+        && isTimestampMs(incoming().createdAt)
+        && exists(/databases/$(database)/documents/friend_requests/$(otherOf(incoming().members) + '__' + request.auth.uid));
+
+      allow update: if false;
+
+      allow delete: if isSignedIn() && request.auth.uid in resource.data.members;
+
+      function otherOf(members) {
+        return members[0] == request.auth.uid ? members[1] : members[0];
+      }
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* friend_cards                                                           */
+    /*                                                                        */
+    /* The richer projection — core stats, volume, streak, recent training     */
+    /* days — readable only by someone you have an accepted friendship with.   */
+    /* `public_profiles` stays exactly as narrow as it was; this is a second,  */
+    /* consent-gated door rather than a wider version of the first one.        */
+    /* --------------------------------------------------------------------- */
+
+    match /friend_cards/{uid} {
+
+      allow read: if isSignedIn()
+        && (request.auth.uid == uid || friendshipExists(uid, request.auth.uid));
+
+      allow create, update: if isOwner(uid) && friendCardIsValid();
+
+      allow delete: if isOwner(uid);
+
+      function friendCardIsValid() {
+        let d = incoming();
+        return d.keys().hasOnly([
+              'displayName', 'photoURL', 'level', 'totalXp', 'tier', 'stats', 'totalReps',
+              'workoutCount', 'streak', 'bestStreak', 'seasonId', 'seasonXp',
+              'recentDays', 'updatedAt',
+            ])
+          && isShortString(d.displayName, 40)
+          && d.displayName.size() >= 1
+          && isShortString(d.get('photoURL', ''), 2048)
+          && isIntInRange(d.level, 1, 100)
+          && isNumInRange(d.totalXp, 0, 100000000)
+          && isShortString(d.tier, 24)
+          && statsAreValid(d.stats)
+          && isIntInRange(d.totalReps, 0, 1000000000)
+          && isIntInRange(d.workoutCount, 0, 1000000)
+          && isIntInRange(d.streak, 0, 100000)
+          && isIntInRange(d.bestStreak, 0, 100000)
+          && isShortString(d.get('seasonId', ''), 16)
+          && isNumInRange(d.get('seasonXp', 0), 0, 100000000)
+          && d.recentDays is list && d.recentDays.size() <= 20
+          && isTimestampMs(d.updatedAt);
+      }
+    }
+
+    /* --------------------------------------------------------------------- */
+    /* challenges                                                             */
+    /*                                                                        */
+    /* Created by one friend, accepted or declined by the other, and never     */
+    /* otherwise edited. There is no stored result: the winner is derived from */
+    /* the two score documents, so there is no result to forge and no rule     */
+    /* deciding who is allowed to declare victory.                            */
+    /* --------------------------------------------------------------------- */
+
+    match /challenges/{challengeId} {
+
+      allow read: if isSignedIn() && request.auth.uid in resource.data.members;
+
+      allow create: if isOwner(incoming().createdBy)
+        && incoming().keys().hasOnly([
+              'createdBy', 'members', 'templateId', 'title', 'metric', 'window',
+              'exerciseId', 'startDay', 'endDay', 'endsAt', 'status',
+              'createdAt', 'respondedAt',
+            ])
+        && incoming().members is list
+        && incoming().members.size() == 2
+        && incoming().members[0] != incoming().members[1]
+        && incoming().createdBy in incoming().members
+        // Challenges are between friends only.
+        && friendshipExists(incoming().members[0], incoming().members[1])
+        && incoming().status == 'pending'
+        && incoming().respondedAt == null
+        && incoming().metric in ['sessions', 'volume', 'xp', 'exercise_volume']
+        && incoming().window in ['week', 'month']
+        && (incoming().exerciseId == null || isShortString(incoming().exerciseId, 40))
+        && isShortString(incoming().templateId, 40)
+        && isShortString(incoming().title, 60)
+        && isDayKey(incoming().startDay)
+        && isDayKey(incoming().endDay)
+        && isTimestampMs(incoming().endsAt)
+        && isTimestampMs(incoming().createdAt);
+
+      // Only the invited member may respond, only once, and only to these two keys.
+      allow update: if isSignedIn()
+        && request.auth.uid in resource.data.members
+        && request.auth.uid != resource.data.createdBy
+        && resource.data.status == 'pending'
+        && incoming().status in ['active', 'declined']
+        && isTimestampMs(incoming().respondedAt)
+        && incoming().diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt']);
+
+      // Either member may drop a challenge. It is a bet between friends, not a
+      // court record — and deleting it is immediately visible to the other side.
+      allow delete: if isSignedIn() && request.auth.uid in resource.data.members;
+
+      /* ------------------------------------------------------------------- */
+      /* challenges/{id}/scores/{uid}                                         */
+      /*                                                                      */
+      /* Every athlete's score is a separate document named after them, so the */
+      /* rule that stops you writing your opponent's number is just the        */
+      /* document id. Scores are self-reported and unverifiable by design;     */
+      /* what is enforced is only that they are self-reported by the right     */
+      /* self.                                                                */
+      /* ------------------------------------------------------------------- */
+
+      match /scores/{scoreUid} {
+
+        allow read: if isSignedIn() && request.auth.uid in challenge().members;
+
+        allow create, update: if isOwner(scoreUid)
+          && request.auth.uid in challenge().members
+          && incoming().keys().hasOnly(['uid', 'value', 'sessions', 'updatedAt'])
+          && incoming().uid == scoreUid
+          && isNumInRange(incoming().value, 0, 10000000)
+          && isIntInRange(incoming().sessions, 0, 400)
+          && isTimestampMs(incoming().updatedAt);
+
+        allow delete: if false;
+
+        function challenge() {
+          return get(/databases/$(database)/documents/challenges/$(challengeId)).data;
+        }
       }
     }
 
