@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import { Dumbbell, TriangleAlert } from 'lucide-react';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { RestTimerProvider } from './context/RestTimerContext';
 import { AppShell, type ViewKey } from './components/layout/AppShell';
 import { LoadingScreen } from './components/ui/Primitives';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -15,6 +15,7 @@ import { LeaderboardView } from './views/LeaderboardView';
 import { ShopView } from './views/ShopView';
 import { ProfileView } from './views/ProfileView';
 import { isFirebaseConfigured, missingFirebaseKeys } from './lib/firebase';
+import { useRoute } from './lib/routing';
 
 export default function App() {
   // Without Firebase config nothing below can mount — show setup instructions
@@ -24,7 +25,9 @@ export default function App() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <Router />
+        <RestTimerProvider>
+          <Router />
+        </RestTimerProvider>
       </AuthProvider>
     </ToastProvider>
   );
@@ -32,7 +35,10 @@ export default function App() {
 
 function Router() {
   const { user, profile, loading } = useAuth();
-  const [view, setView] = useState<ViewKey>('dashboard');
+  // Called unconditionally, above every early return — hooks cannot sit behind
+  // a conditional. `AuthView` and `OnboardingView` have no route of their own;
+  // the path is preserved and honoured once the athlete is signed in.
+  const { view, navigate } = useRoute();
 
   if (loading) {
     return (
@@ -56,7 +62,7 @@ function Router() {
   if (!profile.onboarded) return <OnboardingView profile={profile} />;
 
   return (
-    <AppShell profile={profile} view={view} onNavigate={setView}>
+    <AppShell profile={profile} view={view} onNavigate={navigate}>
       <ErrorBoundary resetKey={view}>{renderView(view)}</ErrorBoundary>
     </AppShell>
   );
@@ -65,11 +71,11 @@ function Router() {
     if (!profile) return null;
     switch (current) {
       case 'dashboard':
-        return <DashboardView profile={profile} onNavigate={setView} />;
+        return <DashboardView profile={profile} onNavigate={navigate} />;
       case 'workout':
-        return <WorkoutLoggerView profile={profile} onNavigate={setView} />;
+        return <WorkoutLoggerView profile={profile} onNavigate={navigate} />;
       case 'progress':
-        return <ProgressView profile={profile} />;
+        return <ProgressView profile={profile} onNavigate={navigate} />;
       case 'leaderboard':
         return <LeaderboardView profile={profile} />;
       case 'shop':

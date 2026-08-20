@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  deleteDoc,
   getDoc,
   getDocs,
   limit as fbLimit,
@@ -10,6 +11,7 @@ import {
   updateDoc,
   where,
   writeBatch,
+  type WriteBatch,
 } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 
@@ -46,6 +48,7 @@ import { mergeMuscleVolume, sessionMuscleVolume } from './game/muscles';
 import { bestSet, entryVolume, normalizeReps } from './game/sets';
 import { newlyEarned, type Achievement } from './game/achievements';
 import { normalizeMeasurementValues } from './game/measurements';
+import { applyReversal, reversalOf } from './game/correction';
 import { buildRoutine, removeRoutine, upsertRoutine } from './game/routines';
 import { LIMITS } from './game/validation';
 
@@ -175,10 +178,18 @@ export async function ensureProfile(user: User, preferredName?: string): Promise
   });
 
   // `goals` starts empty; the first roll happens after onboarding so the
-  // templates can respect the user's assessed level. `uid` is the document id
-  // and `storedTier`/`storedIdentity` are client-side derivation helpers, so
-  // none of them belong in the document body.
-  const { uid: _uid, storedTier: _tier, storedIdentity: _identity, ...document } = fresh;
+  // templates can respect the user's assessed level. `uid` is the document id,
+  // `storedTier`/`storedIdentity` are client-side derivation helpers, and
+  // `grossXp` is read back off the stored `totalXp` field rather than written
+  // beside it — so none of them belong in the document body. `xpVoided` is a
+  // genuine stored field and is written.
+  const {
+    uid: _uid,
+    storedTier: _tier,
+    storedIdentity: _identity,
+    grossXp: _gross,
+    ...document
+  } = fresh;
   await setDoc(ref, stripUndefined(document));
   await syncPublicProfile(fresh);
   return fresh;
@@ -199,6 +210,36 @@ export async function persistRecalculation(
 export interface AssessmentResult {
   stats: Profile['stats'];
   tier: string;
+}
+
+/** How long to wait for a server ack before calling a write "saved locally". */
+const COMMIT_GRACE_MS = 1200;
+
+/**
+ * Commit a batch without hostage-taking the UI.
+ *
+ * Firestore applies a batch to the local cache immediately and only settles the
+ * returned promise once the server acknowledges it — which, offline, is never.
+ * The write is already durable in IndexedDB and will replay on reconnect, so we
+ * report success as soon as that is true and tell the caller whether the server
+ * has actually seen it yet.
+ *
+ * Returns true when the server acknowledged inside the grace window.
+ */
+async function commitBatch(batch: WriteBatch): Promise<boolean> {
+  const commit = batch.commit().then(
+    () => true,
+    (error) => {
+      // A genuine rejection (rules, quota) still deserves a log even though the
+      // caller has already moved on.
+      console.error('[data] batch failed to sync', error);
+      return false;
+    },
+  );
+  const timeout = new Promise<boolean>((resolve) => {
+    window.setTimeout(() => resolve(false), COMMIT_GRACE_MS);
+  });
+  return Promise.race([commit, timeout]);
 }
 
 /**
@@ -265,7 +306,7 @@ export async function completeAssessment(
     updatedAt: now,
   });
 
-  await batch.commit();
+  await commitBatch(batch);
   return { stats, tier };
 }
 
@@ -285,6 +326,11 @@ export interface CompletedGoalSummary {
 }
 
 export interface LogWorkoutResult {
+  /**
+   * True when the write is durable on this device but the server has not
+   * acknowledged it yet. Offline this is the normal outcome, not a failure.
+   */
+  pending: boolean;
   /** Everything banked: session XP, the streak bonus, and goal rewards. */
   xpEarned: number;
   /** Session XP before the streak multiplier and before goal rewards. */
@@ -359,8 +405,12 @@ export async function logWorkout(
   const xpEarned = totals.xp + goalOutcome.rewardXp;
   const coinsEarned = totals.coins + goalOutcome.rewardCoins;
 
+  // Net is what the game reads; gross is what the document stores. They differ
+  // only once an account has corrected a session, and the two must not be mixed
+  // up: writing net into `users.totalXp` would silently un-void a correction.
   const previousTotalXp = Math.max(0, num(profile.totalXp, 0));
   const newTotalXp = previousTotalXp + xpEarned;
+  const grossAfter = Math.max(0, num(profile.grossXp, previousTotalXp)) + xpEarned;
   const previousLevel = levelFromTotalXp(previousTotalXp);
   const newLevel = levelFromTotalXp(newTotalXp);
 
@@ -414,7 +464,8 @@ export async function logWorkout(
   });
 
   batch.update(userDocRef(profile.uid), {
-    totalXp: newTotalXp,
+    // Gross. The leaderboard row and the snapshot below both take net.
+    totalXp: grossAfter,
     level: newLevel,
     coins: Math.max(0, int(profile.coins, 0)) + coinsEarned,
     stats,
@@ -475,9 +526,10 @@ export async function logWorkout(
     source: 'workout',
   });
 
-  await batch.commit();
+  const acknowledged = await commitBatch(batch);
 
   return {
+    pending: !acknowledged,
     xpEarned,
     baseXp: totals.baseXp,
     streakBonusXp: totals.streakBonusXp,
@@ -552,6 +604,163 @@ function mergePersonalBests(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Corrections                                                                 */
+/* -------------------------------------------------------------------------- */
+
+export interface VoidWorkoutResult {
+  xpRemoved: number;
+  newLevel: number;
+  newTier: string;
+  pending: boolean;
+}
+
+/**
+ * Retract a logged session.
+ *
+ * The ledger stays append-only and gross XP stays monotonic: this appends a
+ * `correction` document naming the session it voids, and moves the XP into
+ * `xpVoided` rather than subtracting it from `totalXp`. Level, tier, charts and
+ * the leaderboard read the difference of the two counters, which is free to
+ * fall while neither counter ever does.
+ *
+ * Deliberately does not restore personal bests, streak days or goal progress —
+ * see `correction.ts` for why each is impossible to reconstruct honestly from
+ * the stored document.
+ */
+export async function voidWorkout(
+  profile: Profile,
+  workout: Workout,
+  resolve: (id: string) => Exercise | undefined,
+): Promise<VoidWorkoutResult> {
+  const db = getDbOrThrow();
+  const now = Date.now();
+
+  const reversal = reversalOf(workout, resolve);
+  const corrected = applyReversal(profile, reversal);
+
+  const batch = writeBatch(db);
+
+  const correctionRef = doc(collection(db, COLLECTIONS.workouts));
+  batch.set(correctionRef, {
+    uid: profile.uid,
+    day: dayKey(),
+    createdAt: now,
+    kind: 'correction',
+    correctsId: workout.id,
+    // The rules require at least one entry; copying the originals makes the
+    // ledger readable without a join.
+    entries: arr<WorkoutEntry>(workout.entries).map((e) => {
+      const reps = normalizeReps(e.reps);
+      return {
+        exerciseId: str(e.exerciseId, ''),
+        exerciseName: str(e.exerciseName, 'Exercise'),
+        unit: e.unit === 'seconds' ? 'seconds' : 'reps',
+        sets: Math.max(0, int(e.sets, 0)),
+        amount: Math.max(0, int(e.amount, 0)),
+        volume: Math.max(0, int(e.volume, 0)),
+        ...(reps.length > 1 ? { reps } : {}),
+        xp: Math.max(0, int(e.xp, 0)),
+      };
+    }),
+    xpEarned: 0,
+    coinsEarned: 0,
+    totalVolume: 0,
+    totalReps: 0,
+    presetId: null,
+  });
+
+  // Note the absence of `totalXp`: the stored field is gross lifetime XP and
+  // must not move. `xpVoided` carries the retraction.
+  batch.update(userDocRef(profile.uid), {
+    xpVoided: corrected.xpVoided,
+    level: corrected.level,
+    coins: corrected.coins,
+    stats: corrected.stats,
+    tier: corrected.tier,
+    totalReps: corrected.totalReps,
+    workoutCount: corrected.workoutCount,
+    muscleVolume: corrected.muscleVolume,
+    updatedAt: now,
+  });
+
+  batch.set(publicProfileRef(profile.uid), {
+    ...publicProfileFrom(profile),
+    level: corrected.level,
+    totalXp: corrected.totalXp,
+    tier: corrected.tier,
+    updatedAt: now,
+  });
+
+  // A snapshot so the charts show the dip honestly rather than a mystery flat
+  // spot between two readings.
+  const snapshotRef = doc(collection(db, COLLECTIONS.statsHistory));
+  batch.set(snapshotRef, {
+    uid: profile.uid,
+    createdAt: now,
+    day: dayKey(),
+    stats: corrected.stats,
+    level: corrected.level,
+    totalXp: corrected.totalXp,
+    tier: corrected.tier,
+    bodyFat: clamp(num(profile.bodyFat, 0), 0, LIMITS.MAX_BODY_FAT),
+    totalReps: corrected.totalReps,
+    streak: safeStreak(profile.streak).current,
+    source: 'correction',
+  });
+
+  const acknowledged = await commitBatch(batch);
+
+  return {
+    xpRemoved: Math.max(0, num(profile.totalXp, 0) - corrected.totalXp),
+    newLevel: corrected.level,
+    newTier: corrected.tier,
+    pending: !acknowledged,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Erasure                                                                     */
+/* -------------------------------------------------------------------------- */
+
+/** How many documents to delete per batch. Firestore's own limit is 500. */
+const ERASE_PAGE = 400;
+
+async function erasePage(uid: string, collectionName: string): Promise<number> {
+  const db = getDbOrThrow();
+  const snapshot = await getDocs(
+    query(collection(db, collectionName), where('uid', '==', uid), fbLimit(ERASE_PAGE)),
+  );
+  if (snapshot.empty) return 0;
+
+  const batch = writeBatch(db);
+  snapshot.docs.forEach((d) => batch.delete(d.ref));
+  // Awaited for real, unlike every other write in this file: an erasure that
+  // only happened in the local cache is not an erasure.
+  await batch.commit();
+  return snapshot.size;
+}
+
+/**
+ * Remove everything this account owns.
+ *
+ * The user document goes last on purpose: a failure part-way through leaves an
+ * account that still loads and can retry, rather than an orphaned pile of
+ * sessions belonging to a profile that no longer exists.
+ */
+export async function eraseAccountData(uid: string): Promise<void> {
+  for (const name of [COLLECTIONS.workouts, COLLECTIONS.statsHistory]) {
+    // Paged rather than recursive so a huge history cannot blow the stack.
+    for (;;) {
+      const removed = await erasePage(uid, name);
+      if (removed < ERASE_PAGE) break;
+    }
+  }
+
+  await deleteDoc(publicProfileRef(uid));
+  await deleteDoc(userDocRef(uid));
+}
+
+/* -------------------------------------------------------------------------- */
 /* Body composition                                                            */
 /* -------------------------------------------------------------------------- */
 
@@ -587,7 +796,7 @@ export async function updateBodyFat(profile: Profile, bodyFat: number): Promise<
     source: 'assessment',
   });
 
-  await batch.commit();
+  await commitBatch(batch);
 }
 
 /**
@@ -633,7 +842,7 @@ export async function recordMeasurements(
     measurements: entered,
   });
 
-  await batch.commit();
+  await commitBatch(batch);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -899,7 +1108,9 @@ function normalizeSnapshot(id: string, raw: unknown): StatsSnapshot {
     totalReps: Math.max(0, int(data.totalReps, 0)),
     streak: Math.max(0, int(data.streak, 0)),
     source:
-      data.source === 'assessment' || data.source === 'measurement'
+      data.source === 'assessment' ||
+      data.source === 'measurement' ||
+      data.source === 'correction'
         ? data.source
         : 'workout',
     // Null rather than `{}` when the key is absent, so "no measurements were
@@ -933,6 +1144,9 @@ function normalizeWorkout(id: string, raw: unknown): Workout {
     totalVolume: Math.max(0, int(data.totalVolume, 0)),
     totalReps: Math.max(0, int(data.totalReps, 0)),
     presetId: str(data.presetId, '') || null,
+    // Absent on every document written before corrections existed.
+    kind: data.kind === 'correction' ? 'correction' : 'session',
+    correctsId: str(data.correctsId, '') || null,
   };
 }
 

@@ -272,9 +272,17 @@ await test('a document without routines is still valid', async () => {
   await assertSucceeds(setDoc(doc(alice, 'users', ALICE), withoutRoutines));
 });
 
-await test('profiles cannot be deleted', async () => {
+await test('only the owner can delete their profile', async () => {
+  // Erasure is deliberate: an athlete must be able to remove their own account
+  // from inside the app. It is still nobody else's to remove.
   const { deleteDoc } = await import('firebase/firestore');
-  await assertFails(deleteDoc(doc(alice, 'users', ALICE)));
+  await assertFails(deleteDoc(doc(bob, 'users', ALICE)));
+  await assertSucceeds(deleteDoc(doc(alice, 'users', ALICE)));
+  // Later assertions in this file write to the document again, and an update
+  // against a missing document is a create.
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users', ALICE), userDoc({ totalXp: 6000 }));
+  });
 });
 
 section('users — body measurements and preferences');
@@ -341,6 +349,27 @@ await test('a document predating measurements still validates', async () => {
   assert.ok(!('gymBroMode' in legacy));
   assert.ok(!('unitSystem' in legacy));
   await assertSucceeds(setDoc(doc(alice, 'users', ALICE), legacy));
+});
+
+await test('xpVoided cannot be reduced', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users', ALICE), userDoc({ totalXp: 5000, xpVoided: 1000 }));
+  });
+  await assertFails(updateDoc(doc(alice, 'users', ALICE), { xpVoided: 0 }));
+});
+
+await test('xpVoided cannot exceed gross XP', async () => {
+  await assertFails(updateDoc(doc(alice, 'users', ALICE), { xpVoided: 6000 }));
+});
+
+await test('a correction can retract XP', async () => {
+  await assertSucceeds(updateDoc(doc(alice, 'users', ALICE), { xpVoided: 1200 }));
+});
+
+await test('gross XP still cannot be reduced by a correction', async () => {
+  // The whole design in one assertion: retracting moves `xpVoided` up, never
+  // `totalXp` down.
+  await assertFails(updateDoc(doc(alice, 'users', ALICE), { totalXp: 3000, xpVoided: 1200 }));
 });
 
 section('public_profiles — the leaderboard projection');
@@ -412,13 +441,62 @@ await test('workouts cannot be edited once written', async () => {
   await assertFails(updateDoc(doc(alice, 'workouts', 'w1'), { xpEarned: 999999 }));
 });
 
-await test('workouts cannot be deleted', async () => {
-  const { deleteDoc } = await import('firebase/firestore');
-  await assertFails(deleteDoc(doc(alice, 'workouts', 'w1')));
-});
 
 await test('cannot create a workout owned by someone else', async () => {
   await assertFails(setDoc(doc(bob, 'workouts', 'w2'), workoutDoc(ALICE)));
+});
+
+await test('a correction document is accepted', async () => {
+  await assertSucceeds(
+    setDoc(
+      doc(alice, 'workouts', 'c1'),
+      workoutDoc(ALICE, {
+        kind: 'correction',
+        correctsId: 'w1',
+        xpEarned: 0,
+        coinsEarned: 0,
+        totalVolume: 0,
+        totalReps: 0,
+      }),
+    ),
+  );
+});
+
+await test('a correction cannot also grant XP', async () => {
+  // Without `correctionIsInert` a client could mark a paying session as a
+  // correction and keep the XP.
+  await assertFails(
+    setDoc(
+      doc(alice, 'workouts', 'c2'),
+      workoutDoc(ALICE, {
+        kind: 'correction',
+        correctsId: 'w1',
+        xpEarned: 50,
+        coinsEarned: 0,
+        totalVolume: 0,
+        totalReps: 0,
+      }),
+    ),
+  );
+});
+
+await test('a correction must name what it corrects', async () => {
+  await assertFails(
+    setDoc(
+      doc(alice, 'workouts', 'c3'),
+      workoutDoc(ALICE, {
+        kind: 'correction',
+        xpEarned: 0,
+        coinsEarned: 0,
+        totalVolume: 0,
+        totalReps: 0,
+      }),
+    ),
+  );
+});
+
+await test('an unknown workout kind is rejected', async () => {
+  await assertFails(setDoc(doc(alice, 'workouts', 'c4'), workoutDoc(ALICE, { kind: 'bonus' })));
 });
 
 section('workouts — anti-cheat bounds mirror validation.ts');
@@ -446,6 +524,14 @@ await test('rejects negative XP', async () => {
   await assertFails(setDoc(doc(alice, 'workouts', 'w7'), workoutDoc(ALICE, { xpEarned: -5 })));
 });
 
+await test('only the owner can delete their own workout', async () => {
+  // Deletion exists for account erasure. It destroys history and cannot
+  // inflate anything, since XP is monotonic and `xpVoided` only grows.
+  const { deleteDoc } = await import('firebase/firestore');
+  await assertFails(deleteDoc(doc(bob, 'workouts', 'w1')));
+  await assertSucceeds(deleteDoc(doc(alice, 'workouts', 'w1')));
+});
+
 section('stats_history — private, append-only');
 
 await test('owner can create a snapshot', async () => {
@@ -462,6 +548,18 @@ await test('snapshots cannot be edited', async () => {
 
 await test('rejects an unknown source', async () => {
   await assertFails(setDoc(doc(alice, 'stats_history', 's2'), snapshotDoc(ALICE, { source: 'hacked' })));
+});
+
+await test('a correction snapshot is accepted', async () => {
+  await assertSucceeds(
+    setDoc(doc(alice, 'stats_history', 's5'), snapshotDoc(ALICE, { source: 'correction' })),
+  );
+});
+
+await test('another user cannot delete your snapshots', async () => {
+  const { deleteDoc } = await import('firebase/firestore');
+  await assertFails(deleteDoc(doc(bob, 'stats_history', 's1')));
+  await assertSucceeds(deleteDoc(doc(alice, 'stats_history', 's1')));
 });
 
 await test('accepts a measurement snapshot', async () => {

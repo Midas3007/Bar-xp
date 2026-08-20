@@ -1,6 +1,12 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, type Auth } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  type Firestore,
+} from 'firebase/firestore';
 
 /**
  * Firebase bootstrap.
@@ -34,7 +40,20 @@ let dbInstance: Firestore | null = null;
 if (isFirebaseConfigured) {
   app = initializeApp(config);
   authInstance = getAuth(app);
-  dbInstance = getFirestore(app);
+  try {
+    // IndexedDB-backed cache: the gym is where the signal dies, and a logged
+    // session must not depend on having one. It buys offline reads, offline
+    // queries, and offline writes that replay automatically on reconnect.
+    // `persistentMultipleTabManager` lets two open tabs share the cache instead
+    // of one of them failing to acquire the lease.
+    dbInstance = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    });
+  } catch (error) {
+    // Private browsing and some embedded webviews have no usable IndexedDB.
+    console.warn('[firebase] persistent cache unavailable, falling back to memory', error);
+    dbInstance = getFirestore(app);
+  }
 }
 
 /**

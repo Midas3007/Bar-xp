@@ -15,3 +15,13 @@ createRoot(container).render(
     </ErrorBoundary>
   </StrictMode>,
 );
+
+// Production only: a service worker in front of the dev server fights HMR and
+// produces bug reports that are not bugs.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((error) => {
+      console.warn('[pwa] service worker registration failed', error);
+    });
+  });
+}

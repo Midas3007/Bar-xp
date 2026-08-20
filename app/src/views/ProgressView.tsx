@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -22,12 +22,17 @@ import {
   TrendingUp,
 } from 'lucide-react';
 
-import type { Profile, StatsSnapshot, Workout } from '../lib/types';
-import { Card, CardHeader, EmptyState, SkeletonBlock } from '../components/ui/Primitives';
+import type { Exercise, Profile, StatsSnapshot, Workout } from '../lib/types';
+import type { ViewKey } from '../components/layout/AppShell';
+import { Button, Card, CardHeader, Chip, EmptyState, SkeletonBlock, Spinner } from '../components/ui/Primitives';
 import { MeasurementCharts } from '../components/MeasurementCharts';
 import { STAT_META } from '../lib/game/constants';
-import { fetchStatsHistory, fetchWorkouts } from '../lib/data';
-import { fmt, fmtDecimal, num, round } from '../lib/safe';
+import { fetchStatsHistory, fetchWorkouts, voidWorkout } from '../lib/data';
+import { allExercisesFor } from '../lib/game/exercises';
+import { withinCorrectionWindow } from '../lib/game/correction';
+import { saveDraft } from '../lib/draft';
+import { useToast } from '../context/ToastContext';
+import { fmt, fmtDecimal, num, round, str } from '../lib/safe';
 import { formatSetLadder } from '../lib/game/sets';
 
 /** Chart palette, aligned with the stat colors used across the app. */
@@ -46,15 +51,23 @@ interface ChartPoint {
   level: number;
 }
 
-export function ProgressView({ profile }: { profile: Profile }) {
+export function ProgressView({
+  profile,
+  onNavigate,
+}: {
+  profile: Profile;
+  onNavigate: (view: ViewKey) => void;
+}) {
   const [history, setHistory] = useState<StatsSnapshot[] | null>(null);
   const [workouts, setWorkouts] = useState<Workout[] | null>(null);
   const [failed, setFailed] = useState(false);
+  /** Bumped by a correction, to pull the fresh ledger back down. */
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
 
-    Promise.all([fetchStatsHistory(profile.uid, 120), fetchWorkouts(profile.uid, 60)])
+    Promise.all([fetchStatsHistory(profile.uid, 120), fetchWorkouts(profile.uid, 120)])
       .then(([snapshots, sessions]) => {
         if (!active) return;
         setHistory(snapshots);
@@ -73,7 +86,7 @@ export function ProgressView({ profile }: { profile: Profile }) {
     };
     // `recordedAt` changes exactly once per recording, so a measurement saved
     // from the profile refetches here and nothing else does.
-  }, [profile.uid, profile.workoutCount, profile.measurements?.recordedAt ?? 0]);
+  }, [profile.uid, profile.workoutCount, profile.measurements?.recordedAt ?? 0, reloadKey]);
 
   /** Snapshots -> chart rows, with every value coerced to a finite number. */
   const points = useMemo<ChartPoint[]>(() => {
@@ -91,10 +104,29 @@ export function ProgressView({ profile }: { profile: Profile }) {
     }));
   }, [history]);
 
+  /** Ids of sessions a correction record already retracts. */
+  const corrections = useMemo(
+    () =>
+      new Set(
+        (workouts ?? [])
+          .filter((w) => w.kind === 'correction')
+          .map((w) => str(w.correctsId, ''))
+          .filter((id) => id !== ''),
+      ),
+    [workouts],
+  );
+
+  // A correction is worth nothing by construction, so leaving it in would draw
+  // a zero-XP spike on the volume chart and pad the session count.
+  const sessions = useMemo(
+    () => (workouts ?? []).filter((w) => w.kind !== 'correction'),
+    [workouts],
+  );
+
   /** Workout volume per session, oldest first. */
   const volumePoints = useMemo(() => {
     if (!workouts) return [];
-    return [...workouts]
+    return [...sessions]
       .sort((a, b) => num(a.createdAt, 0) - num(b.createdAt, 0))
       .map((workout) => ({
         label: formatShortDay(workout.day, workout.createdAt),
@@ -102,7 +134,7 @@ export function ProgressView({ profile }: { profile: Profile }) {
         volume: Math.max(0, Math.floor(num(workout.totalVolume, 0))),
         xp: Math.max(0, Math.floor(num(workout.xpEarned, 0))),
       }));
-  }, [workouts]);
+  }, [workouts, sessions]);
 
   // Body fat is only plotted where a real reading exists.
   const bodyFatPoints = useMemo(() => points.filter((p) => p.bodyFat > 0), [points]);
@@ -377,7 +409,13 @@ export function ProgressView({ profile }: { profile: Profile }) {
       <MeasurementCharts history={history ?? []} unitSystem={profile.unitSystem} />
 
       {/* --- Session history --- */}
-      <WorkoutHistory workouts={workouts ?? []} />
+      <WorkoutHistory
+        profile={profile}
+        workouts={sessions}
+        corrections={corrections}
+        onNavigate={onNavigate}
+        onChanged={() => setReloadKey((k) => k + 1)}
+      />
 
       {/* --- Summary strip --- */}
       {hasHistory ? (
@@ -410,13 +448,73 @@ function Header() {
 }
 
 /** Full session log, newest first, with each session's movements on demand. */
-function WorkoutHistory({ workouts }: { workouts: Workout[] }) {
+function WorkoutHistory({
+  profile,
+  workouts,
+  corrections,
+  onNavigate,
+  onChanged,
+}: {
+  profile: Profile;
+  workouts: Workout[];
+  corrections: Set<string>;
+  onNavigate: (view: ViewKey) => void;
+  onChanged: () => void;
+}) {
+  const toast = useToast();
   const [expanded, setExpanded] = useState<string | null>(null);
+  /** Which row is one tap from committing, and to what. */
+  const [confirming, setConfirming] = useState<{ id: string; mode: 'fix' | 'delete' } | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const catalog = useMemo(() => allExercisesFor(profile), [profile]);
+  const resolve = useCallback(
+    (id: string): Exercise | undefined => catalog.find((e) => e.id === id),
+    [catalog],
+  );
 
   const ordered = useMemo(
     () => [...workouts].sort((a, b) => num(b.createdAt, 0) - num(a.createdAt, 0)),
     [workouts],
   );
+
+  // A pending confirmation lapses rather than lingering as an armed delete.
+  useEffect(() => {
+    if (!confirming) return;
+    const id = window.setTimeout(() => setConfirming(null), 5000);
+    return () => window.clearTimeout(id);
+  }, [confirming]);
+
+  const commit = async (workout: Workout, mode: 'fix' | 'delete') => {
+    setConfirming(null);
+    setBusyId(workout.id);
+    try {
+      const result = await voidWorkout(profile, workout, resolve);
+      if (mode === 'fix') {
+        // Hand the movements to the logger as a draft; the athlete edits the
+        // numbers and logs it again. The re-log carries today's date, which is
+        // the price of an append-only ledger and why the window is 48 hours.
+        saveDraft(profile.uid, {
+          entries: workout.entries,
+          presetId: workout.presetId ?? null,
+        });
+        toast.success(
+          'Session retracted',
+          `${fmt(result.xpRemoved)} XP came back off. Fix the numbers and log it again.`,
+        );
+        onChanged();
+        onNavigate('workout');
+        return;
+      }
+      toast.success('Session deleted', `${fmt(result.xpRemoved)} XP came back off your total.`);
+      onChanged();
+    } catch (error) {
+      console.error('[progress] failed to correct session', error);
+      toast.error('Could not correct that session', 'Check your connection and try again.');
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <Card>
@@ -434,8 +532,13 @@ function WorkoutHistory({ workouts }: { workouts: Workout[] }) {
         <ul className="divide-y divide-white/5">
           {ordered.map((workout) => {
             const open = expanded === workout.id;
+            const corrected = corrections.has(workout.id);
+            const correctable = !corrected && withinCorrectionWindow(workout.createdAt);
+            const armed = confirming?.id === workout.id ? confirming.mode : null;
+            const busy = busyId === workout.id;
+
             return (
-              <li key={workout.id}>
+              <li key={workout.id} className={corrected ? 'opacity-50' : undefined}>
                 <button
                   type="button"
                   onClick={() => setExpanded(open ? null : workout.id)}
@@ -443,10 +546,13 @@ function WorkoutHistory({ workouts }: { workouts: Workout[] }) {
                   aria-expanded={open}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-200">
-                      {formatShortDay(workout.day, workout.createdAt)} ·{' '}
-                      {workout.entries.length} movement
-                      {workout.entries.length === 1 ? '' : 's'}
+                    <p className="flex items-center gap-2 truncate text-sm font-medium text-slate-200">
+                      <span className="truncate">
+                        {formatShortDay(workout.day, workout.createdAt)} ·{' '}
+                        {workout.entries.length} movement
+                        {workout.entries.length === 1 ? '' : 's'}
+                      </span>
+                      {corrected ? <Chip>Corrected</Chip> : null}
                     </p>
                     <p className="mt-0.5 font-mono text-[11px] text-slate-600">
                       {fmt(workout.totalVolume)} units · {fmt(workout.totalReps)} reps
@@ -464,22 +570,77 @@ function WorkoutHistory({ workouts }: { workouts: Workout[] }) {
                 </button>
 
                 {open ? (
-                  <ul className="animate-fade-up space-y-1.5 bg-ink-900/40 px-4 pb-4 pt-1">
-                    {workout.entries.map((entry, i) => (
-                      <li
-                        key={`${entry.exerciseId}-${i}`}
-                        className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.03] px-3 py-2"
-                      >
-                        <span className="min-w-0 truncate text-xs text-slate-300">
-                          {entry.exerciseName}
-                        </span>
-                        <span className="shrink-0 font-mono text-[11px] text-slate-500">
-                          {formatSetLadder(entry)}
-                          {entry.unit === 'seconds' ? 's' : ''} · +{fmt(entry.xp)} XP
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="animate-fade-up bg-ink-900/40 px-4 pb-4 pt-1">
+                    <ul className="space-y-1.5">
+                      {workout.entries.map((entry, i) => (
+                        <li
+                          key={`${entry.exerciseId}-${i}`}
+                          className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.03] px-3 py-2"
+                        >
+                          <span className="min-w-0 truncate text-xs text-slate-300">
+                            {entry.exerciseName}
+                          </span>
+                          <span className="shrink-0 font-mono text-[11px] text-slate-500">
+                            {formatSetLadder(entry)}
+                            {entry.unit === 'seconds' ? 's' : ''} · +{fmt(entry.xp)} XP
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {corrected ? (
+                      <p className="mt-3 text-[11px] text-slate-600">
+                        This session was corrected. Its XP, coins, stats, reps and muscle volume
+                        have already come back off.
+                      </p>
+                    ) : correctable ? (
+                      <div className="mt-3">
+                        {armed ? (
+                          <p className="mb-2 text-[11px] leading-relaxed text-amber-200">
+                            XP, coins, stats, reps and muscle volume are reversed. Personal bests,
+                            streak and goal progress are not.
+                            {armed === 'fix'
+                              ? ' The corrected session is re-logged with today\u2019s date.'
+                              : ''}
+                          </p>
+                        ) : null}
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant={armed === 'fix' ? 'primary' : 'secondary'}
+                            disabled={busy}
+                            onClick={() =>
+                              armed === 'fix'
+                                ? void commit(workout, 'fix')
+                                : setConfirming({ id: workout.id, mode: 'fix' })
+                            }
+                          >
+                            {busy && armed === 'fix' ? <Spinner className="h-3.5 w-3.5" /> : null}
+                            {armed === 'fix' ? 'Confirm — this cannot be undone' : 'Fix numbers'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            disabled={busy}
+                            onClick={() =>
+                              armed === 'delete'
+                                ? void commit(workout, 'delete')
+                                : setConfirming({ id: workout.id, mode: 'delete' })
+                            }
+                          >
+                            {busy ? <Spinner className="h-3.5 w-3.5" /> : null}
+                            {armed === 'delete'
+                              ? 'Confirm — this cannot be undone'
+                              : 'Delete session'}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-[11px] text-slate-600">
+                        Sessions can be corrected for 48 hours.
+                      </p>
+                    )}
+                  </div>
                 ) : null}
               </li>
             );

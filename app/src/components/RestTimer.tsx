@@ -1,84 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pause, Play, RotateCcw, Timer } from 'lucide-react';
+import { Pause, Play, RotateCcw, Timer, Volume2, VolumeX } from 'lucide-react';
 
-import { clamp, int } from '../lib/safe';
-
-const PRESETS = [60, 90, 120, 180] as const;
+import { clamp } from '../lib/safe';
+import { REST_PRESETS, formatClock, useRestTimer } from '../context/RestTimerContext';
 
 /**
  * Rest timer for between sets.
  *
- * Counts down from a chosen preset and vibrates when it lands — Android
- * supports `navigator.vibrate`, which matters because this app is mostly used
- * on a phone propped against a wall. The countdown is driven from a target
- * timestamp rather than by decrementing a counter, so it stays accurate even
- * when the browser throttles timers in a backgrounded tab.
+ * Purely presentational now: every piece of state lives in `RestTimerContext`,
+ * mounted above the router, so the countdown survives navigation and the alert
+ * still lands when the athlete has wandered off to the Dashboard.
  */
 export function RestTimer() {
-  const [duration, setDuration] = useState<number>(90);
-  const [remaining, setRemaining] = useState<number>(90);
-  const [running, setRunning] = useState(false);
-
-  /** Wall-clock instant the countdown should reach zero. */
-  const deadlineRef = useRef<number | null>(null);
-  const firedRef = useRef(false);
-
-  const alert = useCallback(() => {
-    if (firedRef.current) return;
-    firedRef.current = true;
-    // Best-effort: unsupported on iOS Safari and behind a user-gesture
-    // requirement elsewhere, so failure here is not worth surfacing.
-    try {
-      navigator.vibrate?.([200, 100, 200]);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!running) return;
-
-    const tick = () => {
-      const deadline = deadlineRef.current;
-      if (deadline === null) return;
-      const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-      setRemaining(left);
-      if (left <= 0) {
-        setRunning(false);
-        deadlineRef.current = null;
-        alert();
-      }
-    };
-
-    tick();
-    const id = window.setInterval(tick, 250);
-    return () => window.clearInterval(id);
-  }, [running, alert]);
-
-  const start = () => {
-    firedRef.current = false;
-    const from = remaining > 0 ? remaining : duration;
-    deadlineRef.current = Date.now() + from * 1000;
-    setRemaining(from);
-    setRunning(true);
-  };
-
-  const pause = () => {
-    setRunning(false);
-    deadlineRef.current = null;
-  };
-
-  const reset = (next = duration) => {
-    setRunning(false);
-    deadlineRef.current = null;
-    firedRef.current = false;
-    setDuration(next);
-    setRemaining(next);
-  };
+  const { duration, remaining, running, done, soundOn, start, pause, reset, setSoundOn } =
+    useRestTimer();
 
   const total = Math.max(1, duration);
   const progress = clamp((remaining / total) * 100, 0, 100);
-  const done = remaining === 0;
 
   return (
     <div className="rounded-xl bg-ink-900/60 p-4 ring-1 ring-white/5">
@@ -106,7 +43,7 @@ export function RestTimer() {
       </div>
 
       <div className="mb-3 flex gap-1.5">
-        {PRESETS.map((preset) => (
+        {REST_PRESETS.map((preset) => (
           <button
             key={preset}
             type="button"
@@ -142,6 +79,19 @@ export function RestTimer() {
         </button>
         <button
           type="button"
+          onClick={() => setSoundOn(!soundOn)}
+          className="rounded-lg bg-white/5 px-3 py-2 text-slate-500 transition hover:text-slate-200"
+          aria-label={soundOn ? 'Mute the rest alert' : 'Unmute the rest alert'}
+          aria-pressed={!soundOn}
+        >
+          {soundOn ? (
+            <Volume2 className="h-3.5 w-3.5" aria-hidden />
+          ) : (
+            <VolumeX className="h-3.5 w-3.5" aria-hidden />
+          )}
+        </button>
+        <button
+          type="button"
           onClick={() => reset()}
           className="rounded-lg bg-white/5 px-3 py-2 text-slate-500 transition hover:text-slate-200"
           aria-label="Reset timer"
@@ -157,12 +107,4 @@ export function RestTimer() {
       ) : null}
     </div>
   );
-}
-
-/** Seconds -> `M:SS`, always safe. */
-function formatClock(seconds: unknown): string {
-  const total = Math.max(0, int(seconds, 0));
-  const mins = Math.floor(total / 60);
-  const secs = total % 60;
-  return `${mins}:${String(secs).padStart(2, '0')}`;
 }

@@ -10,6 +10,10 @@ import {
 } from 'react';
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
   sendPasswordResetEmail,
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -23,7 +27,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { COLLECTIONS, getAuthOrThrow, getDbOrThrow, googleProvider, isFirebaseConfigured } from '../lib/firebase';
 import type { Profile } from '../lib/types';
 import { normalizeProfile, sanitizeDisplayName, UNNAMED_ATHLETE } from '../lib/game/profile';
-import { ensureProfile, persistRecalculation, decayPatch } from '../lib/data';
+import { ensureProfile, eraseAccountData, persistRecalculation, decayPatch } from '../lib/data';
 import { applyStreakDecay, dayKey, safeStreak } from '../lib/game/streak';
 import { identityForStreak, tierForStats } from '../lib/game/constants';
 import { int } from '../lib/safe';
@@ -45,6 +49,12 @@ export interface AuthContextValue {
   /** Send a reset link. Resolves true when the request was accepted. */
   resetPassword: (email: string) => Promise<boolean>;
   signOut: () => Promise<void>;
+  /**
+   * Erase everything this account owns and remove the sign-in itself.
+   * `password` is required only for email/password accounts that have not
+   * signed in recently enough for Firebase to allow the deletion.
+   */
+  deleteAccount: (password?: string) => Promise<void>;
   /** Notice raised by the background check, e.g. a consumed Streak Shield. */
   backgroundNotice: string | null;
   dismissBackgroundNotice: () => void;
@@ -401,6 +411,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [detachProfileListener]);
 
+  const deleteAccount = useCallback(
+    async (password?: string) => {
+      const current = getAuthOrThrow().currentUser;
+      if (!current) return;
+
+      // Detach before the document disappears, for the same reason sign-out
+      // does: a live listener on a deleted document produces a
+      // permission-denied storm.
+      detachProfileListener();
+      setProfile(null);
+      profileRef.current = null;
+
+      await eraseAccountData(current.uid);
+
+      try {
+        await deleteUser(current);
+      } catch (error) {
+        if ((error as { code?: string }).code !== 'auth/requires-recent-login') throw error;
+        // Firebase refuses to delete a stale session, so prove it is really them.
+        const isGoogle = current.providerData.some((p) => p.providerId === 'google.com');
+        if (isGoogle) {
+          await reauthenticateWithPopup(current, googleProvider);
+        } else {
+          if (!password) throw error;
+          await reauthenticateWithCredential(
+            current,
+            EmailAuthProvider.credential(current.email ?? '', password),
+          );
+        }
+        await deleteUser(current);
+      }
+    },
+    [detachProfileListener],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -413,6 +458,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUpWithEmail,
       resetPassword,
       signOut,
+      deleteAccount,
       backgroundNotice,
       dismissBackgroundNotice: () => setBackgroundNotice(null),
     }),
@@ -427,6 +473,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUpWithEmail,
       resetPassword,
       signOut,
+      deleteAccount,
     ],
   );
 
