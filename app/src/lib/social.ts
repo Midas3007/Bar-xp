@@ -94,9 +94,14 @@ function rowFrom(uid: string, raw: unknown): LeaderboardRow {
 /**
  * Prefix search on the stored lowercase name.
  *
- * `` is a very high private-use code point, so `>= q` and `<= q + `
- * bracket every string starting with `q`. Self and existing friends are
- * filtered by the caller, not the query — a query cannot express "not these".
+ * `\uf8ff` is a very high private-use code point, so `>= q` and `<= q + \uf8ff`
+ * bracket every string that starts with `q`. Written as an escape rather than a
+ * literal character on purpose: the literal is invisible in an editor and was
+ * silently lost once already, which turned this into an exact-match query that
+ * only ever found someone by typing their whole name.
+ *
+ * Self and existing friends are filtered by the caller, not the query — a
+ * Firestore query cannot express "not these".
  */
 export async function searchAthletes(term: string, max = 10): Promise<LeaderboardRow[]> {
   const q = searchKey(term);
@@ -107,7 +112,7 @@ export async function searchAthletes(term: string, max = 10): Promise<Leaderboar
     query(
       collection(db, COLLECTIONS.publicProfiles),
       where('searchName', '>=', q),
-      where('searchName', '<=', `${q}`),
+      where('searchName', '<=', `${q}\uf8ff`),
       orderBy('searchName'),
       fbLimit(max),
     ),
