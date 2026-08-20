@@ -27,7 +27,7 @@ const SOURCES = [
 const tsc = process.platform === 'win32' ? 'tsc.cmd' : 'tsc';
 try {
   execFileSync(tsc, [
-    '--ignoreConfig', '--target', 'es2022', '--module', 'esnext',
+    '--target', 'es2022', '--module', 'esnext',
     '--moduleResolution', 'bundler', '--outDir', out, '--skipLibCheck', '--strict',
     ...SOURCES,
   ], { cwd: root, stdio: 'inherit' });
