@@ -6,6 +6,43 @@ import { ensureGoals } from './goals';
 import { LIMITS } from './validation';
 import { normalizeMuscleVolume } from './muscles';
 
+/** The placeholder shown when an athlete has no usable name. */
+export const UNNAMED_ATHLETE = 'Unnamed Athlete';
+
+/**
+ * The longest display name the security rules accept.
+ *
+ * This is not a style preference — `firestore.rules` enforces
+ * `isShortString(d.displayName, 40)` on both create and update, so a name over
+ * this length makes *every* write to the document fail, not just the first.
+ */
+export const MAX_DISPLAY_NAME = LIMITS.MAX_NAME_LENGTH;
+
+/**
+ * Coerce anything into a display name the rules will accept.
+ *
+ * Total by construction: it always returns a non-empty string of at most
+ * `MAX_DISPLAY_NAME` UTF-16 units, which can never exceed 40 characters as the
+ * rules count them.
+ */
+export function sanitizeDisplayName(raw: unknown): string {
+  const collapsed = str(raw, '')
+    // Control characters render as nothing and wreck the leaderboard layout.
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!collapsed) return UNNAMED_ATHLETE;
+
+  let out = collapsed.slice(0, MAX_DISPLAY_NAME);
+  // Slicing must never leave the dangling half of a surrogate pair behind.
+  const last = out.charCodeAt(out.length - 1);
+  if (last >= 0xd800 && last <= 0xdbff) out = out.slice(0, -1);
+  out = out.trim();
+
+  return out || UNNAMED_ATHLETE;
+}
+
 export const EMPTY_INVENTORY: Inventory = {
   streakShields: 0,
   cosmetics: [],
@@ -40,7 +77,7 @@ export function normalizeProfile(uid: string, raw: unknown): Profile {
 
   return {
     uid,
-    displayName: str(data.displayName, '').trim() || 'Unnamed Athlete',
+    displayName: sanitizeDisplayName(data.displayName),
     email: str(data.email, ''),
     photoURL: str(data.photoURL, ''),
     createdAt: num(data.createdAt, Date.now()),
@@ -216,7 +253,7 @@ export function newProfile(params: {
   const now = Date.now();
   return {
     uid: params.uid,
-    displayName: params.displayName.trim() || 'Unnamed Athlete',
+    displayName: sanitizeDisplayName(params.displayName),
     email: params.email,
     photoURL: params.photoURL,
     createdAt: now,

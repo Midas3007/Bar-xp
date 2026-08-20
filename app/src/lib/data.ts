@@ -26,7 +26,14 @@ import type {
 } from './types';
 import { arr, clamp, int, num, round, str } from './safe';
 import { STAT_KEYS, identityForStreak, levelFromTotalXp, tierForStats } from './game/constants';
-import { newProfile, normalizeProfile, baselineStats, type AssessmentInput } from './game/profile';
+import {
+  newProfile,
+  normalizeProfile,
+  baselineStats,
+  sanitizeDisplayName,
+  UNNAMED_ATHLETE,
+  type AssessmentInput,
+} from './game/profile';
 import { dayKey, registerWorkout, safeStreak, type DecayResult } from './game/streak';
 import { advanceGoals, ensureGoals } from './game/goals';
 import { aestheticsFromBodyFat, scoreSession } from './game/xp';
@@ -57,7 +64,7 @@ export function publicProfileRef(uid: string) {
  */
 export function publicProfileFrom(profile: Profile): Record<string, unknown> {
   return {
-    displayName: str(profile.displayName, '').trim().slice(0, 40) || 'Unnamed Athlete',
+    displayName: sanitizeDisplayName(profile.displayName),
     photoURL: str(profile.photoURL, ''),
     level: Math.max(1, int(profile.level, 1)),
     totalXp: Math.max(0, num(profile.totalXp, 0)),
@@ -82,36 +89,79 @@ export async function syncPublicProfile(profile: Profile): Promise<void> {
   }
 }
 
-/** Create the user document on first sign-in, or return the existing one. */
-export async function ensureProfile(user: User): Promise<Profile> {
+/**
+ * Create the user document on first sign-in, or return the existing one.
+ *
+ * `preferredName` is the name typed on the sign-up form. It is passed in
+ * explicitly because at first sign-in the Auth record has not been named yet —
+ * relying on `user.displayName` there is what used to publish the local part of
+ * people's email addresses to the leaderboard.
+ */
+export async function ensureProfile(user: User, preferredName?: string): Promise<Profile> {
   const ref = userDocRef(user.uid);
   const snapshot = await getDoc(ref);
 
-  if (snapshot.exists()) {
-    const profile = normalizeProfile(user.uid, snapshot.data());
+  // Already legal, already truncated: safe to write without further thought.
+  const authName = sanitizeDisplayName(preferredName ?? user.displayName);
+  const emailLocal = str(user.email, '').split('@')[0].trim().toLowerCase();
 
-    // Keep the auth identity in sync if the provider details changed.
+  if (snapshot.exists()) {
+    const raw = (snapshot.data() ?? {}) as Record<string, unknown>;
+    const profile = normalizeProfile(user.uid, raw);
+
     const patch: Record<string, unknown> = {};
-    const authName = str(user.displayName, '').trim();
-    if (authName && authName !== profile.displayName && profile.displayName === 'Unnamed Athlete') {
+    const storedName = str(raw.displayName, '');
+    const legalName = sanitizeDisplayName(storedName);
+
+    // Legality repair. A document written before the length was enforced fails
+    // `userFieldsAreValid` on every subsequent update, which locks the account
+    // out of logging anything at all. Correcting the name inside the patch is
+    // enough on its own: on an update the rules validate the merged document,
+    // so this single write brings the whole document back into compliance.
+    if (legalName !== storedName) patch.displayName = legalName;
+
+    // Leak repair, once per account. `nameFixedAt` is the marker; a name the
+    // athlete chose deliberately (see `updateDisplayName`) sets it too, so this
+    // can never fight a user who genuinely wants to be called by their email
+    // local part.
+    const alreadyRepaired = num(raw.nameFixedAt, 0) > 0;
+    const looksLeaked =
+      legalName === UNNAMED_ATHLETE ||
+      (emailLocal.length > 0 && legalName.toLowerCase() === emailLocal);
+
+    if (
+      !alreadyRepaired &&
+      looksLeaked &&
+      authName !== UNNAMED_ATHLETE &&
+      authName.toLowerCase() !== emailLocal
+    ) {
       patch.displayName = authName;
+      patch.nameFixedAt = Date.now();
     }
+
     if (user.photoURL && user.photoURL !== profile.photoURL) patch.photoURL = user.photoURL;
+
+    const repaired: Profile = {
+      ...profile,
+      displayName: typeof patch.displayName === 'string' ? patch.displayName : profile.displayName,
+      photoURL: typeof patch.photoURL === 'string' ? patch.photoURL : profile.photoURL,
+    };
+
     if (Object.keys(patch).length > 0) {
       patch.updatedAt = Date.now();
       await updateDoc(ref, patch);
     }
 
-    // Keeps the leaderboard row in step for accounts created before the public
-    // collection existed, and repairs it if a mirrored write was ever missed.
-    await syncPublicProfile(profile);
+    // Mirror the *repaired* profile, not the one that was read — otherwise the
+    // leaderboard keeps showing the leaked name until the next workout.
+    await syncPublicProfile(repaired);
 
-    return profile;
+    return repaired;
   }
 
   const fresh = newProfile({
     uid: user.uid,
-    displayName: str(user.displayName, '') || str(user.email, '').split('@')[0] || 'Unnamed Athlete',
+    displayName: authName,
     email: str(user.email, ''),
     photoURL: str(user.photoURL, ''),
   });
@@ -557,9 +607,15 @@ export async function removeCustomExercise(profile: Profile, id: string): Promis
 
 /** Rename the athlete. Kept short so leaderboard rows stay tidy. */
 export async function updateDisplayName(profile: Profile, name: string): Promise<void> {
-  const trimmed = str(name, '').trim().slice(0, LIMITS.MAX_NAME_LENGTH);
-  if (trimmed.length < 2) return;
-  await updateDoc(userDocRef(profile.uid), { displayName: trimmed, updatedAt: Date.now() });
+  const requested = str(name, '').trim();
+  if (requested.length < 2) return;
+  const trimmed = sanitizeDisplayName(requested);
+  await updateDoc(userDocRef(profile.uid), {
+    displayName: trimmed,
+    // A name the athlete chose is never second-guessed by the repair pass.
+    nameFixedAt: Date.now(),
+    updatedAt: Date.now(),
+  });
   await syncPublicProfile({ ...profile, displayName: trimmed });
 }
 
@@ -610,7 +666,7 @@ export async function fetchLeaderboard(max = 50): Promise<LeaderboardRow[]> {
     const active = str(data.activeCosmetic, '');
     return {
       uid: d.id,
-      displayName: str(data.displayName, '').trim() || 'Unnamed Athlete',
+      displayName: sanitizeDisplayName(data.displayName),
       photoURL: str(data.photoURL, ''),
       level: levelFromTotalXp(data.totalXp),
       totalXp: Math.max(0, int(data.totalXp, 0)),

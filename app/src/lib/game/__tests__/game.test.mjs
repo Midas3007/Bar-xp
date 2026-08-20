@@ -18,7 +18,14 @@ import {
   EMPTY_STREAK,
 } from '../streak.js';
 import { volumeMultiplier, DIMINISHING_THRESHOLD, scoreSession, coinsForSession } from '../xp.js';
-import { baselineStats, ASSESSMENT_STAT_CEILING } from '../profile.js';
+import {
+  baselineStats,
+  ASSESSMENT_STAT_CEILING,
+  newProfile,
+  sanitizeDisplayName,
+  MAX_DISPLAY_NAME,
+  UNNAMED_ATHLETE,
+} from '../profile.js';
 import { LIMITS } from '../validation.js';
 
 /* -------------------------------------------------------------------------- */
@@ -292,4 +299,52 @@ test('assessment stats are finite for hostile input', () => {
     const s = baselineStats(bad);
     for (const v of Object.values(s)) assert.ok(Number.isFinite(v) && v >= 0);
   }
+});
+
+/* -------------------------------------------------------------------------- */
+/* Display names must satisfy the security rules                              */
+/* -------------------------------------------------------------------------- */
+
+const HOSTILE_NAMES = [
+  undefined, null, 42, {}, [], '', '   ', '\n\t ',
+  'A'.repeat(200),
+  '🏋️'.repeat(60),
+  '  Ada   Lovelace  ',
+  'Bartholomew Maximilian Featherstonehaugh-Cholmondeley III',
+];
+
+test('REGRESSION: a display name can never exceed the rules bound', () => {
+  for (const name of HOSTILE_NAMES) {
+    const out = sanitizeDisplayName(name);
+    assert.ok(typeof out === 'string' && out.length >= 1, `empty for ${String(name)}`);
+    assert.ok(out.length <= MAX_DISPLAY_NAME, `"${out}" is ${out.length} units long`);
+    assert.ok(!/[\uD800-\uDBFF]$/.test(out), 'left a dangling surrogate');
+  }
+});
+
+test('a blank name falls back to the placeholder', () => {
+  for (const name of [undefined, null, '', '   ', ' ']) {
+    assert.equal(sanitizeDisplayName(name), UNNAMED_ATHLETE);
+  }
+});
+
+test('whitespace is collapsed rather than preserved', () => {
+  assert.equal(sanitizeDisplayName('  Ada   Lovelace  '), 'Ada Lovelace');
+});
+
+test('sanitising twice changes nothing', () => {
+  for (const name of HOSTILE_NAMES) {
+    const once = sanitizeDisplayName(name);
+    assert.equal(sanitizeDisplayName(once), once);
+  }
+});
+
+test('REGRESSION: a long Google name cannot break profile creation', () => {
+  const profile = newProfile({
+    uid: 'u1',
+    displayName: 'A'.repeat(60),
+    email: 'someone@example.com',
+    photoURL: '',
+  });
+  assert.equal(profile.displayName.length, MAX_DISPLAY_NAME);
 });

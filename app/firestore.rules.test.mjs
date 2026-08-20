@@ -222,6 +222,24 @@ await test('rejects an empty display name', async () => {
   await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ displayName: '' })));
 });
 
+await test('accepts a display name at the 40-character limit', async () => {
+  await assertSucceeds(
+    setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, displayName: 'x'.repeat(40) })),
+  );
+});
+
+await test('rejects a display name one character over the limit', async () => {
+  await assertFails(
+    setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, displayName: 'x'.repeat(41) })),
+  );
+});
+
+await test('the nameFixedAt repair marker is accepted on the user document', async () => {
+  await assertSucceeds(
+    setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, nameFixedAt: Date.now() })),
+  );
+});
+
 await test('profiles cannot be deleted', async () => {
   const { deleteDoc } = await import('firebase/firestore');
   await assertFails(deleteDoc(doc(alice, 'users', ALICE)));

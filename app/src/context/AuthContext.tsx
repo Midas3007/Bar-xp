@@ -10,6 +10,7 @@ import {
 } from 'react';
 import {
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -21,7 +22,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 
 import { COLLECTIONS, getAuthOrThrow, getDbOrThrow, googleProvider, isFirebaseConfigured } from '../lib/firebase';
 import type { Profile } from '../lib/types';
-import { normalizeProfile } from '../lib/game/profile';
+import { normalizeProfile, sanitizeDisplayName, UNNAMED_ATHLETE } from '../lib/game/profile';
 import { ensureProfile, persistRecalculation, decayPatch } from '../lib/data';
 import { applyStreakDecay, dayKey, safeStreak } from '../lib/game/streak';
 import { identityForStreak, tierForStats } from '../lib/game/constants';
@@ -41,6 +42,8 @@ export interface AuthContextValue {
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
+  /** Send a reset link. Resolves true when the request was accepted. */
+  resetPassword: (email: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   /** Notice raised by the background check, e.g. a consumed Streak Shield. */
   backgroundNotice: string | null;
@@ -75,6 +78,10 @@ function authErrorMessage(error: unknown): string | null {
       return 'Too many attempts. Wait a moment and try again.';
     case 'auth/popup-blocked':
       return 'Your browser blocked the sign-in popup. Allow popups and try again.';
+    case 'auth/missing-email':
+      return 'Enter your email address first.';
+    case 'auth/operation-not-allowed':
+      return 'That sign-in method is not enabled for this project.';
     case 'auth/network-request-failed':
       return 'Network error. Check your connection and try again.';
     default:
@@ -105,6 +112,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const recalcInFlightRef = useRef(false);
   /** Set on unmount so late async callbacks stop touching state. */
   const mountedRef = useRef(true);
+
+  /**
+   * Held open while an email sign-up is naming the new account.
+   *
+   * `createUserWithEmailAndPassword` signs the user in, so the auth observer
+   * fires *before* `updateProfile` lands. Without this barrier `ensureProfile`
+   * ran against an unnamed user and the name the athlete typed was thrown away.
+   */
+  const signupBarrierRef = useRef<Promise<void> | null>(null);
+  /** The name typed on the sign-up form, handed to `ensureProfile` directly. */
+  const pendingNameRef = useRef<string | null>(null);
 
   const detachProfileListener = useCallback(() => {
     if (unsubscribeProfileRef.current) {
@@ -148,11 +166,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setLoading(true);
 
+      // Wait for an in-flight sign-up to finish naming the account.
+      if (signupBarrierRef.current) await signupBarrierRef.current;
+      if (!mountedRef.current || getAuthOrThrow().currentUser?.uid !== nextUser.uid) return;
+
       try {
         // Guarantees the document exists before the listener attaches, so the
         // first snapshot is never an empty placeholder.
-        await ensureProfile(nextUser);
+        await ensureProfile(nextUser, pendingNameRef.current ?? undefined);
+        pendingNameRef.current = null;
       } catch (error) {
+        pendingNameRef.current = null;
         console.error('[auth] failed to create profile document', error);
         if (mountedRef.current) {
           setAuthError('Could not load your profile. Check your connection and reload.');
@@ -311,21 +335,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUpWithEmail = useCallback(
     async (email: string, password: string, displayName: string) => {
       setAuthError(null);
+
+      const name = sanitizeDisplayName(displayName);
+      pendingNameRef.current = name === UNNAMED_ATHLETE ? null : name;
+
+      let release: () => void = () => {};
+      signupBarrierRef.current = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+
       try {
         const credential = await createUserWithEmailAndPassword(
           getAuthOrThrow(),
           email.trim(),
           password,
         );
-        const name = displayName.trim();
-        if (name) await updateAuthProfile(credential.user, { displayName: name });
+        // Named before the barrier drops, so the profile listener downstream
+        // never sees an unnamed account.
+        if (pendingNameRef.current) {
+          await updateAuthProfile(credential.user, { displayName: pendingNameRef.current });
+        }
       } catch (error) {
+        pendingNameRef.current = null;
         const message = authErrorMessage(error);
         if (message) setAuthError(message);
+      } finally {
+        signupBarrierRef.current = null;
+        release();
       }
     },
     [],
   );
+
+  const resetPassword = useCallback(async (email: string): Promise<boolean> => {
+    setAuthError(null);
+    const address = email.trim();
+    if (!address) {
+      setAuthError('Enter your email address first.');
+      return false;
+    }
+    try {
+      await sendPasswordResetEmail(getAuthOrThrow(), address);
+      return true;
+    } catch (error) {
+      // Never confirm or deny that an address has an account — reporting
+      // "no such user" here turns the sign-in page into an account oracle.
+      if ((error as { code?: string })?.code === 'auth/user-not-found') return true;
+      const message = authErrorMessage(error);
+      if (message) setAuthError(message);
+      return false;
+    }
+  }, []);
 
   const signOut = useCallback(async () => {
     // Detach first: an attached listener plus a revoked token produces a
@@ -351,6 +411,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,
+      resetPassword,
       signOut,
       backgroundNotice,
       dismissBackgroundNotice: () => setBackgroundNotice(null),
@@ -364,6 +425,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,
+      resetPassword,
       signOut,
     ],
   );
