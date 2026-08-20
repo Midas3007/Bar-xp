@@ -1,6 +1,7 @@
 import type { Exercise, WorkoutEntry } from '../types';
 import { arr, num } from '../safe';
 import { entryVolume } from './sets';
+import { MEASUREMENT_BOUNDS, MEASUREMENT_SITES } from './measurements';
 
 /**
  * Anti-cheat bounds.
@@ -37,6 +38,14 @@ export const LIMITS = {
   MAX_ASSESS_PLANK: 1800,
   MIN_BODY_FAT: 3,
   MAX_BODY_FAT: 60,
+  /*
+   * Body measurement bounds, metric. Sanity limits only — measurements are
+   * tracked and charted, never scored, so these reject typos and nothing else.
+   */
+  MIN_BODYWEIGHT_KG: MEASUREMENT_BOUNDS.mass.min,
+  MAX_BODYWEIGHT_KG: MEASUREMENT_BOUNDS.mass.max,
+  MIN_GIRTH_CM: MEASUREMENT_BOUNDS.length.min,
+  MAX_GIRTH_CM: MEASUREMENT_BOUNDS.length.max,
   /** Custom exercise XP-per-unit bounds. */
   MIN_CUSTOM_XP: 0.1,
   MAX_CUSTOM_XP: 8,
@@ -138,6 +147,28 @@ export function validateAssessment(input: {
     return fail(`Body fat should be between ${LIMITS.MIN_BODY_FAT}% and ${LIMITS.MAX_BODY_FAT}%.`);
   }
 
+  return OK;
+}
+
+/**
+ * Validate a set of metric measurement values.
+ *
+ * An empty set is valid — measurements are optional everywhere they appear.
+ * The caller converts a typed value to metric before this runs, so the message
+ * is always in metric; the entry forms carry their own hint in the active unit,
+ * and anyone who trips a bound has typed a wrong number rather than a wrong unit.
+ */
+export function validateMeasurements(values: Record<string, unknown>): ValidationResult {
+  for (const site of MEASUREMENT_SITES) {
+    if (!(site.key in values)) continue;
+    const value = num(values[site.key], NaN);
+    const { min, max } = MEASUREMENT_BOUNDS[site.kind];
+    if (!Number.isFinite(value)) return fail(`${site.label} must be a number.`);
+    if (value < min || value > max) {
+      const unit = site.kind === 'mass' ? 'kg' : 'cm';
+      return fail(`${site.label} should be between ${min}${unit} and ${max}${unit}.`);
+    }
+  }
   return OK;
 }
 

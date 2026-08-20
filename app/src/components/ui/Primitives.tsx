@@ -191,6 +191,43 @@ export function ProgressBar({
 }
 
 /* -------------------------------------------------------------------------- */
+/* Toggle                                                                      */
+/* -------------------------------------------------------------------------- */
+
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  disabled = false,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full ring-1 ring-inset transition disabled:opacity-50 ${
+        checked ? 'bg-forge-500 ring-forge-400/40' : 'bg-ink-700 ring-white/10'
+      }`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-slate-50 shadow transition ${
+          checked ? 'translate-x-6' : 'translate-x-1'
+        }`}
+        aria-hidden
+      />
+    </button>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Badges & chips                                                              */
 /* -------------------------------------------------------------------------- */
 

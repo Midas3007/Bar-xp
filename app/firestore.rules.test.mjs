@@ -277,6 +277,72 @@ await test('profiles cannot be deleted', async () => {
   await assertFails(deleteDoc(doc(alice, 'users', ALICE)));
 });
 
+section('users — body measurements and preferences');
+
+await test('accepts a well-formed measurement block', async () => {
+  await assertSucceeds(
+    setDoc(
+      doc(alice, 'users', ALICE),
+      userDoc({
+        totalXp: 6000,
+        measurements: { values: { bodyweight: 82.4, chest: 104 }, recordedAt: Date.now() },
+      }),
+    ),
+  );
+});
+
+await test('rejects a measurement outside the sanity bounds', async () => {
+  await assertFails(
+    setDoc(
+      doc(alice, 'users', ALICE),
+      userDoc({ totalXp: 6000, measurements: { values: { bodyweight: 900 }, recordedAt: Date.now() } }),
+    ),
+  );
+  await assertFails(
+    setDoc(
+      doc(alice, 'users', ALICE),
+      userDoc({ totalXp: 6000, measurements: { values: { chest: 300 }, recordedAt: Date.now() } }),
+    ),
+  );
+});
+
+await test('rejects an unknown measurement site', async () => {
+  await assertFails(
+    setDoc(
+      doc(alice, 'users', ALICE),
+      userDoc({ totalXp: 6000, measurements: { values: { neck: 40 }, recordedAt: Date.now() } }),
+    ),
+  );
+});
+
+await test('rejects an extra key on the measurement block', async () => {
+  await assertFails(
+    setDoc(
+      doc(alice, 'users', ALICE),
+      userDoc({ totalXp: 6000, measurements: { values: {}, recordedAt: Date.now(), note: 'x' } }),
+    ),
+  );
+});
+
+await test('accepts the display preferences, rejects junk in them', async () => {
+  await assertSucceeds(
+    setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, gymBroMode: false, unitSystem: 'imperial' })),
+  );
+  await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, gymBroMode: 'yes' })));
+  await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, unitSystem: 'furlongs' })));
+});
+
+await test('a document predating measurements still validates', async () => {
+  // `userDoc()` deliberately carries none of the three new keys, so every other
+  // assertion in this file doubles as a legacy-compatibility check. This one
+  // says so explicitly.
+  const legacy = userDoc({ totalXp: 6000 });
+  assert.ok(!('measurements' in legacy));
+  assert.ok(!('gymBroMode' in legacy));
+  assert.ok(!('unitSystem' in legacy));
+  await assertSucceeds(setDoc(doc(alice, 'users', ALICE), legacy));
+});
+
 section('public_profiles — the leaderboard projection');
 
 await test('owner can write their own public row', async () => {
@@ -306,6 +372,12 @@ await test('private fields cannot be smuggled into the public row', async () => 
 
 await test('body fat cannot be smuggled into the public row', async () => {
   await assertFails(setDoc(doc(alice, 'public_profiles', ALICE), publicDoc({ bodyFat: 12 })));
+});
+
+await test('measurements cannot be smuggled into the public row', async () => {
+  await assertFails(
+    setDoc(doc(alice, 'public_profiles', ALICE), publicDoc({ measurements: { waist: 82 } })),
+  );
 });
 
 await test('rejects an over-long display name in the public row', async () => {
@@ -390,6 +462,24 @@ await test('snapshots cannot be edited', async () => {
 
 await test('rejects an unknown source', async () => {
   await assertFails(setDoc(doc(alice, 'stats_history', 's2'), snapshotDoc(ALICE, { source: 'hacked' })));
+});
+
+await test('accepts a measurement snapshot', async () => {
+  await assertSucceeds(
+    setDoc(
+      doc(alice, 'stats_history', 's3'),
+      snapshotDoc(ALICE, { source: 'measurement', measurements: { waist: 82 } }),
+    ),
+  );
+});
+
+await test('rejects an out-of-range measurement on a snapshot', async () => {
+  await assertFails(
+    setDoc(
+      doc(alice, 'stats_history', 's4'),
+      snapshotDoc(ALICE, { source: 'measurement', measurements: { waist: 900 } }),
+    ),
+  );
 });
 
 section('everything else is denied');

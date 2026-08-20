@@ -6,6 +6,7 @@ import { ensureGoals } from './goals';
 import { LIMITS } from './validation';
 import { normalizeMuscleVolume } from './muscles';
 import { normalizeRoutines } from './routines';
+import { normalizeMeasurements } from './measurements';
 
 /** The placeholder shown when an athlete has no usable name. */
 export const UNNAMED_ATHLETE = 'Unnamed Athlete';
@@ -101,6 +102,12 @@ export function normalizeProfile(uid: string, raw: unknown): Profile {
     storedTier: str(data.tier, ''),
     storedIdentity: str(data.identity, ''),
     bodyFat: clamp(num(data.bodyFat, 0), 0, LIMITS.MAX_BODY_FAT),
+    measurements: normalizeMeasurements(data.measurements),
+    unitSystem: data.unitSystem === 'imperial' ? 'imperial' : 'metric',
+    // Gym Bro Mode is on by default, so absence means on — only an explicit
+    // `false` in the document turns it off. Every account created before this
+    // slice therefore lands on the meme labels, which is the intent.
+    gymBroMode: data.gymBroMode !== false,
 
     streak,
     inventory,
@@ -274,6 +281,9 @@ export function newProfile(params: {
     storedTier: tierForStats(EMPTY_STATS).name,
     storedIdentity: identityForStreak(0).label,
     bodyFat: 0,
+    measurements: null,
+    unitSystem: 'metric',
+    gymBroMode: true,
 
     streak: { ...EMPTY_STREAK },
     inventory: { streakShields: 0, cosmetics: [], unlocks: [] },

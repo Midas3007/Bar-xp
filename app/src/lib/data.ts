@@ -18,11 +18,13 @@ import type {
   CustomExercise,
   Exercise,
   LeaderboardRow,
+  MeasurementValues,
   PersonalBest,
   Profile,
   Routine,
   RoutineItem,
   StatsSnapshot,
+  UnitSystem,
   Workout,
   WorkoutEntry,
 } from './types';
@@ -43,6 +45,7 @@ import { findShopItem, type ShopItem } from './game/shop';
 import { mergeMuscleVolume, sessionMuscleVolume } from './game/muscles';
 import { bestSet, entryVolume, normalizeReps } from './game/sets';
 import { newlyEarned, type Achievement } from './game/achievements';
+import { normalizeMeasurementValues } from './game/measurements';
 import { buildRoutine, removeRoutine, upsertRoutine } from './game/routines';
 import { LIMITS } from './game/validation';
 
@@ -207,6 +210,7 @@ export interface AssessmentResult {
 export async function completeAssessment(
   profile: Profile,
   input: AssessmentInput,
+  measurements: MeasurementValues = {},
 ): Promise<AssessmentResult> {
   const db = getDbOrThrow();
   const stats = baselineStats(input);
@@ -214,6 +218,10 @@ export async function completeAssessment(
   const bodyFat = clamp(num(input.bodyFat, 20), LIMITS.MIN_BODY_FAT, LIMITS.MAX_BODY_FAT);
   const now = Date.now();
   const today = dayKey();
+  // Measurements are optional here. Skipping them produces byte-for-byte the
+  // writes this function produced before the field existed.
+  const values = normalizeMeasurementValues(measurements);
+  const hasMeasurements = Object.keys(values).length > 0;
 
   const batch = writeBatch(db);
 
@@ -231,6 +239,7 @@ export async function completeAssessment(
     bodyFat,
     identity: identityForStreak(0).label,
     goals: ensureGoals(1, []),
+    ...(hasMeasurements ? { measurements: { values, recordedAt: now } } : {}),
     updatedAt: now,
   });
 
@@ -247,6 +256,7 @@ export async function completeAssessment(
     totalReps: 0,
     streak: 0,
     source: 'assessment',
+    ...(hasMeasurements ? { measurements: values } : {}),
   });
 
   batch.set(publicProfileRef(profile.uid), {
@@ -580,6 +590,52 @@ export async function updateBodyFat(profile: Profile, bodyFat: number): Promise<
   await batch.commit();
 }
 
+/**
+ * Append a measurement recording.
+ *
+ * Deliberately does NOT touch `stats`, `tier` or `public_profiles`:
+ * measurements are tracked and charted, never scored and never ranked. The
+ * profile keeps a merged "latest per site" for the entry form; the snapshot
+ * keeps only what was entered now, so a chart never draws a three-month-old
+ * chest reading as if it were taken today.
+ */
+export async function recordMeasurements(
+  profile: Profile,
+  input: MeasurementValues,
+): Promise<void> {
+  const db = getDbOrThrow();
+  const entered = normalizeMeasurementValues(input);
+  if (Object.keys(entered).length === 0) return;
+
+  const now = Date.now();
+  const merged = { ...(profile.measurements?.values ?? {}), ...entered };
+
+  const batch = writeBatch(db);
+
+  batch.update(userDocRef(profile.uid), {
+    measurements: { values: merged, recordedAt: now },
+    updatedAt: now,
+  });
+
+  const snapshotRef = doc(collection(db, COLLECTIONS.statsHistory));
+  batch.set(snapshotRef, {
+    uid: profile.uid,
+    createdAt: now,
+    day: dayKey(),
+    stats: profile.stats,
+    level: profile.level,
+    totalXp: profile.totalXp,
+    tier: profile.tier,
+    bodyFat: clamp(num(profile.bodyFat, 0), 0, LIMITS.MAX_BODY_FAT),
+    totalReps: profile.totalReps,
+    streak: safeStreak(profile.streak).current,
+    source: 'measurement',
+    measurements: entered,
+  });
+
+  await batch.commit();
+}
+
 /* -------------------------------------------------------------------------- */
 /* Shop                                                                        */
 /* -------------------------------------------------------------------------- */
@@ -749,6 +805,19 @@ export async function updateDisplayName(profile: Profile, name: string): Promise
   await syncPublicProfile({ ...profile, displayName: trimmed });
 }
 
+/** Persist the per-user display preferences. Never mirrored to the leaderboard. */
+export async function updatePreferences(
+  profile: Profile,
+  patch: { unitSystem?: UnitSystem; gymBroMode?: boolean },
+): Promise<void> {
+  const next: Record<string, unknown> = { updatedAt: Date.now() };
+  if (patch.unitSystem === 'metric' || patch.unitSystem === 'imperial') {
+    next.unitSystem = patch.unitSystem;
+  }
+  if (typeof patch.gymBroMode === 'boolean') next.gymBroMode = patch.gymBroMode;
+  await updateDoc(userDocRef(profile.uid), next);
+}
+
 /* -------------------------------------------------------------------------- */
 /* History & leaderboard reads                                                 */
 /* -------------------------------------------------------------------------- */
@@ -829,7 +898,13 @@ function normalizeSnapshot(id: string, raw: unknown): StatsSnapshot {
     bodyFat: Math.max(0, num(data.bodyFat, 0)),
     totalReps: Math.max(0, int(data.totalReps, 0)),
     streak: Math.max(0, int(data.streak, 0)),
-    source: data.source === 'assessment' ? 'assessment' : 'workout',
+    source:
+      data.source === 'assessment' || data.source === 'measurement'
+        ? data.source
+        : 'workout',
+    // Null rather than `{}` when the key is absent, so "no measurements were
+    // taken" stays distinguishable from "the key exists but held junk".
+    measurements: 'measurements' in data ? normalizeMeasurementValues(data.measurements) : null,
   };
 }
 

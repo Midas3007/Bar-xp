@@ -19,16 +19,50 @@ import { normalizeMuscleVolume, type MuscleKey } from './muscles';
 
 export type AestheticGrade = 'unknown' | 'weak' | 'building' | 'good' | 'elite';
 
-export const GRADE_META: Record<
-  AestheticGrade,
-  { label: string; color: string; bar: string }
-> = {
-  unknown: { label: 'No data', color: 'text-slate-500', bar: 'from-slate-600 to-slate-500' },
-  weak: { label: 'Lagging', color: 'text-rose-300', bar: 'from-rose-600 to-rose-400' },
-  building: { label: 'Building', color: 'text-amber-300', bar: 'from-amber-600 to-amber-400' },
-  good: { label: 'Good', color: 'text-forge-300', bar: 'from-forge-500 to-forge-300' },
-  elite: { label: 'Standout', color: 'text-vital-300', bar: 'from-vital-500 to-vital-300' },
+/** Which vocabulary the trait grades are read in. */
+export type LabelSet = 'plain' | 'bro';
+
+export const GRADE_META: Record<AestheticGrade, { color: string; bar: string }> = {
+  unknown: { color: 'text-slate-500', bar: 'from-slate-600 to-slate-500' },
+  weak: { color: 'text-rose-300', bar: 'from-rose-600 to-rose-400' },
+  building: { color: 'text-amber-300', bar: 'from-amber-600 to-amber-400' },
+  good: { color: 'text-forge-300', bar: 'from-forge-500 to-forge-300' },
+  elite: { color: 'text-vital-300', bar: 'from-vital-500 to-vital-300' },
 };
+
+/**
+ * The same five grades in two vocabularies.
+ *
+ * Only the words differ — `gradeFor` and every score above it are untouched, so
+ * turning Gym Bro Mode off cannot change a single number. `unknown` stays
+ * literal in both: there is nothing funny about missing data, and a joke there
+ * would read as a judgement of the user rather than of the dataset.
+ */
+export const GRADE_LABELS: Record<LabelSet, Record<AestheticGrade, string>> = {
+  plain: {
+    unknown: 'No data',
+    weak: 'Lagging',
+    building: 'Building',
+    good: 'Good',
+    elite: 'Standout',
+  },
+  bro: {
+    unknown: 'No data',
+    weak: 'Chud',
+    building: 'Normie',
+    good: 'Chad',
+    elite: 'GIGACHAD',
+  },
+};
+
+export function gradeLabel(grade: AestheticGrade, labelSet: LabelSet): string {
+  return GRADE_LABELS[labelSet][grade];
+}
+
+/** The profile flag, resolved to a label set in one place. */
+export function labelSetFor(gymBroMode: boolean): LabelSet {
+  return gymBroMode ? 'bro' : 'plain';
+}
 
 export interface AestheticTrait {
   id: string;

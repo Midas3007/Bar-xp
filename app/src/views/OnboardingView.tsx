@@ -1,15 +1,20 @@
 import { useMemo, useState } from 'react';
-import { ArrowRight, ClipboardCheck, Sparkles, TriangleAlert } from 'lucide-react';
+import { ArrowRight, ChevronDown, ClipboardCheck, Sparkles, TriangleAlert } from 'lucide-react';
 
-import type { Profile } from '../lib/types';
+import type { MeasurementValues, Profile, UnitSystem } from '../lib/types';
 import { Button, Card, Field, Input, Spinner } from '../components/ui/Primitives';
 import { StatGrid, TierBadge } from '../components/GameBits';
 import { baselineStats } from '../lib/game/profile';
 import { tierForStats } from '../lib/game/constants';
-import { validateAssessment } from '../lib/game/validation';
+import { validateAssessment, validateMeasurements } from '../lib/game/validation';
 import { completeAssessment } from '../lib/data';
 import { useToast } from '../context/ToastContext';
 import { num } from '../lib/safe';
+import {
+  MEASUREMENT_SITES,
+  metricFromDisplay,
+  unitLabel,
+} from '../lib/game/measurements';
 
 /**
  * First-run assessment.
@@ -27,6 +32,12 @@ export function OnboardingView({ profile }: { profile: Profile }) {
   const [bodyFat, setBodyFat] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Optional and deliberately absent from `filled` below: measurements must
+  // never be able to block the assessment.
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
+  const [showMeasurements, setShowMeasurements] = useState(false);
+  const [measurements, setMeasurements] = useState<Record<string, string>>({});
 
   const input = useMemo(
     () => ({
@@ -61,15 +72,40 @@ export function OnboardingView({ profile }: { profile: Profile }) {
       return;
     }
 
+    // With the section collapsed and untouched this is `{}`, and
+    // `completeAssessment` then writes exactly what it wrote before the field
+    // existed.
+    const values: MeasurementValues = {};
+    for (const site of MEASUREMENT_SITES) {
+      const raw = measurements[site.key] ?? '';
+      // A blank field must be rejected before conversion: `num('', NaN)` is 0,
+      // because `Number('')` is 0, and every untouched site would record a zero.
+      if (raw.trim() === '') continue;
+      const typed = num(raw, NaN);
+      if (!Number.isFinite(typed)) continue;
+      values[site.key] = metricFromDisplay(typed, site.kind, unitSystem);
+    }
+
+    const measurementCheck = validateMeasurements(values as Record<string, unknown>);
+    if (!measurementCheck.ok) {
+      setError(measurementCheck.error ?? 'Check your measurements.');
+      setShowMeasurements(true);
+      return;
+    }
+
     setError(null);
     setBusy(true);
     try {
-      const result = await completeAssessment(profile, {
-        maxPullUps: input.maxPullUps,
-        maxPushUps: input.maxPushUps,
-        plankSeconds: input.plankSeconds,
-        bodyFat: input.bodyFat,
-      });
+      const result = await completeAssessment(
+        profile,
+        {
+          maxPullUps: input.maxPullUps,
+          maxPushUps: input.maxPushUps,
+          plankSeconds: input.plankSeconds,
+          bodyFat: input.bodyFat,
+        },
+        values,
+      );
       toast.success(
         `Assessment complete — you start at ${result.tier}.`,
         'Your baseline is saved. Every session from here is measured against it.',
@@ -161,6 +197,74 @@ export function OnboardingView({ profile }: { profile: Profile }) {
             </Field>
           </div>
 
+          <button
+            type="button"
+            onClick={() => setShowMeasurements((v) => !v)}
+            className="mt-5 flex w-full items-center justify-between gap-3 rounded-xl bg-ink-900/60 px-4 py-3 text-left ring-1 ring-white/5 transition hover:bg-ink-900"
+            aria-expanded={showMeasurements}
+          >
+            <span>
+              <span className="block text-sm font-medium text-slate-200">
+                Body measurements — optional
+              </span>
+              <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">
+                Bodyweight and a tape measure, if you have one. Tracked and charted, never scored.
+                You can add these later from your profile.
+              </span>
+            </span>
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${
+                showMeasurements ? 'rotate-180' : ''
+              }`}
+              aria-hidden
+            />
+          </button>
+
+          {showMeasurements ? (
+            <div className="mt-4 rounded-xl bg-ink-900/40 p-4 ring-1 ring-white/5">
+              <div className="mb-4 inline-flex rounded-xl bg-ink-900 p-1 ring-1 ring-inset ring-white/5">
+                {(['metric', 'imperial'] as const).map((system) => (
+                  <button
+                    key={system}
+                    type="button"
+                    onClick={() => setUnitSystem(system)}
+                    aria-pressed={unitSystem === system}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      unitSystem === system
+                        ? 'bg-forge-500/20 text-forge-200 ring-1 ring-inset ring-forge-400/30'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {system === 'metric' ? 'Metric kg/cm' : 'Imperial lb/in'}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {MEASUREMENT_SITES.map((site) => (
+                  <Field
+                    key={site.key}
+                    label={`${site.label} (${unitLabel(site.kind, unitSystem)})`}
+                    hint={site.hint}
+                  >
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.1"
+                      value={measurements[site.key] ?? ''}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        setMeasurements((m) => ({ ...m, [site.key]: next }));
+                        setError(null);
+                      }}
+                      placeholder="—"
+                    />
+                  </Field>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {error ? (
             <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-rose-500/10 p-3 ring-1 ring-rose-500/25">
               <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" aria-hidden />
@@ -198,8 +302,8 @@ export function OnboardingView({ profile }: { profile: Profile }) {
           </Button>
 
           <p className="mt-4 text-center text-[11px] leading-relaxed text-slate-600">
-            You can re-record your body fat any time from your profile. Strength and endurance grow
-            only through logged work.
+            You can re-record your body fat and your measurements any time from your profile.
+            Strength and endurance grow only through logged work.
           </p>
         </Card>
       </div>

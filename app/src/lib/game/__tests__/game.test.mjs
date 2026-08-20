@@ -36,8 +36,15 @@ import {
   MAX_DISPLAY_NAME,
   UNNAMED_ATHLETE,
 } from '../profile.js';
-import { LIMITS, validateSetLadder, validateRoutine, validateSession } from '../validation.js';
+import {
+  LIMITS, validateSetLadder, validateRoutine, validateSession, validateMeasurements,
+} from '../validation.js';
 import { newlyEarned, isTierAchievement } from '../achievements.js';
+import {
+  MEASUREMENT_BOUNDS, displayFromMetric, metricFromDisplay,
+  normalizeMeasurementValues, unitLabel,
+} from '../measurements.js';
+import { GRADE_LABELS, gradeLabel, overallAestheticScore, rateAesthetics } from '../aesthetics.js';
 import {
   buildShareCardSvg, escapeXml, shareCardFilename,
   SHARE_CARD_WIDTH, SHARE_CARD_HEIGHT,
@@ -707,4 +714,134 @@ test('shareCardFilename dates the file, and falls back rather than emitting junk
   assert.equal(shareCardFilename('2026-08-18'), 'bar-xp-2026-08-18.png');
   assert.equal(shareCardFilename('not a day'), 'bar-xp-session.png');
   assert.equal(shareCardFilename(undefined), 'bar-xp-session.png');
+});
+
+/* -------------------------------------------------------------------------- */
+/* Body measurements                                                           */
+/* -------------------------------------------------------------------------- */
+
+const KINDS = ['mass', 'length'];
+const SYSTEMS = ['metric', 'imperial'];
+
+test('the unit conversion round-trips exactly', () => {
+  for (const v of [20, 73.5, 104, 400]) {
+    for (const kind of KINDS) {
+      for (const system of SYSTEMS) {
+        const back = metricFromDisplay(displayFromMetric(v, kind, system), kind, system);
+        assert.ok(
+          Math.abs(back - v) < 1e-9,
+          `${v} ${kind} in ${system} came back as ${back}`,
+        );
+      }
+    }
+  }
+});
+
+test('the imperial conversions are the real ones', () => {
+  assert.ok(Math.abs(displayFromMetric(100, 'mass', 'imperial') - 220.46226218487757) < 1e-6);
+  assert.ok(Math.abs(displayFromMetric(100, 'length', 'imperial') - 39.37007874015748) < 1e-9);
+});
+
+test('metric is the identity in both directions', () => {
+  for (const kind of KINDS) {
+    assert.equal(displayFromMetric(82.4, kind, 'metric'), 82.4);
+    assert.equal(metricFromDisplay(82.4, kind, 'metric'), 82.4);
+  }
+});
+
+test('normalizeMeasurementValues drops junk rather than clamping it', () => {
+  const out = normalizeMeasurementValues({
+    neck: 40,
+    bodyweight: 500,
+    chest: 300,
+    waist: -10,
+    biceps: 0,
+    back: NaN,
+    thighs: Infinity,
+    calves: 'wide',
+  });
+  assert.deepEqual(out, {}, 'a typo must never be silently recorded as the bound');
+});
+
+test('normalizeMeasurementValues keeps and rounds a good reading', () => {
+  assert.deepEqual(normalizeMeasurementValues({ chest: 104.26 }), { chest: 104.3 });
+  assert.deepEqual(normalizeMeasurementValues({ bodyweight: 82.44, waist: 82 }), {
+    bodyweight: 82.4,
+    waist: 82,
+  });
+});
+
+test('normalizeMeasurementValues survives being handed anything at all', () => {
+  for (const junk of [null, undefined, 42, 'x', [], true]) {
+    assert.deepEqual(normalizeMeasurementValues(junk), {});
+  }
+});
+
+test('validateMeasurements accepts an empty set and names the bound it rejects', () => {
+  assert.ok(validateMeasurements({}).ok);
+  assert.ok(validateMeasurements({ chest: 104, waist: 82 }).ok);
+  const bad = validateMeasurements({ bodyweight: 900 });
+  assert.ok(!bad.ok);
+  assert.ok(bad.error.includes('400'), bad.error);
+});
+
+test('LIMITS mirrors MEASUREMENT_BOUNDS, the one place the two could drift', () => {
+  assert.equal(LIMITS.MIN_BODYWEIGHT_KG, MEASUREMENT_BOUNDS.mass.min);
+  assert.equal(LIMITS.MAX_BODYWEIGHT_KG, MEASUREMENT_BOUNDS.mass.max);
+  assert.equal(LIMITS.MIN_GIRTH_CM, MEASUREMENT_BOUNDS.length.min);
+  assert.equal(LIMITS.MAX_GIRTH_CM, MEASUREMENT_BOUNDS.length.max);
+});
+
+test('the two grade vocabularies cover the same five grades', () => {
+  assert.deepEqual(Object.keys(GRADE_LABELS.plain).sort(), Object.keys(GRADE_LABELS.bro).sort());
+  assert.equal(Object.keys(GRADE_LABELS.plain).length, 5);
+  assert.equal(gradeLabel('elite', 'bro'), 'GIGACHAD');
+  assert.equal(gradeLabel('elite', 'plain'), 'Standout');
+  // Missing data is not a joke, and a joke there would read as a judgement of
+  // the user rather than of the dataset.
+  assert.equal(gradeLabel('unknown', 'bro'), gradeLabel('unknown', 'plain'));
+});
+
+/**
+ * DESIGN INVARIANT: measurements are never scored.
+ *
+ * This is the test that fails if a future change starts feeding a waist-to-
+ * shoulder ratio into a grade.
+ */
+test('the physique ratings are identical with and without measurements', () => {
+  const base = {
+    ...newProfile({ uid: 'u1', displayName: 'Test', email: 't@example.com', photoURL: '' }),
+    bodyFat: 14,
+    workoutCount: 40,
+    totalReps: 6000,
+    muscleVolume: {
+      chest: 900, shoulders: 700, triceps: 600, biceps: 550, lats: 800,
+      upper_back: 700, abs: 500, obliques: 300, quads: 900, glutes: 700,
+      hamstrings: 500, calves: 400, forearms: 300, lower_back: 300,
+    },
+  };
+  const withMeasurements = {
+    ...base,
+    measurements: {
+      values: {
+        bodyweight: 82.4, chest: 104, back: 112, waist: 80,
+        biceps: 38, thighs: 60, calves: 39,
+      },
+      recordedAt: Date.now(),
+    },
+    gymBroMode: false,
+  };
+
+  assert.deepEqual(rateAesthetics(withMeasurements), rateAesthetics(base));
+  assert.equal(
+    overallAestheticScore(rateAesthetics(withMeasurements)),
+    overallAestheticScore(rateAesthetics(base)),
+  );
+});
+
+test('unitLabel names the unit the value is actually shown in', () => {
+  assert.equal(unitLabel('mass', 'metric'), 'kg');
+  assert.equal(unitLabel('mass', 'imperial'), 'lb');
+  assert.equal(unitLabel('length', 'metric'), 'cm');
+  assert.equal(unitLabel('length', 'imperial'), 'in');
 });
