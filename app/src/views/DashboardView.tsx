@@ -145,7 +145,7 @@ export function DashboardView({
               value={`${fmtDecimal(multiplier, 2)}×`}
               sub={
                 multiplier > 1
-                  ? `from a ${fmt(profile.streak.current)}-week streak`
+                  ? `from a ${fmt(profile.streak.current)}-day streak`
                   : 'train today to start one'
               }
               accent={multiplier > 1 ? 'text-ember-300' : 'text-slate-400'}

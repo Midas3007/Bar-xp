@@ -113,10 +113,13 @@ export function OnboardingView({ profile }: { profile: Profile }) {
     } catch (err) {
       console.error('[onboarding] assessment failed', err);
       setError('Could not save your assessment. Check your connection and try again.');
+    } finally {
+      // Always cleared. On success the profile listener flips `onboarded` and
+      // this view unmounts before it matters; if anything stops that snapshot
+      // arriving, the athlete gets their button back instead of an eternal
+      // spinner. Re-submitting is idempotent.
       setBusy(false);
     }
-    // On success the profile listener flips `onboarded` and this view unmounts,
-    // so `busy` is deliberately left set.
   };
 
   return (

@@ -249,29 +249,39 @@ export interface AssessmentResult {
 const COMMIT_GRACE_MS = 1200;
 
 /**
- * Commit a batch without hostage-taking the UI.
+ * Commit a batch without hostage-taking the UI — but without lying about it.
  *
  * Firestore applies a batch to the local cache immediately and only settles the
- * returned promise once the server acknowledges it — which, offline, is never.
- * The write is already durable in IndexedDB and will replay on reconnect, so we
- * report success as soon as that is true and tell the caller whether the server
- * has actually seen it yet.
+ * returned promise once the server acknowledges it, which offline is never. So
+ * a commit that has not settled inside the grace window is reported as
+ * `pending`: the write is durable in IndexedDB and will replay on reconnect.
  *
- * Returns true when the server acknowledged inside the grace window.
+ * A commit that *rejects* is something else entirely — rules, quota, invalid
+ * data — and is rethrown. An earlier version swallowed rejections and returned
+ * `false` for both cases, which turned every rejected write into a silent
+ * success: the caller showed a success toast, the document never changed, and
+ * onboarding sat on a spinner forever waiting for a snapshot that was never
+ * coming. Never collapse "not yet" and "no" into the same value.
  */
 async function commitBatch(batch: WriteBatch): Promise<boolean> {
-  const commit = batch.commit().then(
-    () => true,
-    (error) => {
-      // A genuine rejection (rules, quota) still deserves a log even though the
-      // caller has already moved on.
-      console.error('[data] batch failed to sync', error);
-      return false;
-    },
-  );
+  let settled = false;
+  const commit = batch.commit().then(() => {
+    settled = true;
+    return true;
+  });
+
   const timeout = new Promise<boolean>((resolve) => {
     window.setTimeout(() => resolve(false), COMMIT_GRACE_MS);
   });
+
+  // `Promise.race` leaves the loser running. If the commit later rejects with
+  // nobody awaiting it that is an unhandled rejection, so it is caught and
+  // logged here — by then the caller has already been told the write is
+  // pending, and a genuine failure will surface on the next read.
+  commit.catch((error) => {
+    if (!settled) console.error('[data] a pending write was rejected on sync', error);
+  });
+
   return Promise.race([commit, timeout]);
 }
 

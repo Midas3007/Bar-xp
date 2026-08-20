@@ -22,6 +22,15 @@ export const WEEKLY_TARGET = 4;
 
 /** Bonus per consecutive week held, and the ceiling it stops at. */
 export const WEEKLY_BONUS = 0.05;
+
+/**
+ * Session XP bonus per day of the current run.
+ *
+ * The streak counts days again. It is protected by the weekly target rather
+ * than by training literally every day, so 3% a day is affordable: a realistic
+ * four-a-week athlete sits well below the cap for months.
+ */
+export const DAILY_BONUS = 0.03;
 export const MAX_STREAK_BONUS = 0.45;
 
 /* -------------------------------------------------------------------------- */
@@ -123,42 +132,68 @@ export function safeStreak(value: unknown): Streak {
     shieldsUsed: Math.max(0, int(raw.shieldsUsed, 0)),
     weekKey: week,
     daysThisWeek: Math.max(0, int(raw.daysThisWeek, 0)),
+    ...(raw.model === 'daily' ? { model: 'daily' as const } : {}),
   };
 }
 
-/** Has this streak been through the daily -> weekly migration yet? */
+/** A streak document written before the weekly model existed. */
 export function isLegacyStreak(streak: Streak): boolean {
   return streak.weekKey === null && (streak.current > 0 || streak.lastWorkoutDay !== null);
 }
 
-/**
- * Convert a pre-weekly streak document into the weekly model.
- *
- * A day-run of N converts to ceil(N / 7) weeks, which is the generous reading —
- * a 15-day run becomes 3 weeks rather than 2. Nothing else about the account is
- * touched: level, tier, XP, coins and unlocks are all untouched by this change,
- * and `best` keeps whichever of the two readings is larger so a past record can
- * never be erased by the migration.
- */
-export function migrateLegacyStreak(streak: Streak, today: string = dayKey()): Streak {
-  if (!isLegacyStreak(streak)) return streak;
-
-  const days = streak.current;
-  const weeks = days > 0 ? Math.ceil(days / 7) : 0;
-  const thisWeek = weekKeyForDay(today) ?? weekKey();
-  const trainedThisWeek =
-    streak.lastWorkoutDay !== null && weekKeyForDay(streak.lastWorkoutDay) === thisWeek;
-
-  return {
-    ...streak,
-    current: weeks,
-    best: Math.max(streak.best, weeks),
-    weekKey: thisWeek,
-    // Credit the days already trained inside the current week, capped at the
-    // target so the migration cannot itself complete a week.
-    daysThisWeek: trainedThisWeek ? Math.min(days, WEEKLY_TARGET) : 0,
-  };
+/** A streak document whose `current` still counts weeks. */
+export function isWeeklyStreak(streak: Streak): boolean {
+  return streak.model !== 'daily' && streak.weekKey !== null;
 }
+
+/**
+ * Bring any stored streak onto the daily model.
+ *
+ * The counter has been through two schemes. Originally it counted days; slice 1
+ * made it count weeks; it counts days again now, protected by a weekly target
+ * rather than by having to train every single day. Both older shapes are
+ * converted on read, once, and every write since carries `model: 'daily'` so a
+ * converted document is never converted twice.
+ *
+ * A week-run of N becomes `N * WEEKLY_TARGET` days, which is the honest floor:
+ * holding a week required at least that many training days, so nobody is handed
+ * a run they did not train for, and nobody loses one they did. `best` keeps
+ * whichever reading is larger, so a past record can never be erased by a
+ * migration.
+ */
+export function migrateStreakModel(streak: Streak, today: string = dayKey()): Streak {
+  const thisWeek = weekKeyForDay(today) ?? weekKey();
+
+  if (isLegacyStreak(streak)) {
+    // Pre-weekly: `current` was already a day count, so it carries over as-is.
+    const trainedThisWeek =
+      streak.lastWorkoutDay !== null && weekKeyForDay(streak.lastWorkoutDay) === thisWeek;
+    return {
+      ...streak,
+      model: 'daily',
+      weekKey: thisWeek,
+      daysThisWeek: trainedThisWeek ? Math.min(streak.current, WEEKLY_TARGET) : 0,
+    };
+  }
+
+  if (isWeeklyStreak(streak)) {
+    const days = Math.max(0, streak.current) * WEEKLY_TARGET;
+    // `best` was in weeks too, so it converts on the same scale. Taking the max
+    // against the live run as well means the record can only ever move up.
+    const bestDays = Math.max(Math.max(0, streak.best) * WEEKLY_TARGET, days);
+    return {
+      ...streak,
+      model: 'daily',
+      current: days,
+      best: bestDays,
+    };
+  }
+
+  return streak;
+}
+
+/** Kept under its old name: the recalculation pass and the tests both call it. */
+export const migrateLegacyStreak = migrateStreakModel;
 
 /* -------------------------------------------------------------------------- */
 /* Settling elapsed weeks                                                      */
@@ -194,7 +229,7 @@ export function settleStreak(
   availableShields: unknown,
   today: string = dayKey(),
 ): DecayResult {
-  const current = migrateLegacyStreak(safeStreak(streak), today);
+  const current = migrateStreakModel(safeStreak(streak), today);
   const shields = Math.max(0, int(availableShields, 0));
   const thisWeek = weekKeyForDay(today) ?? weekKey();
 
@@ -210,7 +245,7 @@ export function settleStreak(
     // Never trained. Start the clock without judging anything.
     return {
       ...unchanged,
-      streak: { ...current, weekKey: thisWeek, daysThisWeek: 0 },
+      streak: { ...current, model: 'daily', weekKey: thisWeek, daysThisWeek: 0 },
       changed: true,
     };
   }
@@ -252,6 +287,7 @@ export function settleStreak(
   return {
     streak: {
       ...current,
+      model: 'daily',
       current: run,
       best: Math.max(current.best, run),
       shieldsUsed: current.shieldsUsed + consumed,
@@ -287,12 +323,15 @@ export function registerWorkout(
   // Already logged today — the streak does not double-count.
   if (settled.lastWorkoutDay === today) return settled;
 
+  // Every distinct training day advances the run. `daysThisWeek` still tracks
+  // the week so the safety net in `settleStreak` can read it, but it no longer
+  // gates the counter — that was the weekly model, and this is not it.
   const days = Math.min(settled.daysThisWeek + 1, 7);
-  const justHitTarget = days === WEEKLY_TARGET;
-  const run = justHitTarget ? settled.current + 1 : settled.current;
+  const run = settled.current + 1;
 
   return {
     ...settled,
+    model: 'daily',
     current: run,
     best: Math.max(settled.best, run),
     lastWorkoutDay: today,
@@ -310,8 +349,8 @@ export function daysRemainingThisWeek(streak: Streak | null | undefined): number
   return Math.max(0, WEEKLY_TARGET - safeStreak(streak).daysThisWeek);
 }
 
-/** Session XP multiplier earned by the current run of weeks. */
+/** Session XP multiplier earned by the current run of days. */
 export function streakMultiplier(streak: unknown): number {
-  const weeks = Math.max(0, int(streak, 0));
-  return 1 + Math.min(weeks * WEEKLY_BONUS, MAX_STREAK_BONUS);
+  const days = Math.max(0, int(streak, 0));
+  return 1 + Math.min(days * DAILY_BONUS, MAX_STREAK_BONUS);
 }

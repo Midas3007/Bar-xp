@@ -135,7 +135,7 @@ export function SessionSummary({
           <dl className="mt-3 space-y-1 text-sm">
             <Row label="Base" value={`${fmt(result.baseXp)} XP`} />
             <Row
-              label={`Streak bonus (${fmt(result.streak)} week${
+              label={`Streak bonus (${fmt(result.streak)} day${
                 result.streak === 1 ? '' : 's'
               } · ×${fmtDecimal(multiplier, 2)})`}
               value={`+${fmt(result.streakBonusXp)} XP`}
