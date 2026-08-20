@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Coins, Flame, Shield, Trophy } from 'lucide-react';
 
 import type { Profile, StatKey, Stats } from '../lib/types';
@@ -12,7 +13,7 @@ import {
   tierForStats,
 } from '../lib/game/constants';
 import { cosmeticNameClass } from '../lib/game/shop';
-import { Card, Chip, ProgressBar } from './ui/Primitives';
+import { Card, Chip, ProgressBar, usePrefersReducedMotion } from './ui/Primitives';
 
 /* -------------------------------------------------------------------------- */
 /* Cosmetic-aware display name                                                 */
@@ -120,6 +121,76 @@ export function LevelBar({ totalXp, compact = false }: { totalXp: unknown; compa
             : `${fmt(Math.max(0, progress.xpForNext - progress.xpIntoLevel))} XP to level ${progress.level + 1}`}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * The XP bar as a movement rather than a jump. Tweens lifetime XP and derives
+ * the bar from it, so crossing a level renders as the bar filling, resetting
+ * and continuing — which is what actually happened.
+ */
+export function AnimatedLevelBar({
+  fromTotalXp,
+  toTotalXp,
+  durationMs = 1100,
+}: {
+  fromTotalXp: unknown;
+  toTotalXp: unknown;
+  durationMs?: number;
+}) {
+  const from = Math.max(0, num(fromTotalXp, 0));
+  const to = Math.max(from, num(toTotalXp, from));
+  const reduced = usePrefersReducedMotion();
+  const [displayed, setDisplayed] = useState(reduced ? to : from);
+
+  useEffect(() => {
+    if (reduced || to <= from) {
+      setDisplayed(to);
+      return;
+    }
+    let frame = 0;
+    const start = performance.now();
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / Math.max(1, durationMs));
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplayed(from + (to - from) * eased);
+      if (t < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [from, to, durationMs, reduced]);
+
+  const progress = levelProgress(displayed);
+
+  return (
+    <div className="w-full">
+      <div className="mb-2 flex items-end justify-between gap-4">
+        <div className="flex items-baseline gap-2">
+          <span className="font-display text-xs font-semibold uppercase tracking-widest text-slate-500">
+            Level
+          </span>
+          <span className="font-display text-2xl font-bold leading-none text-slate-50">
+            {progress.level}
+          </span>
+        </div>
+        <span className="font-mono text-xs text-slate-500">
+          {progress.isMax
+            ? 'MAX LEVEL'
+            : `${fmt(progress.xpIntoLevel)} / ${fmt(progress.xpForNext)} XP`}
+        </span>
+      </div>
+
+      <ProgressBar
+        value={progress.isMax ? 1 : progress.xpIntoLevel}
+        max={progress.isMax ? 1 : progress.xpForNext}
+        gradient="from-forge-500 via-forge-400 to-arcane-400"
+        height="h-3"
+        // The tween rewrites the width every frame; a 700ms CSS transition on
+        // top of that would chase it and always arrive late.
+        transition={false}
+        label={`Level ${progress.level} progress`}
+      />
     </div>
   );
 }

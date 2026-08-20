@@ -42,6 +42,7 @@ import { aestheticsFromBodyFat, scoreSession } from './game/xp';
 import { findShopItem, type ShopItem } from './game/shop';
 import { mergeMuscleVolume, sessionMuscleVolume } from './game/muscles';
 import { bestSet, entryVolume, normalizeReps } from './game/sets';
+import { newlyEarned, type Achievement } from './game/achievements';
 import { buildRoutine, removeRoutine, upsertRoutine } from './game/routines';
 import { LIMITS } from './game/validation';
 
@@ -262,19 +263,52 @@ export async function completeAssessment(
 /* Workout logging                                                             */
 /* -------------------------------------------------------------------------- */
 
+/** A personal best, plus what it beat. `previousValue` is never persisted. */
+export interface PersonalBestGain extends PersonalBest {
+  previousValue: number;
+}
+
+export interface CompletedGoalSummary {
+  title: string;
+  rewardXp: number;
+  rewardCoins: number;
+}
+
 export interface LogWorkoutResult {
+  /** Everything banked: session XP, the streak bonus, and goal rewards. */
   xpEarned: number;
+  /** Session XP before the streak multiplier and before goal rewards. */
+  baseXp: number;
+  streakBonusXp: number;
+  goalRewardXp: number;
+  /** Coins from the session itself; `coinsEarned` also includes goal rewards. */
+  sessionCoins: number;
+  goalRewardCoins: number;
   coinsEarned: number;
-  levelsGained: number;
+
+  totalXpBefore: number;
+  totalXpAfter: number;
+  levelBefore: number;
   newLevel: number;
+  levelsGained: number;
+
+  tierBefore: string;
   newTier: string;
   tierChanged: boolean;
-  newPersonalBests: PersonalBest[];
-  completedGoals: string[];
-  goalRewardXp: number;
-  goalRewardCoins: number;
+
+  newPersonalBests: PersonalBestGain[];
+  completedGoals: CompletedGoalSummary[];
+  newAchievements: Achievement[];
+
+  streakBefore: number;
   streak: number;
   totalReps: number;
+  totalVolume: number;
+  entryCount: number;
+  /** Exercise names in session order, for the share card. */
+  movementNames: string[];
+  /** Local calendar day the session was filed under, `YYYY-MM-DD`. */
+  day: string;
 }
 
 /**
@@ -396,6 +430,27 @@ export async function logWorkout(
     updatedAt: now,
   });
 
+  // The profile as the batch will leave it. Achievements are derived, so the
+  // only way to know what this session unlocked is to score both sides — and
+  // it has to be built from the same locals the update writes, or the summary
+  // would celebrate a badge the document does not back.
+  const profileAfter: Profile = {
+    ...profile,
+    level: newLevel,
+    totalXp: newTotalXp,
+    coins: Math.max(0, int(profile.coins, 0)) + coinsEarned,
+    stats,
+    tier: tierAfter.name,
+    identity: identityAfter.label,
+    streak: streakAfter,
+    personalBests,
+    goals: goalOutcome.goals,
+    workoutCount: Math.max(0, int(profile.workoutCount, 0)) + 1,
+    totalReps,
+    muscleVolume,
+  };
+  const newAchievements = newlyEarned(profile, profileAfter);
+
   batch.set(snapshotRef, {
     uid: profile.uid,
     createdAt: now,
@@ -414,17 +469,39 @@ export async function logWorkout(
 
   return {
     xpEarned,
+    baseXp: totals.baseXp,
+    streakBonusXp: totals.streakBonusXp,
+    goalRewardXp: goalOutcome.rewardXp,
+
+    sessionCoins: totals.coins,
+    goalRewardCoins: goalOutcome.rewardCoins,
     coinsEarned,
-    levelsGained: Math.max(0, newLevel - previousLevel),
+
+    totalXpBefore: previousTotalXp,
+    totalXpAfter: newTotalXp,
+    levelBefore: previousLevel,
     newLevel,
+    levelsGained: Math.max(0, newLevel - previousLevel),
+
+    tierBefore: str(profile.tier, ''),
     newTier: tierAfter.name,
     tierChanged: tierAfter.name !== profile.tier,
+
     newPersonalBests: fresh,
-    completedGoals: goalOutcome.completed.map((g) => g.title),
-    goalRewardXp: goalOutcome.rewardXp,
-    goalRewardCoins: goalOutcome.rewardCoins,
+    completedGoals: goalOutcome.completed.map((g) => ({
+      title: str(g.title, ''),
+      rewardXp: Math.max(0, int(g.rewardXp, 0)),
+      rewardCoins: Math.max(0, int(g.rewardCoins, 0)),
+    })),
+    newAchievements,
+
+    streakBefore: streakBefore.current,
     streak: streakAfter.current,
     totalReps: totals.totalReps,
+    totalVolume: totals.totalVolume,
+    entryCount: entries.length,
+    movementNames: entries.map((e) => str(e.exerciseName, '')).filter(Boolean),
+    day: today,
   };
 }
 
@@ -432,9 +509,9 @@ export async function logWorkout(
 function mergePersonalBests(
   existing: Profile['personalBests'],
   entries: WorkoutEntry[],
-): { personalBests: Profile['personalBests']; fresh: PersonalBest[] } {
+): { personalBests: Profile['personalBests']; fresh: PersonalBestGain[] } {
   const personalBests: Profile['personalBests'] = { ...existing };
-  const fresh: PersonalBest[] = [];
+  const fresh: PersonalBestGain[] = [];
 
   for (const entry of entries) {
     const id = str(entry.exerciseId, '');
@@ -455,8 +532,10 @@ function mergePersonalBests(
       achievedAt: Date.now(),
     };
     personalBests[id] = record;
-    // Only announce a PR when there was something to beat.
-    if (current) fresh.push(record);
+    // Only announce a PR when there was something to beat. `previousValue` is a
+    // display concern and is spread into a *copy*: pushing the same reference
+    // would persist it into `personalBests` for every user, permanently.
+    if (current) fresh.push({ ...record, previousValue: Math.max(0, int(current.value, 0)) });
   }
 
   return { personalBests, fresh };

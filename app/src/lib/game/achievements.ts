@@ -1,5 +1,5 @@
 import type { Profile } from '../types';
-import { int, num } from '../safe';
+import { int, num, str } from '../safe';
 import { TIERS } from './constants';
 
 /**
@@ -230,4 +230,25 @@ export function achievementsFor(profile: Profile): Achievement[] {
 
 export function earnedCount(achievements: Achievement[]): number {
   return achievements.filter((a) => a.earned).length;
+}
+
+/**
+ * Achievements the second profile has earned and the first had not.
+ *
+ * Derived badges have no "earned at" timestamp to sort by, so the only honest
+ * way to know what a session unlocked is to score the profile before and after
+ * it and take the difference.
+ */
+export function newlyEarned(before: Profile, after: Profile): Achievement[] {
+  const had = new Set(
+    achievementsFor(before)
+      .filter((a) => a.earned)
+      .map((a) => a.id),
+  );
+  return achievementsFor(after).filter((a) => a.earned && !had.has(a.id));
+}
+
+/** True for the derived rank badge, which the summary announces on its own row. */
+export function isTierAchievement(id: unknown): boolean {
+  return str(id, '').startsWith('tier_');
 }

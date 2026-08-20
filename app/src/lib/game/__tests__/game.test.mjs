@@ -37,6 +37,11 @@ import {
   UNNAMED_ATHLETE,
 } from '../profile.js';
 import { LIMITS, validateSetLadder, validateRoutine, validateSession } from '../validation.js';
+import { newlyEarned, isTierAchievement } from '../achievements.js';
+import {
+  buildShareCardSvg, escapeXml, shareCardFilename,
+  SHARE_CARD_WIDTH, SHARE_CARD_HEIGHT,
+} from '../../share/shareCard.js';
 
 /* -------------------------------------------------------------------------- */
 /* The migration guarantee                                                     */
@@ -551,4 +556,155 @@ test('validateRoutine enforces the name, the item count and the cap', () => {
   const atCap = validateRoutine({ name: 'Push Day', items, existingCount: LIMITS.MAX_ROUTINES });
   assert.ok(!atCap.ok);
   assert.ok(atCap.error.includes(String(LIMITS.MAX_ROUTINES)), 'the error names the limit');
+});
+
+/* -------------------------------------------------------------------------- */
+/* Base XP and the achievement diff                                            */
+/* -------------------------------------------------------------------------- */
+
+test('baseXp and streakBonusXp add up to the session total, at every streak', () => {
+  for (const weeks of [0, 3, 20]) {
+    const totals = scoreSession([entry(3, 20)], resolve, weeks);
+    assert.equal(
+      totals.baseXp + totals.streakBonusXp,
+      totals.xp,
+      `base + bonus should equal the total at ${weeks} weeks`,
+    );
+  }
+});
+
+test('baseXp is untouched by the streak multiplier', () => {
+  const flat = scoreSession([entry(3, 20)], resolve, 0);
+  const hot = scoreSession([entry(3, 20)], resolve, 20);
+  assert.equal(flat.baseXp, hot.baseXp);
+  assert.ok(hot.xp > flat.xp, 'the streak still pays');
+});
+
+test('baseXp still reflects session-level diminishing returns', () => {
+  const oneEntry = scoreSession([entry(1, 150)], resolve, 0);
+  const split = scoreSession([entry(1, 75), entry(1, 75)], resolve, 0);
+  assert.equal(
+    oneEntry.baseXp,
+    split.baseXp,
+    'splitting a movement across entries must not dodge the taper',
+  );
+});
+
+const athlete = (overrides) => ({
+  ...newProfile({ uid: 'u1', displayName: 'Test', email: 't@example.com', photoURL: '' }),
+  ...overrides,
+});
+
+test('newlyEarned reports only what flipped', () => {
+  const before = athlete({ workoutCount: 0 });
+  const after = athlete({ workoutCount: 1 });
+  assert.deepEqual(
+    newlyEarned(before, after).map((a) => a.id),
+    ['first_session'],
+  );
+  assert.deepEqual(newlyEarned(after, after), [], 'an unchanged profile earns nothing');
+});
+
+test('newlyEarned surfaces the rank badge, which isTierAchievement identifies', () => {
+  const before = athlete({ tier: 'Bronze' });
+  const after = athlete({ tier: 'Silver' });
+  const earned = newlyEarned(before, after);
+  assert.ok(earned.some((a) => isTierAchievement(a.id)), 'the promotion produces a tier badge');
+  assert.ok(!isTierAchievement('sessions_10'));
+  assert.ok(!isTierAchievement(undefined));
+});
+
+test('newlyEarned reports nothing when the profile goes backwards', () => {
+  const before = athlete({ workoutCount: 50, totalReps: 20000 });
+  const after = athlete({ workoutCount: 1, totalReps: 10 });
+  assert.deepEqual(newlyEarned(before, after), []);
+});
+
+/* -------------------------------------------------------------------------- */
+/* The share card                                                              */
+/* -------------------------------------------------------------------------- */
+
+/** No bare ampersand left anywhere outside a well-formed entity. */
+const hasBareAmpersand = (svg) => /&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/.test(svg);
+
+test('escapeXml escapes the ampersand first and never double-escapes', () => {
+  assert.equal(escapeXml('&<'), '&amp;&lt;');
+  const escaped = escapeXml('a & b < c > d " e \' f');
+  assert.ok(!hasBareAmpersand(escaped), escaped);
+  assert.ok(!escaped.includes('&amp;lt;'), 'entities must not be escaped twice');
+});
+
+const cardData = (overrides) => ({
+  athlete: 'Test Athlete',
+  day: '2026-08-18',
+  level: 12,
+  tier: 'Silver',
+  xpEarned: 420,
+  baseXp: 380,
+  streakBonusXp: 40,
+  coinsEarned: 50,
+  streakWeeks: 3,
+  totalReps: 180,
+  movements: ['Push-up', 'Pull-up'],
+  highlights: ['Level 12 reached'],
+  ...overrides,
+});
+
+test('buildShareCardSvg neutralises a hostile display name', () => {
+  const svg = buildShareCardSvg(cardData({ athlete: '<script>alert(1)</script>&' }));
+  assert.ok(!svg.includes('<script'), 'no live markup survives');
+  assert.ok(!hasBareAmpersand(svg), 'no bare ampersand survives');
+});
+
+test('buildShareCardSvg never prints NaN, undefined or Infinity', () => {
+  const svg = buildShareCardSvg({
+    athlete: undefined,
+    day: undefined,
+    level: NaN,
+    tier: undefined,
+    xpEarned: NaN,
+    baseXp: undefined,
+    streakBonusXp: Infinity,
+    coinsEarned: -500,
+    streakWeeks: NaN,
+    totalReps: undefined,
+    movements: undefined,
+    highlights: undefined,
+  });
+  assert.ok(!svg.includes('NaN'), svg.slice(0, 400));
+  assert.ok(!svg.includes('undefined'));
+  assert.ok(!svg.includes('Infinity'));
+});
+
+test('buildShareCardSvg emits a well-formed, correctly sized root element', () => {
+  const svg = buildShareCardSvg(cardData());
+  assert.ok(svg.startsWith('<svg'));
+  assert.ok(svg.includes('xmlns="http://www.w3.org/2000/svg"'));
+  assert.ok(svg.includes(`width="${SHARE_CARD_WIDTH}"`));
+  assert.ok(svg.includes(`height="${SHARE_CARD_HEIGHT}"`));
+  assert.ok(svg.includes(`viewBox="0 0 ${SHARE_CARD_WIDTH} ${SHARE_CARD_HEIGHT}"`));
+  assert.ok(svg.endsWith('</svg>'));
+  const opens = svg.match(/<text /g)?.length ?? 0;
+  const closes = svg.match(/<\/text>/g)?.length ?? 0;
+  assert.equal(opens, closes, 'every text element is closed');
+});
+
+test('buildShareCardSvg bounds the movement and highlight lists', () => {
+  const svg = buildShareCardSvg(
+    cardData({
+      movements: Array.from({ length: 12 }, (_, i) => `Movement ${i + 1}`),
+      highlights: Array.from({ length: 9 }, (_, i) => `Highlight ${i + 1}`),
+    }),
+  );
+  // Highlights are one text element each, bulleted with a circle.
+  assert.ok((svg.match(/<circle /g)?.length ?? 0) <= 4, 'at most four highlight rows');
+  assert.ok(svg.includes('more'), 'the overflowing movements are counted, not dropped');
+  const listed = (svg.match(/Movement \d+/g) ?? []).length;
+  assert.ok(listed <= 5, `at most five movements named, saw ${listed}`);
+});
+
+test('shareCardFilename dates the file, and falls back rather than emitting junk', () => {
+  assert.equal(shareCardFilename('2026-08-18'), 'bar-xp-2026-08-18.png');
+  assert.equal(shareCardFilename('not a day'), 'bar-xp-session.png');
+  assert.equal(shareCardFilename(undefined), 'bar-xp-session.png');
 });

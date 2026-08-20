@@ -15,7 +15,8 @@ import { Card, CardHeader } from './ui/Primitives';
 import { achievementsFor, earnedCount, type AchievementIcon } from '../lib/game/achievements';
 import { fmt, pct } from '../lib/safe';
 
-const ICONS: Record<AchievementIcon, typeof Flame> = {
+/** Shared with `SessionSummary`, which announces newly earned badges. */
+export const ICONS: Record<AchievementIcon, typeof Flame> = {
   flame: Flame,
   trophy: Trophy,
   dumbbell: Dumbbell,
