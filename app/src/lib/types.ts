@@ -164,8 +164,13 @@ export interface StatsSnapshot {
   bodyFat: number;
   totalReps: number;
   streak: number;
-  /** `assessment` for the onboarding baseline, `workout` for post-session snapshots. */
-  source: 'assessment' | 'workout';
+  /**
+   * `assessment` for the onboarding baseline and body-fat edits, `workout` for
+   * post-session snapshots, `measurement` for a body-measurement recording.
+   */
+  source: 'assessment' | 'workout' | 'measurement';
+  /** Only the sites entered in this sitting. Absent on documents written before slice 4. */
+  measurements: MeasurementValues | null;
 }
 
 export interface PersonalBest {
@@ -195,6 +200,26 @@ export interface Goal {
   createdAt: number;
   completedAt?: number | null;
 }
+
+export type MeasurementKey =
+  | 'bodyweight'
+  | 'chest'
+  | 'back'
+  | 'waist'
+  | 'biceps'
+  | 'thighs'
+  | 'calves';
+
+/** Metric always — bodyweight in kg, every girth in cm. */
+export type MeasurementValues = Partial<Record<MeasurementKey, number>>;
+
+export interface Measurements {
+  values: MeasurementValues;
+  recordedAt: number;
+}
+
+/** Display preference only. Nothing is ever stored in imperial. */
+export type UnitSystem = 'metric' | 'imperial';
 
 export interface Assessment {
   maxPullUps: number;
@@ -260,6 +285,12 @@ export interface Profile {
   storedTier: string;
   storedIdentity: string;
   bodyFat: number;
+  /** Latest known value per site, merged across recordings. Null until one exists. */
+  measurements: Measurements | null;
+  /** Display preference for measurement entry and charts. Defaults to metric. */
+  unitSystem: UnitSystem;
+  /** Chud / Normie / Chad / GIGACHAD labels in the Physique Lab. On by default. */
+  gymBroMode: boolean;
 
   streak: Streak;
   inventory: Inventory;

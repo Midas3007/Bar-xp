@@ -5,6 +5,8 @@ import type { Profile } from '../lib/types';
 import { Card, CardHeader, EmptyState, ProgressBar } from './ui/Primitives';
 import {
   GRADE_META,
+  gradeLabel,
+  labelSetFor,
   LEVERS,
   hasEnoughData,
   overallAestheticScore,
@@ -25,6 +27,8 @@ const HIDDEN_KEY = 'barxp.physiqueLab.hidden';
  */
 export function PhysiqueLab({ profile }: { profile: Profile }) {
   const [hidden, setHidden] = useState(true);
+  // The whole mechanism: one lookup, resolved once. No gymBroMode ternaries in JSX.
+  const labelSet = labelSetFor(profile.gymBroMode);
 
   // Default to hidden, then restore the user's stored preference.
   useEffect(() => {
@@ -153,7 +157,7 @@ export function PhysiqueLab({ profile }: { profile: Profile }) {
                       <span className="text-sm font-medium text-slate-200">{trait.label}</span>
                       <span className="flex items-baseline gap-2">
                         <span className={`text-[10px] font-semibold ${grade.color}`}>
-                          {grade.label}
+                          {gradeLabel(trait.grade, labelSet)}
                         </span>
                         <span className="font-mono text-xs text-slate-500">
                           {trait.grade === 'unknown' ? '—' : fmtDecimal(trait.score, 0)}

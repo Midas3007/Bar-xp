@@ -89,7 +89,40 @@ drives:
 - **The Physique Lab**, a private section rating eight physique traits with a
   specific next action for each. Collapsed by default, revealed by a local
   toggle. Scores come only from logged data; body-fat guidance stops at healthy
-  ranges rather than rewarding ever-lower numbers.
+  ranges rather than rewarding ever-lower numbers. **Gym Bro Mode** — on by
+  default, toggled from the profile — reads the five grades as Chud / Normie /
+  Chad / GIGACHAD instead of Lagging / Building / Good / Standout. Only the
+  words change; the two vocabularies share one lookup table and the scores
+  behind them are untouched.
+
+### Body measurements
+
+Bodyweight and six girths — chest, back, waist, biceps, thigh, calf — can be
+recorded optionally at onboarding and any time afterwards from the profile, and
+each is charted over time on the Progress view.
+
+They live on the existing `stats_history` collection rather than a new one:
+that collection is already append-only, already private to the owner, and
+already covered by the `uid` + `createdAt` composite index, so the query, the
+loading state and the immutability guarantee come for free. A snapshot gains an
+optional map of the sites recorded in that sitting; the profile keeps the latest
+known value per site for the entry form. Re-emitting a three-month-old chest
+measurement alongside today's waist would draw a flat line that looks like data
+and is not.
+
+Values are **always stored metric** — kilograms and centimetres. The unit
+system is a display preference converted at the UI boundary, so switching it
+never rewrites a document and never mixes scales on an axis.
+
+**Nothing here is scored.** There is no ideal ratio, no target range and no
+comparison against another athlete. A test asserts the physique trait ratings
+are identical with and without measurements present, so a later change cannot
+quietly turn a waist into a grade.
+
+The girth charts are small multiples rather than one six-line overlay: six
+categorical hues bright enough for this surface cannot be told apart under
+deuteranopia across every pair, and chest centimetres and calf centimetres share
+an axis unit but nothing else.
 
 ### Levels & XP
 
@@ -198,7 +231,8 @@ src/
       validation.ts     Anti-cheat bounds
       achievements.ts   Derived badge definitions
       muscles.ts        Muscle groups, equipment setups, volume & balance
-      aesthetics.ts     Physique trait ratings and tips
+      aesthetics.ts     Physique trait ratings, tips, and the two grade vocabularies
+      measurements.ts   Measurement sites, metric/imperial conversion, coercion
   context/
     AuthContext.tsx     Auth state, profile listener, hourly recalculation
     ToastContext.tsx    Toast notifications
@@ -259,6 +293,8 @@ have rejected:
 | Total session volume | 5,000 units |
 | Custom exercise XP/unit | 0.1–8 |
 | Body fat | 3–60% |
+| Bodyweight | 20–400 kg |
+| Any girth measurement | 10–250 cm |
 
 The rules additionally enforce that `totalXp` is **monotonic** — it can never be
 reduced — and that `workouts` and `stats_history` documents are **immutable**
@@ -271,7 +307,7 @@ once written.
 | `users/{uid}` | **Owner-only, read and write.** Holds email, body-fat readings, the assessment, personal bests and per-muscle volume. |
 | `public_profiles/{uid}` | Readable by any signed-in user. Exactly the nine fields the leaderboard renders, enforced with `hasOnly`. Mirrored from the user document on every write that changes one. |
 | `workouts/{id}` | Private to the owner. Create-only, never updated or deleted. |
-| `stats_history/{id}` | Private to the owner. Append-only audit trail. |
+| `stats_history/{id}` | Private to the owner. Append-only audit trail, and where body measurements are recorded. |
 
 The split matters: an earlier version let any signed-in user read whole user
 documents, on the reasoning that the client only rendered safe fields. That was
@@ -285,7 +321,7 @@ UI would not have helped; the data had to move.
 npm run test:rules
 ```
 
-Runs 49 assertions against the Firestore emulator, which executes the real
+Runs 58 assertions against the Firestore emulator, which executes the real
 rules engine — the rules are enforced, not merely inspected. Needs the Firebase
 CLI on your PATH and a JVM. Coverage includes cross-user read/write denial,
 XP monotonicity, immutability of `workouts` and `stats_history`, the anti-cheat

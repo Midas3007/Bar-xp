@@ -24,14 +24,15 @@ import {
 
 import type { Profile, StatsSnapshot, Workout } from '../lib/types';
 import { Card, CardHeader, EmptyState, SkeletonBlock } from '../components/ui/Primitives';
+import { MeasurementCharts } from '../components/MeasurementCharts';
 import { STAT_META } from '../lib/game/constants';
 import { fetchStatsHistory, fetchWorkouts } from '../lib/data';
 import { fmt, fmtDecimal, num, round } from '../lib/safe';
 import { formatSetLadder } from '../lib/game/sets';
 
 /** Chart palette, aligned with the stat colors used across the app. */
-const AXIS_COLOR = '#4a5266';
-const GRID_COLOR = 'rgba(255,255,255,0.05)';
+export const AXIS_COLOR = '#4a5266';
+export const GRID_COLOR = 'rgba(255,255,255,0.05)';
 
 interface ChartPoint {
   label: string;
@@ -70,7 +71,9 @@ export function ProgressView({ profile }: { profile: Profile }) {
     return () => {
       active = false;
     };
-  }, [profile.uid, profile.workoutCount]);
+    // `recordedAt` changes exactly once per recording, so a measurement saved
+    // from the profile refetches here and nothing else does.
+  }, [profile.uid, profile.workoutCount, profile.measurements?.recordedAt ?? 0]);
 
   /** Snapshots -> chart rows, with every value coerced to a finite number. */
   const points = useMemo<ChartPoint[]>(() => {
@@ -370,6 +373,9 @@ export function ProgressView({ profile }: { profile: Profile }) {
         </div>
       )}
 
+      {/* --- Body measurements --- */}
+      <MeasurementCharts history={history ?? []} unitSystem={profile.unitSystem} />
+
       {/* --- Session history --- */}
       <WorkoutHistory workouts={workouts ?? []} />
 
@@ -512,8 +518,8 @@ interface TooltipEntry {
   color?: string;
 }
 
-/** Dark-mode tooltip that never prints NaN. */
-function ChartTooltip({
+/** Dark-mode tooltip that never prints NaN. Shared with `MeasurementCharts`. */
+export function ChartTooltip({
   active,
   payload,
   label,
@@ -560,7 +566,7 @@ function compactNumber(value: unknown): string {
 }
 
 /** `YYYY-MM-DD` -> "12 Mar", falling back to the timestamp then a placeholder. */
-function formatShortDay(day: unknown, timestamp: unknown): string {
+export function formatShortDay(day: unknown, timestamp: unknown): string {
   const value = typeof day === 'string' ? day : '';
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
 

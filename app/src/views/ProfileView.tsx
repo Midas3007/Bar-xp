@@ -26,7 +26,9 @@ import {
 } from '../components/ui/Primitives';
 import { Avatar } from '../components/layout/AppShell';
 import { Achievements } from '../components/Achievements';
+import { MeasurementsCard } from '../components/MeasurementsCard';
 import { MuscleMap } from '../components/MuscleMap';
+import { SettingsCard } from '../components/SettingsCard';
 import { PhysiqueLab } from '../components/PhysiqueLab';
 import {
   IdentityChip,
@@ -72,6 +74,7 @@ export function ProfileView({ profile }: { profile: Profile }) {
 
           <DisciplineCard profile={profile} />
           <BodyFatCard profile={profile} />
+          <MeasurementsCard profile={profile} />
         </div>
 
         <div className="space-y-6">
@@ -115,6 +118,7 @@ export function ProfileView({ profile }: { profile: Profile }) {
           </Card>
 
           <CustomExercisesCard profile={profile} />
+          <SettingsCard profile={profile} />
         </div>
       </div>
 
