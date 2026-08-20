@@ -46,28 +46,28 @@ export function Achievements({ profile }: { profile: Profile }) {
               key={achievement.id}
               className={`relative overflow-hidden rounded-xl p-3 ring-1 transition ${
                 achievement.earned
-                  ? 'bg-gradient-to-br from-amber-500/15 to-ember-500/5 ring-amber-500/30'
-                  : 'bg-ink-900/50 ring-white/5'
+                  ? 'bg-gradient-to-br from-warn-vivid/15 to-ember/5 ring-warn/30'
+                  : 'bg-surface-sunken/50 ring-line'
               }`}
               title={achievement.description}
             >
               <Icon
-                className={`h-5 w-5 ${achievement.earned ? 'text-amber-300' : 'text-slate-700'}`}
+                className={`h-5 w-5 ${achievement.earned ? 'text-warn' : 'text-content-faint'}`}
                 aria-hidden
               />
               <p
                 className={`mt-2 font-display text-xs font-bold leading-tight ${
-                  achievement.earned ? 'text-slate-100' : 'text-slate-500'
+                  achievement.earned ? 'text-content-strong' : 'text-content-muted'
                 }`}
               >
                 {achievement.name}
               </p>
-              <p className="mt-0.5 text-[10px] leading-tight text-slate-600">
+              <p className="mt-0.5 text-[10px] leading-tight text-content-subtle">
                 {achievement.description}
               </p>
               <p
                 className={`mt-1.5 font-mono text-[10px] ${
-                  achievement.earned ? 'text-amber-400/80' : 'text-slate-600'
+                  achievement.earned ? 'text-warn/80' : 'text-content-subtle'
                 }`}
               >
                 {achievement.detail}
@@ -75,9 +75,9 @@ export function Achievements({ profile }: { profile: Profile }) {
 
               {/* Progress sliver along the bottom of unearned badges. */}
               {!achievement.earned ? (
-                <div className="absolute inset-x-0 bottom-0 h-0.5 bg-ink-950">
+                <div className="absolute inset-x-0 bottom-0 h-0.5 bg-surface-base">
                   <div
-                    className="h-full bg-forge-500/60"
+                    className="h-full bg-forge/60"
                     style={{ width: `${pct(achievement.progress, 1)}%` }}
                   />
                 </div>

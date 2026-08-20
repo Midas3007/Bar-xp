@@ -18,25 +18,25 @@ export function RestTimer() {
   const progress = clamp((remaining / total) * 100, 0, 100);
 
   return (
-    <div className="rounded-xl bg-ink-900/60 p-4 ring-1 ring-white/5">
+    <div className="rounded-xl bg-surface-sunken/60 p-4 ring-1 ring-line">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <span className="flex items-center gap-2 font-display text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+        <span className="flex items-center gap-2 font-display text-[11px] font-semibold uppercase tracking-widest text-content-muted">
           <Timer className="h-3.5 w-3.5" aria-hidden />
           Rest Timer
         </span>
         <span
           className={`font-mono text-2xl font-bold tabular-nums ${
-            done ? 'text-vital-300' : running ? 'text-forge-300' : 'text-slate-300'
+            done ? 'text-vital' : running ? 'text-forge' : 'text-content'
           }`}
         >
           {formatClock(remaining)}
         </span>
       </div>
 
-      <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-ink-950">
+      <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-base">
         <div
           className={`h-full rounded-full transition-[width] duration-300 ease-linear ${
-            done ? 'bg-vital-400' : 'bg-gradient-to-r from-forge-500 to-forge-300'
+            done ? 'bg-vital-vivid' : 'bg-gradient-to-r from-forge-vivid to-forge'
           }`}
           style={{ width: `${done ? 100 : progress}%` }}
         />
@@ -50,8 +50,8 @@ export function RestTimer() {
             onClick={() => reset(preset)}
             className={`flex-1 rounded-lg px-2 py-1.5 font-mono text-[11px] font-semibold transition ${
               duration === preset
-                ? 'bg-forge-500/15 text-forge-300 ring-1 ring-forge-500/30'
-                : 'bg-white/5 text-slate-500 hover:text-slate-300'
+                ? 'bg-forge/15 text-forge ring-1 ring-forge/30'
+                : 'bg-surface-hover text-content-muted hover:text-content'
             }`}
           >
             {preset}s
@@ -63,7 +63,7 @@ export function RestTimer() {
         <button
           type="button"
           onClick={running ? pause : start}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-ink-750 py-2 text-xs font-semibold text-slate-200 ring-1 ring-white/10 transition hover:bg-ink-700"
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-surface-inset py-2 text-xs font-semibold text-content ring-1 ring-line-strong transition hover:bg-surface-strong"
         >
           {running ? (
             <>
@@ -80,7 +80,7 @@ export function RestTimer() {
         <button
           type="button"
           onClick={() => setSoundOn(!soundOn)}
-          className="rounded-lg bg-white/5 px-3 py-2 text-slate-500 transition hover:text-slate-200"
+          className="rounded-lg bg-surface-hover px-3 py-2 text-content-muted transition hover:text-content"
           aria-label={soundOn ? 'Mute the rest alert' : 'Unmute the rest alert'}
           aria-pressed={!soundOn}
         >
@@ -93,7 +93,7 @@ export function RestTimer() {
         <button
           type="button"
           onClick={() => reset()}
-          className="rounded-lg bg-white/5 px-3 py-2 text-slate-500 transition hover:text-slate-200"
+          className="rounded-lg bg-surface-hover px-3 py-2 text-content-muted transition hover:text-content"
           aria-label="Reset timer"
         >
           <RotateCcw className="h-3.5 w-3.5" aria-hidden />
@@ -101,7 +101,7 @@ export function RestTimer() {
       </div>
 
       {done ? (
-        <p className="mt-2.5 text-center text-[11px] font-medium text-vital-300">
+        <p className="mt-2.5 text-center text-[11px] font-medium text-vital">
           Rest complete — back on the bar.
         </p>
       ) : null}

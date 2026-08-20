@@ -20,7 +20,8 @@ import {
   type MeasurementSite,
 } from '../lib/game/measurements';
 import { Card, CardHeader, EmptyState } from './ui/Primitives';
-import { AXIS_COLOR, ChartTooltip, GRID_COLOR, formatShortDay } from '../views/ProgressView';
+import { axisColor, ChartTooltip, gridColor, formatShortDay } from '../views/ProgressView';
+import { useTheme } from '../context/ThemeContext';
 
 /**
  * Measurement history, as small multiples rather than one six-line overlay.
@@ -67,6 +68,10 @@ export function MeasurementCharts({
   history: StatsSnapshot[];
   unitSystem: UnitSystem;
 }) {
+  const { resolved } = useTheme();
+  const axis = axisColor(resolved);
+  const grid = gridColor(resolved);
+
   const series = useMemo(() => {
     const out = new Map<MeasurementKey, SitePoint[]>();
     for (const site of MEASUREMENT_SITES) {
@@ -119,17 +124,17 @@ export function MeasurementCharts({
                 data={bodyweightPoints}
                 margin={{ top: 8, right: 8, bottom: 4, left: -12 }}
               >
-                <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+                <CartesianGrid stroke={grid} vertical={false} />
                 <XAxis
                   dataKey="label"
-                  stroke={AXIS_COLOR}
+                  stroke={axis}
                   tick={{ fontSize: 11 }}
                   tickLine={false}
                   axisLine={false}
                   minTickGap={24}
                 />
                 <YAxis
-                  stroke={AXIS_COLOR}
+                  stroke={axis}
                   tick={{ fontSize: 11 }}
                   tickLine={false}
                   axisLine={false}
@@ -166,6 +171,7 @@ export function MeasurementCharts({
               site={site}
               points={series.get(site.key) ?? []}
               unitSystem={unitSystem}
+              axis={axis}
             />
           ))}
         </div>
@@ -178,10 +184,12 @@ function GirthPanel({
   site,
   points,
   unitSystem,
+  axis,
 }: {
   site: MeasurementSite;
   points: SitePoint[];
   unitSystem: UnitSystem;
+  axis: string;
 }) {
   const unit = unitLabel(site.kind, unitSystem);
   const latest = points.length > 0 ? points[points.length - 1].value : null;
@@ -189,22 +197,22 @@ function GirthPanel({
   const delta = latest !== null && first !== null ? latest - first : null;
 
   return (
-    <div className="rounded-xl bg-ink-900/60 p-3 ring-1 ring-inset ring-white/5">
-      <p className="font-display text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+    <div className="rounded-xl bg-surface-sunken/60 p-3 ring-1 ring-inset ring-line">
+      <p className="font-display text-[11px] font-semibold uppercase tracking-widest text-content-muted">
         {site.label}
       </p>
-      <p className="mt-1 font-display text-2xl font-bold text-slate-100">
+      <p className="mt-1 font-display text-2xl font-bold text-content-strong">
         {latest === null ? (
-          <span className="text-slate-600">—</span>
+          <span className="text-content-subtle">—</span>
         ) : (
           <>
             {fmtDecimal(latest, 1)}
-            <span className="ml-1 text-xs font-medium text-slate-500">{unit}</span>
+            <span className="ml-1 text-xs font-medium text-content-muted">{unit}</span>
           </>
         )}
       </p>
       {delta !== null ? (
-        <p className="mt-0.5 text-xs text-slate-500">
+        <p className="mt-0.5 text-xs text-content-muted">
           {delta >= 0 ? '+' : '−'}
           {fmtDecimal(Math.abs(delta), 1)} {unit} since first reading
         </p>
@@ -216,7 +224,7 @@ function GirthPanel({
             <LineChart data={points} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
               <XAxis dataKey="label" hide />
               <YAxis
-                stroke={AXIS_COLOR}
+                stroke={axis}
                 width={34}
                 tick={{ fontSize: 10 }}
                 tickLine={false}

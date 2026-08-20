@@ -45,22 +45,29 @@ export const MUSCLE_KEYS: MuscleKey[] = [
 
 export const MUSCLE_META: Record<
   MuscleKey,
-  { label: string; short: string; region: 'upper' | 'core' | 'lower'; hex: string }
+  {
+    label: string;
+    short: string;
+    region: 'upper' | 'core' | 'lower';
+    hex: string;
+    /** The same muscle in the light theme, measured against the light surfaces. */
+    hexLight: string;
+  }
 > = {
-  chest: { label: 'Chest', short: 'CHE', region: 'upper', hex: '#fb923c' },
-  shoulders: { label: 'Shoulders', short: 'SHO', region: 'upper', hex: '#f59e0b' },
-  triceps: { label: 'Triceps', short: 'TRI', region: 'upper', hex: '#fbbf24' },
-  biceps: { label: 'Biceps', short: 'BIC', region: 'upper', hex: '#38bdf8' },
-  forearms: { label: 'Forearms & Grip', short: 'FOR', region: 'upper', hex: '#0ea5e9' },
-  lats: { label: 'Lats', short: 'LAT', region: 'upper', hex: '#22d3ee' },
-  upper_back: { label: 'Upper Back', short: 'UBK', region: 'upper', hex: '#2dd4bf' },
-  abs: { label: 'Abs', short: 'ABS', region: 'core', hex: '#c084fc' },
-  obliques: { label: 'Obliques', short: 'OBL', region: 'core', hex: '#a855f7' },
-  lower_back: { label: 'Lower Back', short: 'LBK', region: 'core', hex: '#8b5cf6' },
-  glutes: { label: 'Glutes', short: 'GLU', region: 'lower', hex: '#4ade80' },
-  quads: { label: 'Quads', short: 'QUA', region: 'lower', hex: '#22c55e' },
-  hamstrings: { label: 'Hamstrings', short: 'HAM', region: 'lower', hex: '#16a34a' },
-  calves: { label: 'Calves', short: 'CAL', region: 'lower', hex: '#65a30d' },
+  chest: { label: 'Chest', short: 'CHE', region: 'upper', hex: '#fb923c', hexLight: '#a83408' },
+  shoulders: { label: 'Shoulders', short: 'SHO', region: 'upper', hex: '#f59e0b', hexLight: '#9a4a08' },
+  triceps: { label: 'Triceps', short: 'TRI', region: 'upper', hex: '#fbbf24', hexLight: '#8a5108' },
+  biceps: { label: 'Biceps', short: 'BIC', region: 'upper', hex: '#38bdf8', hexLight: '#0369a1' },
+  forearms: { label: 'Forearms & Grip', short: 'FOR', region: 'upper', hex: '#0ea5e9', hexLight: '#075985' },
+  lats: { label: 'Lats', short: 'LAT', region: 'upper', hex: '#22d3ee', hexLight: '#0b5f75' },
+  upper_back: { label: 'Upper Back', short: 'UBK', region: 'upper', hex: '#2dd4bf', hexLight: '#0d5f59' },
+  abs: { label: 'Abs', short: 'ABS', region: 'core', hex: '#c084fc', hexLight: '#7326b8' },
+  obliques: { label: 'Obliques', short: 'OBL', region: 'core', hex: '#a855f7', hexLight: '#6b21a8' },
+  lower_back: { label: 'Lower Back', short: 'LBK', region: 'core', hex: '#a78bfa', hexLight: '#5b21b6' },
+  glutes: { label: 'Glutes', short: 'GLU', region: 'lower', hex: '#4ade80', hexLight: '#12662d' },
+  quads: { label: 'Quads', short: 'QUA', region: 'lower', hex: '#22c55e', hexLight: '#166534' },
+  hamstrings: { label: 'Hamstrings', short: 'HAM', region: 'lower', hex: '#16a34a', hexLight: '#14532d' },
+  calves: { label: 'Calves', short: 'CAL', region: 'lower', hex: '#65a30d', hexLight: '#3f6212' },
 };
 
 /* -------------------------------------------------------------------------- */
@@ -280,6 +287,11 @@ export function subtractMuscleVolume(existing: unknown, subtraction: MuscleVolum
   return base;
 }
 
+/** The muscle's colour for the active theme. */
+export function muscleHex(key: MuscleKey, theme: 'light' | 'dark'): string {
+  return theme === 'light' ? MUSCLE_META[key].hexLight : MUSCLE_META[key].hex;
+}
+
 /** Coerce a stored blob into a clean, finite volume map. */
 export function normalizeMuscleVolume(value: unknown): MuscleVolume {
   const raw = (value ?? {}) as Record<string, unknown>;
@@ -301,11 +313,11 @@ export const MUSCLE_GRADE_META: Record<
   MuscleGrade,
   { label: string; color: string; bar: string }
 > = {
-  untrained: { label: 'Untrained', color: 'text-slate-500', bar: 'from-slate-600 to-slate-500' },
-  neglected: { label: 'Neglected', color: 'text-rose-300', bar: 'from-rose-600 to-rose-400' },
-  developing: { label: 'Developing', color: 'text-amber-300', bar: 'from-amber-600 to-amber-400' },
-  strong: { label: 'Strong', color: 'text-forge-300', bar: 'from-forge-500 to-forge-300' },
-  dominant: { label: 'Dominant', color: 'text-vital-300', bar: 'from-vital-500 to-vital-300' },
+  untrained: { label: 'Untrained', color: 'text-content-muted', bar: 'from-surface-strong to-content-faint' },
+  neglected: { label: 'Neglected', color: 'text-danger', bar: 'from-danger-vivid to-danger' },
+  developing: { label: 'Developing', color: 'text-warn', bar: 'from-warn-vivid to-warn' },
+  strong: { label: 'Strong', color: 'text-forge', bar: 'from-forge-vivid to-forge' },
+  dominant: { label: 'Dominant', color: 'text-vital', bar: 'from-vital-vivid to-vital' },
 };
 
 export interface MuscleRating {

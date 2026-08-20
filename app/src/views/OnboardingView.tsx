@@ -123,25 +123,25 @@ export function OnboardingView({ profile }: { profile: Profile }) {
   };
 
   return (
-    <div className="min-h-screen bg-ink-950 px-4 py-10 sm:px-6">
+    <div className="min-h-screen bg-surface-base px-4 py-10 sm:px-6">
       <div
         className="pointer-events-none fixed inset-0"
         style={{
           background:
-            'radial-gradient(900px 600px at 50% -10%, rgba(56,189,248,0.12), transparent 60%)',
+            'radial-gradient(900px 600px at 50% -10%, rgb(var(--wash-forge) / var(--wash-alpha)), transparent 60%)',
         }}
         aria-hidden
       />
 
       <div className="relative mx-auto max-w-3xl">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-forge-500 to-arcane-500 shadow-glow-forge">
-            <ClipboardCheck className="h-6 w-6 text-ink-950" aria-hidden />
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-forge-vivid to-arcane-vivid shadow-glow-forge">
+            <ClipboardCheck className="h-6 w-6 text-on-accent" aria-hidden />
           </div>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-slate-50">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-content-strong">
             Initial Assessment
           </h1>
-          <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-slate-400">
+          <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-content-muted">
             Four numbers set your starting stats and rank. Be honest — the whole system is
             calibrated against this baseline, and inflating it only flattens your own progress
             curve.
@@ -203,20 +203,20 @@ export function OnboardingView({ profile }: { profile: Profile }) {
           <button
             type="button"
             onClick={() => setShowMeasurements((v) => !v)}
-            className="mt-5 flex w-full items-center justify-between gap-3 rounded-xl bg-ink-900/60 px-4 py-3 text-left ring-1 ring-white/5 transition hover:bg-ink-900"
+            className="mt-5 flex w-full items-center justify-between gap-3 rounded-xl bg-surface-sunken/60 px-4 py-3 text-left ring-1 ring-line transition hover:bg-surface-sunken"
             aria-expanded={showMeasurements}
           >
             <span>
-              <span className="block text-sm font-medium text-slate-200">
+              <span className="block text-sm font-medium text-content">
                 Body measurements — optional
               </span>
-              <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">
+              <span className="mt-0.5 block text-xs leading-relaxed text-content-muted">
                 Bodyweight and a tape measure, if you have one. Tracked and charted, never scored.
                 You can add these later from your profile.
               </span>
             </span>
             <ChevronDown
-              className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${
+              className={`h-4 w-4 shrink-0 text-content-muted transition-transform ${
                 showMeasurements ? 'rotate-180' : ''
               }`}
               aria-hidden
@@ -224,8 +224,8 @@ export function OnboardingView({ profile }: { profile: Profile }) {
           </button>
 
           {showMeasurements ? (
-            <div className="mt-4 rounded-xl bg-ink-900/40 p-4 ring-1 ring-white/5">
-              <div className="mb-4 inline-flex rounded-xl bg-ink-900 p-1 ring-1 ring-inset ring-white/5">
+            <div className="mt-4 rounded-xl bg-surface-sunken/40 p-4 ring-1 ring-line">
+              <div className="mb-4 inline-flex rounded-xl bg-surface-sunken p-1 ring-1 ring-inset ring-line">
                 {(['metric', 'imperial'] as const).map((system) => (
                   <button
                     key={system}
@@ -234,8 +234,8 @@ export function OnboardingView({ profile }: { profile: Profile }) {
                     aria-pressed={unitSystem === system}
                     className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                       unitSystem === system
-                        ? 'bg-forge-500/20 text-forge-200 ring-1 ring-inset ring-forge-400/30'
-                        : 'text-slate-400 hover:text-slate-200'
+                        ? 'bg-forge-vivid/20 text-forge ring-1 ring-inset ring-forge/30'
+                        : 'text-content-muted hover:text-content'
                     }`}
                   >
                     {system === 'metric' ? 'Metric kg/cm' : 'Imperial lb/in'}
@@ -269,25 +269,25 @@ export function OnboardingView({ profile }: { profile: Profile }) {
           ) : null}
 
           {error ? (
-            <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-rose-500/10 p-3 ring-1 ring-rose-500/25">
-              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" aria-hidden />
-              <p className="text-xs leading-relaxed text-rose-200">{error}</p>
+            <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-danger/10 p-3 ring-1 ring-danger/25">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-danger" aria-hidden />
+              <p className="text-xs leading-relaxed text-danger">{error}</p>
             </div>
           ) : null}
 
           {preview ? (
-            <div className="mt-7 animate-fade-up rounded-2xl bg-ink-900/60 p-5 ring-1 ring-white/5">
+            <div className="mt-7 animate-fade-up rounded-2xl bg-surface-sunken/60 p-5 ring-1 ring-line">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-arcane-400" aria-hidden />
-                  <p className="font-display text-xs font-semibold uppercase tracking-widest text-slate-400">
+                  <Sparkles className="h-4 w-4 text-arcane" aria-hidden />
+                  <p className="font-display text-xs font-semibold uppercase tracking-widest text-content-muted">
                     Your starting build
                   </p>
                 </div>
                 <TierBadge tierName={preview.tier.name} />
               </div>
               <StatGrid stats={preview.stats} />
-              <p className="mt-4 text-xs italic leading-relaxed text-slate-500">
+              <p className="mt-4 text-xs italic leading-relaxed text-content-muted">
                 {preview.tier.blurb}
               </p>
             </div>
@@ -304,7 +304,7 @@ export function OnboardingView({ profile }: { profile: Profile }) {
             {!busy ? <ArrowRight className="h-4 w-4" aria-hidden /> : null}
           </Button>
 
-          <p className="mt-4 text-center text-[11px] leading-relaxed text-slate-600">
+          <p className="mt-4 text-center text-[11px] leading-relaxed text-content-subtle">
             You can re-record your body fat and your measurements any time from your profile.
             Strength and endurance grow only through logged work.
           </p>

@@ -39,7 +39,7 @@ export function NeonName({
 }) {
   const cosmetic = cosmeticNameClass(activeCosmetic, ownedCosmetics);
   return (
-    <span className={`${cosmetic || 'text-slate-100'} ${className}`}>
+    <span className={`${cosmetic || 'text-content-strong'} ${className}`}>
       {name || 'Unnamed Athlete'}
     </span>
   );
@@ -60,7 +60,7 @@ export function TierBadge({
   const padding = size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-3 py-1 text-xs';
   return (
     <span
-      className={`inline-flex items-center rounded-full bg-gradient-to-r ${tier.gradient} ${padding} font-display font-semibold uppercase tracking-wider text-ink-950 shadow-sm`}
+      className={`inline-flex items-center rounded-full bg-gradient-to-r ${tier.gradient} ${padding} font-display font-semibold uppercase tracking-wider text-on-accent shadow-sm`}
     >
       {tier.name}
     </span>
@@ -92,14 +92,14 @@ export function LevelBar({ totalXp, compact = false }: { totalXp: unknown; compa
     <div className="w-full">
       <div className="mb-2 flex items-end justify-between gap-4">
         <div className="flex items-baseline gap-2">
-          <span className="font-display text-xs font-semibold uppercase tracking-widest text-slate-500">
+          <span className="font-display text-xs font-semibold uppercase tracking-widest text-content-muted">
             Level
           </span>
-          <span className="font-display text-2xl font-bold leading-none text-slate-50">
+          <span className="font-display text-2xl font-bold leading-none text-content-strong">
             {progress.level}
           </span>
         </div>
-        <span className="font-mono text-xs text-slate-500">
+        <span className="font-mono text-xs text-content-muted">
           {progress.isMax
             ? 'MAX LEVEL'
             : `${fmt(progress.xpIntoLevel)} / ${fmt(progress.xpForNext)} XP`}
@@ -109,13 +109,13 @@ export function LevelBar({ totalXp, compact = false }: { totalXp: unknown; compa
       <ProgressBar
         value={progress.isMax ? 1 : progress.xpIntoLevel}
         max={progress.isMax ? 1 : progress.xpForNext}
-        gradient="from-forge-500 via-forge-400 to-arcane-400"
+        gradient="from-forge-vivid via-forge to-arcane"
         height={compact ? 'h-2' : 'h-3'}
         label={`Level ${progress.level} progress`}
       />
 
       {!compact ? (
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-content-muted">
           {progress.isMax
             ? 'You have reached the ceiling. The bar has nothing left to teach you.'
             : `${fmt(Math.max(0, progress.xpForNext - progress.xpIntoLevel))} XP to level ${progress.level + 1}`}
@@ -167,14 +167,14 @@ export function AnimatedLevelBar({
     <div className="w-full">
       <div className="mb-2 flex items-end justify-between gap-4">
         <div className="flex items-baseline gap-2">
-          <span className="font-display text-xs font-semibold uppercase tracking-widest text-slate-500">
+          <span className="font-display text-xs font-semibold uppercase tracking-widest text-content-muted">
             Level
           </span>
-          <span className="font-display text-2xl font-bold leading-none text-slate-50">
+          <span className="font-display text-2xl font-bold leading-none text-content-strong">
             {progress.level}
           </span>
         </div>
-        <span className="font-mono text-xs text-slate-500">
+        <span className="font-mono text-xs text-content-muted">
           {progress.isMax
             ? 'MAX LEVEL'
             : `${fmt(progress.xpIntoLevel)} / ${fmt(progress.xpForNext)} XP`}
@@ -184,7 +184,7 @@ export function AnimatedLevelBar({
       <ProgressBar
         value={progress.isMax ? 1 : progress.xpIntoLevel}
         max={progress.isMax ? 1 : progress.xpForNext}
-        gradient="from-forge-500 via-forge-400 to-arcane-400"
+        gradient="from-forge-vivid via-forge to-arcane"
         height="h-3"
         // The tween rewrites the width every frame; a 700ms CSS transition on
         // top of that would chase it and always arrive late.
@@ -207,7 +207,7 @@ export function StatCard({ statKey, value }: { statKey: StatKey; value: unknown 
   return (
     <Card className="p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
-        <span className="font-display text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+        <span className="font-display text-[11px] font-semibold uppercase tracking-widest text-content-muted">
           {meta.short}
         </span>
         <span className={`font-display text-xl font-bold leading-none ${meta.color}`}>
@@ -224,7 +224,7 @@ export function StatCard({ statKey, value }: { statKey: StatKey; value: unknown 
           label={meta.label}
         />
       </div>
-      <p className="mt-2 text-[11px] leading-tight text-slate-600">{meta.label}</p>
+      <p className="mt-2 text-[11px] leading-tight text-content-subtle">{meta.label}</p>
     </Card>
   );
 }
@@ -232,13 +232,13 @@ export function StatCard({ statKey, value }: { statKey: StatKey; value: unknown 
 export function statGradient(statKey: StatKey): string {
   switch (statKey) {
     case 'strength':
-      return 'from-ember-500 to-ember-300';
+      return 'from-ember-vivid to-ember';
     case 'endurance':
-      return 'from-forge-500 to-forge-300';
+      return 'from-forge-vivid to-forge';
     case 'aesthetics':
-      return 'from-vital-500 to-vital-300';
+      return 'from-vital-vivid to-vital';
     case 'discipline':
-      return 'from-arcane-500 to-arcane-300';
+      return 'from-arcane-vivid to-arcane';
   }
 }
 
@@ -265,9 +265,9 @@ export function TierProgress({ stats }: { stats: Stats }) {
   if (!next) {
     return (
       <div className="flex items-center gap-3">
-        <Trophy className="h-4 w-4 text-orange-400" aria-hidden />
-        <p className="text-xs text-slate-400">
-          <span className="font-semibold text-orange-300">Legend</span> — the highest rank. Nothing
+        <Trophy className="h-4 w-4 text-ember" aria-hidden />
+        <p className="text-xs text-content-muted">
+          <span className="font-semibold text-ember">Legend</span> — the highest rank. Nothing
           left above you.
         </p>
       </div>
@@ -280,10 +280,10 @@ export function TierProgress({ stats }: { stats: Stats }) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between text-xs">
-        <span className="text-slate-500">
+        <span className="text-content-muted">
           Rank progress · <span className={current.text}>{current.name}</span>
         </span>
-        <span className="font-mono text-slate-500">
+        <span className="font-mono text-content-muted">
           {fmtDecimal(power, 1)} / {fmt(next.min)}
         </span>
       </div>
@@ -295,7 +295,7 @@ export function TierProgress({ stats }: { stats: Stats }) {
         animated={false}
         label={`Progress to ${next.name}`}
       />
-      <p className="mt-2 text-xs text-slate-500">
+      <p className="mt-2 text-xs text-content-muted">
         {fmtDecimal(Math.max(0, next.min - power), 1)} average stat points to{' '}
         <span className={next.text}>{next.name}</span>.
       </p>
@@ -316,15 +316,15 @@ export function StreakPill({ profile }: { profile: Profile }) {
       <Chip
         className={
           streak > 0
-            ? 'bg-ember-500/10 text-ember-300 ring-ember-500/30'
-            : 'bg-slate-500/10 text-slate-400 ring-slate-500/30'
+            ? 'bg-ember/10 text-ember ring-ember/30'
+            : 'bg-surface-hover text-content-muted ring-line-strong'
         }
       >
         <Flame className="h-3 w-3" aria-hidden />
         {fmt(streak)}-day streak
       </Chip>
       {shields > 0 ? (
-        <Chip className="bg-forge-500/10 text-forge-300 ring-forge-500/30">
+        <Chip className="bg-forge/10 text-forge ring-forge/30">
           <Shield className="h-3 w-3" aria-hidden />
           {fmt(shields)}
         </Chip>
@@ -335,7 +335,7 @@ export function StreakPill({ profile }: { profile: Profile }) {
 
 export function CoinPill({ coins }: { coins: unknown }) {
   return (
-    <Chip className="bg-amber-500/10 text-amber-300 ring-amber-500/30">
+    <Chip className="bg-warn/10 text-warn ring-warn/30">
       <Coins className="h-3 w-3" aria-hidden />
       {fmt(coins)}
     </Chip>
@@ -347,7 +347,7 @@ export function StatReadout({
   label,
   value,
   sub,
-  accent = 'text-slate-100',
+  accent = 'text-content-strong',
 }: {
   label: string;
   value: string;
@@ -356,11 +356,11 @@ export function StatReadout({
 }) {
   return (
     <div>
-      <p className="font-display text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+      <p className="font-display text-[11px] font-semibold uppercase tracking-widest text-content-muted">
         {label}
       </p>
       <p className={`mt-1 font-display text-xl font-bold ${accent}`}>{value}</p>
-      {sub ? <p className="mt-0.5 text-xs text-slate-600">{sub}</p> : null}
+      {sub ? <p className="mt-0.5 text-xs text-content-subtle">{sub}</p> : null}
     </div>
   );
 }

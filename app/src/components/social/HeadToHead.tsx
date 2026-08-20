@@ -30,20 +30,20 @@ export function HeadToHead({
 
   return (
     <Card>
-      <div className="flex items-start justify-between gap-3 border-b border-white/5 p-5">
+      <div className="flex items-start justify-between gap-3 border-b border-line p-5">
         <div className="min-w-0">
-          <h3 className="flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-slate-300">
-            <Swords className="h-4 w-4 text-slate-500" aria-hidden />
+          <h3 className="flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-content">
+            <Swords className="h-4 w-4 text-content-muted" aria-hidden />
             Head to head
           </h3>
-          <p className="mt-1 truncate text-xs text-slate-500">
+          <p className="mt-1 truncate text-xs text-content-muted">
             {profile.displayName} versus {row.displayName}
           </p>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg p-1.5 text-slate-600 transition hover:text-slate-200"
+          className="rounded-lg p-1.5 text-content-subtle transition hover:text-content"
           aria-label="Close comparison"
         >
           <X className="h-4 w-4" aria-hidden />
@@ -51,7 +51,7 @@ export function HeadToHead({
       </div>
 
       {/* --- Header: level, XP, tier from the public row --- */}
-      <div className="grid grid-cols-2 divide-x divide-white/5 border-b border-white/5">
+      <div className="grid grid-cols-2 divide-x divide-line border-b border-line">
         <HeaderSide
           name={profile.displayName}
           level={profile.level}
@@ -75,16 +75,16 @@ export function HeadToHead({
             const meta = STAT_META[key];
             return (
               <div key={key}>
-                <p className="mb-1.5 text-center font-display text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                <p className="mb-1.5 text-center font-display text-[11px] font-semibold uppercase tracking-widest text-content-muted">
                   {meta.label}
                 </p>
                 <div className="flex items-center gap-3">
-                  <span className="w-12 shrink-0 text-right font-mono text-xs text-slate-300">
+                  <span className="w-12 shrink-0 text-right font-mono text-xs text-content">
                     {fmt(mine)}
                   </span>
                   {/* Mirrored bars, so the longer one is visibly the winner
                       without needing to read either number. */}
-                  <div className="flex h-2 flex-1 justify-end overflow-hidden rounded-full bg-ink-950">
+                  <div className="flex h-2 flex-1 justify-end overflow-hidden rounded-full bg-surface-base">
                     <div
                       className="h-full rounded-full"
                       style={{
@@ -93,7 +93,7 @@ export function HeadToHead({
                       }}
                     />
                   </div>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-ink-950">
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-base">
                     <div
                       className="h-full rounded-full opacity-60"
                       style={{
@@ -102,7 +102,7 @@ export function HeadToHead({
                       }}
                     />
                   </div>
-                  <span className="w-12 shrink-0 font-mono text-xs text-slate-300">
+                  <span className="w-12 shrink-0 font-mono text-xs text-content">
                     {fmt(theirs)}
                   </span>
                 </div>
@@ -110,7 +110,7 @@ export function HeadToHead({
             );
           })}
 
-          <div className="grid grid-cols-2 gap-x-6 gap-y-3 border-t border-white/5 pt-5">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 border-t border-line pt-5">
             <Compare label="Lifetime reps" mine={profile.totalReps} theirs={card.totalReps} />
             <Compare label="Sessions" mine={profile.workoutCount} theirs={card.workoutCount} />
             <Compare
@@ -127,8 +127,8 @@ export function HeadToHead({
             />
           </div>
 
-          <div className="border-t border-white/5 pt-5">
-            <p className="mb-2 font-display text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+          <div className="border-t border-line pt-5">
+            <p className="mb-2 font-display text-[11px] font-semibold uppercase tracking-widest text-content-muted">
               Last 14 days
             </p>
             <ActivityStrip label="You" days={profile.recentDays} />
@@ -137,7 +137,7 @@ export function HeadToHead({
         </div>
       ) : (
         <div className="p-5">
-          <p className="text-xs leading-relaxed text-slate-500">
+          <p className="text-xs leading-relaxed text-content-muted">
             {row.displayName} has not opened the app since comparisons were added, so only their
             public rank is available. The rest appears the next time they do.
           </p>
@@ -160,9 +160,9 @@ function HeaderSide({
 }) {
   return (
     <div className="p-4 text-center">
-      <p className="truncate text-sm font-semibold text-slate-200">{name}</p>
-      <p className="mt-1 font-display text-2xl font-bold text-forge-300">{fmt(totalXp)}</p>
-      <p className="text-[11px] text-slate-600">XP · Lv {fmt(level)}</p>
+      <p className="truncate text-sm font-semibold text-content">{name}</p>
+      <p className="mt-1 font-display text-2xl font-bold text-forge">{fmt(totalXp)}</p>
+      <p className="text-[11px] text-content-subtle">XP · Lv {fmt(level)}</p>
       <div className="mt-2 flex justify-center">
         <TierBadge tierName={tier} size="sm" />
       </div>
@@ -187,14 +187,14 @@ function Compare({
   return (
     <div className="flex items-baseline justify-between gap-2">
       <span
-        className={`font-mono text-sm ${ahead === 'left' ? 'font-bold text-vital-300' : 'text-slate-400'}`}
+        className={`font-mono text-sm ${ahead === 'left' ? 'font-bold text-vital' : 'text-content-muted'}`}
       >
         {fmt(a)}
         {suffix}
       </span>
-      <span className="text-[10px] uppercase tracking-widest text-slate-600">{label}</span>
+      <span className="text-[10px] uppercase tracking-widest text-content-subtle">{label}</span>
       <span
-        className={`font-mono text-sm ${ahead === 'right' ? 'font-bold text-vital-300' : 'text-slate-400'}`}
+        className={`font-mono text-sm ${ahead === 'right' ? 'font-bold text-vital' : 'text-content-muted'}`}
       >
         {fmt(b)}
         {suffix}
@@ -211,14 +211,14 @@ function ActivityStrip({ label, days }: { label: string; days: unknown }) {
 
   return (
     <div className="mb-2 flex items-center gap-2">
-      <span className="w-20 shrink-0 truncate text-[11px] text-slate-500">{label}</span>
+      <span className="w-20 shrink-0 truncate text-[11px] text-content-muted">{label}</span>
       <div className="flex flex-1 gap-1">
         {cells.map((day) => (
           <div
             key={day}
             title={day}
             className={`h-4 flex-1 rounded-sm ${
-              trained.has(day) ? 'bg-forge-500' : 'bg-ink-900 ring-1 ring-inset ring-white/5'
+              trained.has(day) ? 'bg-forge-vivid' : 'bg-surface-sunken ring-1 ring-inset ring-line'
             }`}
           />
         ))}

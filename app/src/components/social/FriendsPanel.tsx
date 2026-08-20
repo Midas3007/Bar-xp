@@ -98,17 +98,17 @@ export function FriendsPanel({
             subtitle="Nothing is shared until a request is accepted."
             icon={<UserPlus className="h-4 w-4" aria-hidden />}
           />
-          <ul className="divide-y divide-white/5">
+          <ul className="divide-y divide-line">
             {graph.incoming.map((request) => (
               <li key={request.id} className="flex items-center gap-3 p-4">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm text-slate-200">
+                  <p className="truncate text-sm text-content">
                     Request from{' '}
                     <span className="font-semibold">
                       {graph.people[request.from]?.displayName ?? 'An athlete'}
                     </span>
                   </p>
-                  <p className="mt-0.5 text-[11px] text-slate-600">Wants to compare training.</p>
+                  <p className="mt-0.5 text-[11px] text-content-subtle">Wants to compare training.</p>
                 </div>
                 <div className="flex shrink-0 gap-2">
                   <Button
@@ -153,13 +153,13 @@ export function FriendsPanel({
             {graph.outgoing.map((request) => (
               <li key={request.id} className="flex items-center gap-3 p-4">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm text-slate-400">
+                  <p className="truncate text-sm text-content-muted">
                     Sent to{' '}
                     <span className="font-semibold">
                       {graph.people[request.to]?.displayName ?? 'an athlete'}
                     </span>
                   </p>
-                  <p className="mt-0.5 text-[11px] text-slate-600">Waiting for a reply.</p>
+                  <p className="mt-0.5 text-[11px] text-content-subtle">Waiting for a reply.</p>
                 </div>
                 <Button
                   size="sm"
@@ -195,7 +195,7 @@ export function FriendsPanel({
             message="Search for someone by name, or add them from the global leaderboard."
           />
         ) : (
-          <ul className="divide-y divide-white/5">
+          <ul className="divide-y divide-line">
             {ladder.map((row, index) => {
               const isMe = row.uid === profile.uid;
               return (
@@ -219,7 +219,7 @@ export function FriendsPanel({
                             'Friend removed',
                           )
                         }
-                        className="rounded-lg p-1.5 text-slate-600 transition hover:text-rose-300"
+                        className="rounded-lg p-1.5 text-content-subtle transition hover:text-danger"
                         aria-label={`Remove ${row.displayName}`}
                       >
                         <X className="h-3.5 w-3.5" aria-hidden />
@@ -244,8 +244,8 @@ export function FriendsPanel({
 
       {/* --- Search --- */}
       <Card className="p-5">
-        <h3 className="mb-3 flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-slate-300">
-          <Search className="h-4 w-4 text-slate-500" aria-hidden />
+        <h3 className="mb-3 flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-content">
+          <Search className="h-4 w-4 text-content-muted" aria-hidden />
           Find an athlete
         </h3>
         <div className="flex items-end gap-2">
@@ -272,18 +272,18 @@ export function FriendsPanel({
 
         {results !== null ? (
           results.length === 0 ? (
-            <p className="mt-3 text-xs text-slate-600">No athletes matched that name.</p>
+            <p className="mt-3 text-xs text-content-subtle">No athletes matched that name.</p>
           ) : (
             <ul className="mt-3 space-y-2">
               {results.map((row) => (
                 <li
                   key={row.uid}
-                  className="flex items-center gap-3 rounded-xl bg-ink-900/60 p-3 ring-1 ring-inset ring-white/5"
+                  className="flex items-center gap-3 rounded-xl bg-surface-sunken/60 p-3 ring-1 ring-inset ring-line"
                 >
                   <RowAvatar row={row} />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-200">{row.displayName}</p>
-                    <p className="mt-0.5 text-[11px] text-slate-600">
+                    <p className="truncate text-sm font-medium text-content">{row.displayName}</p>
+                    <p className="mt-0.5 text-[11px] text-content-subtle">
                       Lv {fmt(row.level)} · {row.tier}
                     </p>
                   </div>

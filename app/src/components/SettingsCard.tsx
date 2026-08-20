@@ -33,19 +33,19 @@ export function SettingsCard({ profile }: { profile: Profile }) {
 
   return (
     <Card className="p-5">
-      <h2 className="mb-4 flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-slate-300">
-        <Settings className="h-4 w-4 text-slate-500" aria-hidden />
+      <h2 className="mb-4 flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-content">
+        <Settings className="h-4 w-4 text-content-muted" aria-hidden />
         Settings
       </h2>
 
       <div className="space-y-5">
         <div>
-          <p className="text-sm font-medium text-slate-200">Units</p>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="text-sm font-medium text-content">Units</p>
+          <p className="mt-0.5 text-xs text-content-muted">
             A display preference only. Measurements are always stored the same way, so switching
             never rewrites your history.
           </p>
-          <div className="mt-3 inline-flex rounded-xl bg-ink-900 p-1 ring-1 ring-inset ring-white/5">
+          <div className="mt-3 inline-flex rounded-xl bg-surface-sunken p-1 ring-1 ring-inset ring-line">
             <UnitButton
               active={profile.unitSystem === 'metric'}
               disabled={busy}
@@ -63,10 +63,10 @@ export function SettingsCard({ profile }: { profile: Profile }) {
           </div>
         </div>
 
-        <div className="flex items-start justify-between gap-4 border-t border-white/5 pt-5">
+        <div className="flex items-start justify-between gap-4 border-t border-line pt-5">
           <div>
-            <p className="text-sm font-medium text-slate-200">Gym Bro Mode</p>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="text-sm font-medium text-content">Gym Bro Mode</p>
+            <p className="mt-0.5 text-xs text-content-muted">
               Chud / Normie / Chad / GIGACHAD instead of Lagging / Building / Good / Standout in
               the Physique Lab. Same scores either way.
             </p>
@@ -101,7 +101,7 @@ function UnitButton({
       onClick={onClick}
       aria-pressed={active}
       className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
-        active ? 'bg-forge-500/20 text-forge-200 ring-1 ring-inset ring-forge-400/30' : 'text-slate-400 hover:text-slate-200'
+        active ? 'bg-forge-vivid/20 text-forge ring-1 ring-inset ring-forge/30' : 'text-content-muted hover:text-content'
       }`}
     >
       {children}

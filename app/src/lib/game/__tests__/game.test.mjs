@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import {
   xpForLevel, totalXpForLevel, levelFromTotalXp, levelProgress,
-  TIERS, tierForStats, MAX_LEVEL,
+  TIERS, IDENTITIES, STAT_META, tierForStats, MAX_LEVEL,
 } from '../constants.js';
 import {
   WEEKLY_TARGET, weekKey, weekKeyForDay, registerWorkout, settleStreak,
@@ -46,10 +46,16 @@ import {
   normalizeMeasurementValues, unitLabel,
 } from '../measurements.js';
 import {
-  GRADE_LABELS, gradeLabel, measuredVTaper, overallAestheticScore, overallGrade, rateAesthetics,
+  GRADE_LABELS, GRADE_META, gradeLabel, measuredVTaper, overallAestheticScore,
+  overallGrade, rateAesthetics,
 } from '../aesthetics.js';
+import { SHOP_ITEMS } from '../shop.js';
+import {
+  normalizeThemePreference, resolveTheme, THEME_PREFERENCES,
+} from '../../theme.js';
 import {
   mergeMuscleVolume, sessionMuscleVolume, subtractMuscleVolume,
+  MUSCLE_META, MUSCLE_GRADE_META, muscleHex,
 } from '../muscles.js';
 import {
   CORRECTION_WINDOW_MS, applyReversal, canCorrect, reversalOf, withinCorrectionWindow,
@@ -1492,4 +1498,136 @@ test('the friend card carries exactly FRIEND_CARD_FIELDS and nothing private', (
     assert.ok(!(forbidden in card), `${forbidden} must never reach a friend card`);
   }
   assert.equal(card.updatedAt, 123);
+});
+
+/* -------------------------------------------------------------------------- */
+/* Design system                                                              */
+/* -------------------------------------------------------------------------- */
+
+/** WCAG relative luminance. */
+function luminance(hex) {
+  const channels = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const [r, g, b] = channels.map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(a, b) {
+  const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m);
+  return (x + 0.05) / (y + 0.05);
+}
+
+/** The card surface in each theme — where these colours are actually read. */
+const DARK_CARD = '#0f1119';
+const LIGHT_CARD = '#ffffff';
+const LIGHT_SUNKEN = '#f1f4f9';
+
+test('the contrast helper agrees with the published reference values', () => {
+  // Anchoring the helper itself, so a bug in it cannot silently pass the
+  // assertions below.
+  assert.ok(Math.abs(contrast('#ffffff', '#000000') - 21) < 1e-6);
+  assert.ok(Math.abs(contrast('#777777', '#ffffff') - 4.478) < 0.01);
+});
+
+test('every muscle colour is readable on the surface it sits on', () => {
+  for (const [key, meta] of Object.entries(MUSCLE_META)) {
+    assert.match(meta.hex, /^#[0-9a-f]{6}$/, `${key} hex`);
+    assert.match(meta.hexLight, /^#[0-9a-f]{6}$/, `${key} hexLight`);
+    assert.ok(
+      contrast(meta.hex, DARK_CARD) >= 4.5,
+      `${key} dark: ${contrast(meta.hex, DARK_CARD).toFixed(2)}:1`,
+    );
+    assert.ok(
+      contrast(meta.hexLight, LIGHT_CARD) >= 4.5,
+      `${key} light on card: ${contrast(meta.hexLight, LIGHT_CARD).toFixed(2)}:1`,
+    );
+    assert.ok(
+      contrast(meta.hexLight, LIGHT_SUNKEN) >= 4.5,
+      `${key} light on sunken: ${contrast(meta.hexLight, LIGHT_SUNKEN).toFixed(2)}:1`,
+    );
+  }
+});
+
+test('every stat colour is readable on the surface it sits on', () => {
+  for (const [key, meta] of Object.entries(STAT_META)) {
+    assert.match(meta.hex, /^#[0-9a-f]{6}$/, `${key} hex`);
+    assert.match(meta.hexLight, /^#[0-9a-f]{6}$/, `${key} hexLight`);
+    assert.ok(contrast(meta.hex, DARK_CARD) >= 4.5, `${key} dark`);
+    assert.ok(contrast(meta.hexLight, LIGHT_CARD) >= 4.5, `${key} light on card`);
+    assert.ok(contrast(meta.hexLight, LIGHT_SUNKEN) >= 4.5, `${key} light on sunken`);
+  }
+});
+
+/**
+ * TOKEN HYGIENE: no raw Tailwind palette in the data layer.
+ *
+ * The point of the token layer is that a component names meaning rather than
+ * pigment. A raw palette shade reaching a class string here would be invisible
+ * to the theme and unreadable in one of the two.
+ */
+test('no pure module hands the UI a raw Tailwind palette class', () => {
+  const RAW =
+    /\b(?:text|bg|ring|from|via|to|border|divide)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d/;
+
+  const offenders = [];
+  const check = (label, value) => {
+    if (typeof value === 'string' && RAW.test(value)) offenders.push(`${label}: ${value}`);
+  };
+
+  for (const tier of TIERS) {
+    check(`TIERS.${tier.name}.gradient`, tier.gradient);
+    check(`TIERS.${tier.name}.text`, tier.text);
+    check(`TIERS.${tier.name}.ring`, tier.ring);
+  }
+  for (const identity of IDENTITIES) {
+    check(`IDENTITIES.${identity.label}.text`, identity.text);
+    check(`IDENTITIES.${identity.label}.bg`, identity.bg);
+  }
+  for (const [key, meta] of Object.entries(STAT_META)) check(`STAT_META.${key}.color`, meta.color);
+  for (const [key, meta] of Object.entries(MUSCLE_GRADE_META)) {
+    check(`MUSCLE_GRADE_META.${key}.color`, meta.color);
+    check(`MUSCLE_GRADE_META.${key}.bar`, meta.bar);
+  }
+  for (const [key, meta] of Object.entries(GRADE_META)) {
+    check(`GRADE_META.${key}.color`, meta.color);
+    check(`GRADE_META.${key}.bar`, meta.bar);
+  }
+  for (const item of SHOP_ITEMS) check(`SHOP_ITEMS.${item.id}.nameClass`, item.nameClass);
+
+  assert.deepEqual(offenders, []);
+});
+
+test('tier names and thresholds are untouched by the token migration', () => {
+  // Tier names are persisted in live user documents. The design pass moved
+  // presentation only.
+  assert.deepEqual(
+    TIERS.map((t) => t.name),
+    ['Uninitiated', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond',
+     'Mythic', 'Legend', 'Ascendant', 'Immortal', 'Apex'],
+  );
+  assert.deepEqual(TIERS.map((t) => t.min), [0, 12, 26, 45, 68, 95, 130, 175, 240, 330, 450]);
+});
+
+test('theme preference normalisation is total', () => {
+  for (const junk of [null, undefined, 'sepia', 42, {}, [], '', 'Light']) {
+    assert.equal(normalizeThemePreference(junk), 'system', String(junk));
+  }
+  assert.equal(normalizeThemePreference('light'), 'light');
+  assert.equal(normalizeThemePreference('dark'), 'dark');
+  assert.equal(normalizeThemePreference('system'), 'system');
+});
+
+test('resolveTheme follows the system only when asked to', () => {
+  assert.equal(resolveTheme('system', true), 'dark');
+  assert.equal(resolveTheme('system', false), 'light');
+  assert.equal(resolveTheme('light', true), 'light', 'an explicit choice wins');
+  assert.equal(resolveTheme('dark', false), 'dark', 'an explicit choice wins');
+});
+
+test('every offered theme preference round-trips', () => {
+  assert.equal(THEME_PREFERENCES.length, 3);
+  for (const pref of THEME_PREFERENCES) {
+    assert.equal(normalizeThemePreference(pref), pref);
+    assert.ok(['light', 'dark'].includes(resolveTheme(pref, true)));
+    assert.ok(['light', 'dark'].includes(resolveTheme(pref, false)));
+  }
 });

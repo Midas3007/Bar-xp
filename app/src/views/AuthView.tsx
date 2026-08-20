@@ -65,12 +65,12 @@ export function AuthView() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-ink-950 px-4 py-10">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-surface-base px-4 py-10">
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'radial-gradient(900px 600px at 20% 0%, rgba(56,189,248,0.14), transparent 60%), radial-gradient(700px 500px at 85% 20%, rgba(168,85,247,0.12), transparent 55%)',
+            'radial-gradient(900px 600px at 20% 0%, rgba(56,189,248,0.14), transparent 60%), radial-gradient(700px 500px at 85% 20%, rgb(var(--wash-arcane) / var(--wash-alpha)), transparent 55%)',
         }}
         aria-hidden
       />
@@ -79,27 +79,27 @@ export function AuthView() {
         {/* --- Pitch --- */}
         <div className="flex flex-col justify-center">
           <div className="mb-6 flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-forge-500 to-arcane-500 shadow-glow-forge">
-              <Dumbbell className="h-6 w-6 text-ink-950" aria-hidden />
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-forge-vivid to-arcane-vivid shadow-glow-forge">
+              <Dumbbell className="h-6 w-6 text-on-accent" aria-hidden />
             </div>
             <div>
-              <p className="font-display text-xl font-bold leading-none tracking-tight text-slate-50">
+              <p className="font-display text-xl font-bold leading-none tracking-tight text-content-strong">
                 Bar XP
               </p>
-              <p className="mt-1 text-[11px] uppercase tracking-widest text-slate-500">
+              <p className="mt-1 text-[11px] uppercase tracking-widest text-content-muted">
                 Calisthenics RPG
               </p>
             </div>
           </div>
 
-          <h1 className="font-display text-4xl font-bold leading-tight tracking-tight text-slate-50 sm:text-5xl">
+          <h1 className="font-display text-4xl font-bold leading-tight tracking-tight text-content-strong sm:text-5xl">
             Your training is a{' '}
-            <span className="bg-gradient-to-r from-forge-400 via-arcane-400 to-ember-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-forge-vivid via-arcane to-ember bg-clip-text text-transparent">
               character sheet
             </span>
             .
           </h1>
-          <p className="mt-4 max-w-md text-base leading-relaxed text-slate-400">
+          <p className="mt-4 max-w-md text-base leading-relaxed text-content-muted">
             Log every set on the bar. Earn XP, level up, bank Bar Coins, and grow four stats that
             decide your rank — from Uninitiated all the way to Legend.
           </p>
@@ -125,8 +125,8 @@ export function AuthView() {
 
         {/* --- Form --- */}
         <div className="flex items-center">
-          <div className="w-full rounded-2xl bg-ink-850/80 p-6 shadow-glow ring-1 ring-white/10 backdrop-blur-xl sm:p-8">
-            <div className="mb-6 flex rounded-xl bg-ink-900 p-1 ring-1 ring-white/5">
+          <div className="w-full rounded-2xl bg-surface-raised/80 p-6 shadow-glow ring-1 ring-line-strong backdrop-blur-xl sm:p-8">
+            <div className="mb-6 flex rounded-xl bg-surface-sunken p-1 ring-1 ring-line">
               <TabButton active={mode === 'signin'} onClick={() => switchMode('signin')}>
                 Sign in
               </TabButton>
@@ -184,7 +184,7 @@ export function AuthView() {
                     type="button"
                     onClick={() => void onForgotPassword()}
                     disabled={busy}
-                    className="text-xs text-slate-500 transition hover:text-forge-300 disabled:text-slate-700"
+                    className="text-xs text-content-muted transition hover:text-forge disabled:text-content-subtle"
                   >
                     Forgot password?
                   </button>
@@ -192,9 +192,9 @@ export function AuthView() {
               ) : null}
 
               {resetSent ? (
-                <div className="flex items-start gap-2.5 rounded-xl bg-emerald-500/10 p-3 ring-1 ring-emerald-500/25">
-                  <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" aria-hidden />
-                  <p className="text-xs leading-relaxed text-emerald-200">
+                <div className="flex items-start gap-2.5 rounded-xl bg-vital/10 p-3 ring-1 ring-vital/25">
+                  <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-vital" aria-hidden />
+                  <p className="text-xs leading-relaxed text-vital">
                     If an account exists for that address, a reset link is on its way. Check your
                     spam folder.
                   </p>
@@ -202,9 +202,9 @@ export function AuthView() {
               ) : null}
 
               {authError ? (
-                <div className="flex items-start gap-2.5 rounded-xl bg-rose-500/10 p-3 ring-1 ring-rose-500/25">
-                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" aria-hidden />
-                  <p className="text-xs leading-relaxed text-rose-200">{authError}</p>
+                <div className="flex items-start gap-2.5 rounded-xl bg-danger/10 p-3 ring-1 ring-danger/25">
+                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-danger" aria-hidden />
+                  <p className="text-xs leading-relaxed text-danger">{authError}</p>
                 </div>
               ) : null}
 
@@ -215,9 +215,9 @@ export function AuthView() {
             </form>
 
             <div className="my-5 flex items-center gap-3">
-              <div className="h-px flex-1 bg-white/5" />
-              <span className="text-[11px] uppercase tracking-widest text-slate-600">or</span>
-              <div className="h-px flex-1 bg-white/5" />
+              <div className="h-px flex-1 bg-surface-hover" />
+              <span className="text-[11px] uppercase tracking-widest text-content-subtle">or</span>
+              <div className="h-px flex-1 bg-surface-hover" />
             </div>
 
             <Button
@@ -232,7 +232,7 @@ export function AuthView() {
               Continue with Google
             </Button>
 
-            <p className="mt-5 text-center text-[11px] leading-relaxed text-slate-600">
+            <p className="mt-5 text-center text-[11px] leading-relaxed text-content-subtle">
               Your workout data is stored against your account only. Ranks and XP appear on the
               public leaderboard.
             </p>
@@ -246,12 +246,12 @@ export function AuthView() {
 function Feature({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) {
   return (
     <li className="flex gap-3.5">
-      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5 text-forge-300 ring-1 ring-white/10">
+      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-hover text-forge ring-1 ring-line-strong">
         {icon}
       </div>
       <div>
-        <p className="text-sm font-semibold text-slate-200">{title}</p>
-        <p className="mt-0.5 text-sm leading-relaxed text-slate-500">{body}</p>
+        <p className="text-sm font-semibold text-content">{title}</p>
+        <p className="mt-0.5 text-sm leading-relaxed text-content-muted">{body}</p>
       </div>
     </li>
   );
@@ -271,7 +271,7 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
-        active ? 'bg-ink-750 text-slate-100 shadow-sm' : 'text-slate-500 hover:text-slate-300'
+        active ? 'bg-surface-inset text-content-strong shadow-sm' : 'text-content-muted hover:text-content'
       }`}
     >
       {children}

@@ -52,23 +52,23 @@ export function SeasonPanel({
       <Card className="p-5">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h3 className="flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-slate-300">
-              <CalendarClock className="h-4 w-4 text-slate-500" aria-hidden />
+            <h3 className="flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-content">
+              <CalendarClock className="h-4 w-4 text-content-muted" aria-hidden />
               {seasonLabel(seasonId)}
             </h3>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-content-muted">
               {fmt(daysLeftInSeason())} day{daysLeftInSeason() === 1 ? '' : 's'} left.
             </p>
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-3">
-          <StatReadout label="Season XP" value={fmt(profile.season?.xp ?? 0)} accent="text-forge-300" />
+          <StatReadout label="Season XP" value={fmt(profile.season?.xp ?? 0)} accent="text-forge" />
           <StatReadout label="Sessions" value={fmt(profile.season?.sessions ?? 0)} />
           <StatReadout label="Days left" value={fmt(daysLeftInSeason())} />
         </div>
 
-        <p className="mt-4 text-xs leading-relaxed text-slate-500">
+        <p className="mt-4 text-xs leading-relaxed text-content-muted">
           A season resets a scoreboard, not a character. Lifetime XP, your level, stats, tier,
           coins, unlocks and personal bests carry over untouched — only the season counter above
           goes back to zero, and your final placement is kept on your profile forever.
@@ -98,7 +98,7 @@ export function SeasonPanel({
             }
           />
         ) : (
-          <ul className="divide-y divide-white/5">
+          <ul className="divide-y divide-line">
             {ladder.map((row, index) => (
               <LeaderRow
                 key={row.uid}
@@ -120,7 +120,7 @@ export function SeasonPanel({
             subtitle="The same people, ranked on this season only."
             icon={<Trophy className="h-4 w-4" aria-hidden />}
           />
-          <ul className="divide-y divide-white/5">
+          <ul className="divide-y divide-line">
             {friendLadder.map((row, index) => (
               <LeaderRow
                 key={row.uid}

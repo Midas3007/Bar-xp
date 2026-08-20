@@ -41,10 +41,10 @@ const TOAST_MS = 5200;
 const MAX_VISIBLE_TOASTS = 4;
 
 const KIND_STYLES: Record<ToastKind, { icon: typeof Info; ring: string; iconColor: string }> = {
-  success: { icon: CheckCircle2, ring: 'ring-vital-500/30', iconColor: 'text-vital-400' },
-  error: { icon: TriangleAlert, ring: 'ring-rose-500/30', iconColor: 'text-rose-400' },
-  info: { icon: Info, ring: 'ring-forge-500/30', iconColor: 'text-forge-400' },
-  xp: { icon: Zap, ring: 'ring-amber-500/30', iconColor: 'text-amber-400' },
+  success: { icon: CheckCircle2, ring: 'ring-vital/30', iconColor: 'text-vital' },
+  error: { icon: TriangleAlert, ring: 'ring-danger/30', iconColor: 'text-danger' },
+  info: { icon: Info, ring: 'ring-forge/30', iconColor: 'text-forge' },
+  xp: { icon: Zap, ring: 'ring-warn/30', iconColor: 'text-warn' },
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -109,19 +109,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           return (
             <div
               key={toast.id}
-              className={`pointer-events-auto flex w-full max-w-sm animate-scale-in items-start gap-3 rounded-xl bg-ink-800/95 p-4 ring-1 backdrop-blur-xl ${style.ring} shadow-glow`}
+              className={`pointer-events-auto flex w-full max-w-sm animate-scale-in items-start gap-3 rounded-xl bg-surface-overlay/95 p-4 ring-1 backdrop-blur-xl ${style.ring} shadow-glow`}
             >
               <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${style.iconColor}`} aria-hidden />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-100">{toast.title}</p>
+                <p className="text-sm font-semibold text-content-strong">{toast.title}</p>
                 {toast.detail ? (
-                  <p className="mt-0.5 text-xs leading-relaxed text-slate-400">{toast.detail}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-content-muted">{toast.detail}</p>
                 ) : null}
               </div>
               <button
                 type="button"
                 onClick={() => dismiss(toast.id)}
-                className="-m-1 rounded-lg p-1 text-slate-500 transition hover:bg-white/5 hover:text-slate-300"
+                className="-m-1 rounded-lg p-1 text-content-muted transition hover:bg-surface-hover hover:text-content"
                 aria-label="Dismiss notification"
               >
                 <X className="h-4 w-4" aria-hidden />

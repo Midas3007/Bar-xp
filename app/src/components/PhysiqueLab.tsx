@@ -70,7 +70,7 @@ export function PhysiqueLab({ profile }: { profile: Profile }) {
           <button
             type="button"
             onClick={toggle}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-300 ring-1 ring-white/10 transition hover:bg-white/10"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-hover px-2.5 py-1.5 text-xs font-medium text-content ring-1 ring-line-strong transition hover:bg-surface-active"
           >
             {hidden ? (
               <>
@@ -100,23 +100,23 @@ export function PhysiqueLab({ profile }: { profile: Profile }) {
           message="Log at least three sessions and record a body-fat estimate. The ratings are built from your actual training volume, so they need something to work with."
         />
       ) : (
-        <div className="divide-y divide-white/5">
+        <div className="divide-y divide-line">
           {/* --- Overall --- */}
           <div className="p-5">
             <div className="flex items-end justify-between gap-3">
               <div>
-                <p className="font-display text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+                <p className="font-display text-[11px] font-semibold uppercase tracking-widest text-content-muted">
                   Overall
                 </p>
-                <p className="mt-1 font-display text-3xl font-bold text-slate-50">
+                <p className="mt-1 font-display text-3xl font-bold text-content-strong">
                   {fmtDecimal(overall, 0)}
-                  <span className="ml-1 text-base font-medium text-slate-600">/100</span>
+                  <span className="ml-1 text-base font-medium text-content-subtle">/100</span>
                 </p>
                 <p className={`mt-1 font-display text-sm font-semibold ${GRADE_META[overallBand].color}`}>
                   {gradeLabel(overallBand, labelSet)}
                 </p>
               </div>
-              <p className="max-w-[55%] text-right text-[11px] leading-relaxed text-slate-600">
+              <p className="max-w-[55%] text-right text-[11px] leading-relaxed text-content-subtle">
                 An average of the traits below. It measures your training, not you.
               </p>
             </div>
@@ -124,7 +124,7 @@ export function PhysiqueLab({ profile }: { profile: Profile }) {
               <ProgressBar
                 value={overall}
                 max={100}
-                gradient="from-arcane-500 via-forge-400 to-vital-400"
+                gradient="from-arcane-vivid via-forge to-vital"
                 height="h-2"
                 label="Overall physique score"
               />
@@ -133,19 +133,19 @@ export function PhysiqueLab({ profile }: { profile: Profile }) {
 
           {/* --- Priorities --- */}
           <div className="p-5">
-            <h3 className="mb-3 flex items-center gap-2 font-display text-xs font-semibold uppercase tracking-widest text-slate-400">
+            <h3 className="mb-3 flex items-center gap-2 font-display text-xs font-semibold uppercase tracking-widest text-content-muted">
               <Target className="h-4 w-4" aria-hidden />
               Attack these first
             </h3>
             <ol className="space-y-3">
               {priorities.map((trait, i) => (
                 <li key={trait.id} className="flex gap-3">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-500/15 font-mono text-[10px] font-bold text-rose-300">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-danger/15 font-mono text-[10px] font-bold text-danger">
                     {i + 1}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-200">{trait.label}</p>
-                    <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{trait.tip}</p>
+                    <p className="text-sm font-semibold text-content">{trait.label}</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-content-muted">{trait.tip}</p>
                   </div>
                 </li>
               ))}
@@ -154,7 +154,7 @@ export function PhysiqueLab({ profile }: { profile: Profile }) {
 
           {/* --- Every trait --- */}
           <div className="p-5">
-            <h3 className="mb-4 font-display text-xs font-semibold uppercase tracking-widest text-slate-400">
+            <h3 className="mb-4 font-display text-xs font-semibold uppercase tracking-widest text-content-muted">
               Full breakdown
             </h3>
             <ul className="space-y-4">
@@ -163,12 +163,12 @@ export function PhysiqueLab({ profile }: { profile: Profile }) {
                 return (
                   <li key={trait.id}>
                     <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                      <span className="text-sm font-medium text-slate-200">{trait.label}</span>
+                      <span className="text-sm font-medium text-content">{trait.label}</span>
                       <span className="flex items-baseline gap-2">
                         <span className={`text-[10px] font-semibold ${grade.color}`}>
                           {gradeLabel(trait.grade, 'plain')}
                         </span>
-                        <span className="font-mono text-xs text-slate-500">
+                        <span className="font-mono text-xs text-content-muted">
                           {trait.grade === 'unknown' ? '—' : fmtDecimal(trait.score, 0)}
                         </span>
                       </span>
@@ -181,8 +181,8 @@ export function PhysiqueLab({ profile }: { profile: Profile }) {
                       animated={false}
                       label={trait.label}
                     />
-                    <p className="mt-1.5 text-[11px] leading-relaxed text-slate-600">{trait.what}</p>
-                    <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{trait.tip}</p>
+                    <p className="mt-1.5 text-[11px] leading-relaxed text-content-subtle">{trait.what}</p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-content-muted">{trait.tip}</p>
                   </li>
                 );
               })}
@@ -191,21 +191,21 @@ export function PhysiqueLab({ profile }: { profile: Profile }) {
 
           {/* --- Non-training levers --- */}
           <div className="p-5">
-            <h3 className="mb-3 flex items-center gap-2 font-display text-xs font-semibold uppercase tracking-widest text-slate-400">
+            <h3 className="mb-3 flex items-center gap-2 font-display text-xs font-semibold uppercase tracking-widest text-content-muted">
               <Lightbulb className="h-4 w-4" aria-hidden />
               Beyond training
             </h3>
             <ul className="space-y-3">
               {LEVERS.map((lever) => (
                 <li key={lever.title}>
-                  <p className="text-sm font-semibold text-slate-200">{lever.title}</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{lever.detail}</p>
+                  <p className="text-sm font-semibold text-content">{lever.title}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-content-muted">{lever.detail}</p>
                 </li>
               ))}
             </ul>
           </div>
 
-          <p className="p-5 text-[10px] leading-relaxed text-slate-600">
+          <p className="p-5 text-[10px] leading-relaxed text-content-subtle">
             These are training and aesthetic heuristics computed from your logged data — not medical
             or nutritional advice, and not a measure of your worth. If you find yourself checking
             this compulsively, or it is making you feel worse about your body, hide the section and

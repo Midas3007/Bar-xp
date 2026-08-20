@@ -24,11 +24,11 @@ export type AestheticGrade = 'unknown' | 'weak' | 'building' | 'good' | 'elite';
 export type LabelSet = 'plain' | 'bro';
 
 export const GRADE_META: Record<AestheticGrade, { color: string; bar: string }> = {
-  unknown: { color: 'text-slate-500', bar: 'from-slate-600 to-slate-500' },
-  weak: { color: 'text-rose-300', bar: 'from-rose-600 to-rose-400' },
-  building: { color: 'text-amber-300', bar: 'from-amber-600 to-amber-400' },
-  good: { color: 'text-forge-300', bar: 'from-forge-500 to-forge-300' },
-  elite: { color: 'text-vital-300', bar: 'from-vital-500 to-vital-300' },
+  unknown: { color: 'text-content-muted', bar: 'from-surface-strong to-content-faint' },
+  weak: { color: 'text-danger', bar: 'from-danger-vivid to-danger' },
+  building: { color: 'text-warn', bar: 'from-warn-vivid to-warn' },
+  good: { color: 'text-forge', bar: 'from-forge-vivid to-forge' },
+  elite: { color: 'text-vital', bar: 'from-vital-vivid to-vital' },
 };
 
 /**

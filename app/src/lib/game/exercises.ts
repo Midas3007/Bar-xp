@@ -716,20 +716,13 @@ export const EXERCISES: Exercise[] = [
   },
 ];
 
-export const CATEGORY_META: Record<
-  ExerciseCategory,
-  { label: string; color: string; ring: string }
-> = {
-  push: { label: 'Push', color: 'text-ember-300', ring: 'ring-ember-500/30 bg-ember-500/10' },
-  pull: { label: 'Pull', color: 'text-forge-300', ring: 'ring-forge-500/30 bg-forge-500/10' },
-  legs: { label: 'Legs', color: 'text-vital-300', ring: 'ring-vital-500/30 bg-vital-500/10' },
-  core: { label: 'Core', color: 'text-arcane-300', ring: 'ring-arcane-500/30 bg-arcane-500/10' },
-  skill: { label: 'Skill', color: 'text-rose-300', ring: 'ring-rose-500/30 bg-rose-500/10' },
-  conditioning: {
-    label: 'Conditioning',
-    color: 'text-teal-300',
-    ring: 'ring-teal-500/30 bg-teal-500/10',
-  },
+export const CATEGORY_META: Record<ExerciseCategory, { label: string; color: string; ring: string }> = {
+  push: { label: 'Push', color: 'text-ember', ring: 'ring-ember/30 bg-ember/10' },
+  pull: { label: 'Pull', color: 'text-forge', ring: 'ring-forge/30 bg-forge/10' },
+  legs: { label: 'Legs', color: 'text-vital', ring: 'ring-vital/30 bg-vital/10' },
+  core: { label: 'Core', color: 'text-arcane', ring: 'ring-arcane/30 bg-arcane/10' },
+  skill: { label: 'Skill', color: 'text-danger', ring: 'ring-danger/30 bg-danger/10' },
+  conditioning: { label: 'Conditioning', color: 'text-tide', ring: 'ring-tide/30 bg-tide/10' },
 };
 
 export const CATEGORY_ORDER: ExerciseCategory[] = [
@@ -742,9 +735,9 @@ export const CATEGORY_ORDER: ExerciseCategory[] = [
 ];
 
 export const GRADE_META: Record<ExerciseGrade, { label: string; color: string }> = {
-  foundation: { label: 'Foundation', color: 'bg-vital-500/10 text-vital-300 ring-vital-500/30' },
-  intermediate: { label: 'Intermediate', color: 'bg-amber-500/10 text-amber-300 ring-amber-500/30' },
-  elite: { label: 'Elite', color: 'bg-rose-500/10 text-rose-300 ring-rose-500/30' },
+  foundation: { label: 'Foundation', color: 'bg-vital/10 text-vital ring-vital/30' },
+  intermediate: { label: 'Intermediate', color: 'bg-warn/10 text-warn ring-warn/30' },
+  elite: { label: 'Elite', color: 'bg-danger/10 text-danger ring-danger/30' },
 };
 
 /* -------------------------------------------------------------------------- */
