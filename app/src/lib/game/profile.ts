@@ -6,6 +6,43 @@ import { ensureGoals } from './goals';
 import { LIMITS } from './validation';
 import { normalizeMuscleVolume } from './muscles';
 
+/** The placeholder shown when an athlete has no usable name. */
+export const UNNAMED_ATHLETE = 'Unnamed Athlete';
+
+/**
+ * The longest display name the security rules accept.
+ *
+ * This is not a style preference — `firestore.rules` enforces
+ * `isShortString(d.displayName, 40)` on both create and update, so a name over
+ * this length makes *every* write to the document fail, not just the first.
+ */
+export const MAX_DISPLAY_NAME = LIMITS.MAX_NAME_LENGTH;
+
+/**
+ * Coerce anything into a display name the rules will accept.
+ *
+ * Total by construction: it always returns a non-empty string of at most
+ * `MAX_DISPLAY_NAME` UTF-16 units, which can never exceed 40 characters as the
+ * rules count them.
+ */
+export function sanitizeDisplayName(raw: unknown): string {
+  const collapsed = str(raw, '')
+    // Control characters render as nothing and wreck the leaderboard layout.
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!collapsed) return UNNAMED_ATHLETE;
+
+  let out = collapsed.slice(0, MAX_DISPLAY_NAME);
+  // Slicing must never leave the dangling half of a surrogate pair behind.
+  const last = out.charCodeAt(out.length - 1);
+  if (last >= 0xd800 && last <= 0xdbff) out = out.slice(0, -1);
+  out = out.trim();
+
+  return out || UNNAMED_ATHLETE;
+}
+
 export const EMPTY_INVENTORY: Inventory = {
   streakShields: 0,
   cosmetics: [],
@@ -40,7 +77,7 @@ export function normalizeProfile(uid: string, raw: unknown): Profile {
 
   return {
     uid,
-    displayName: str(data.displayName, '').trim() || 'Unnamed Athlete',
+    displayName: sanitizeDisplayName(data.displayName),
     email: str(data.email, ''),
     photoURL: str(data.photoURL, ''),
     createdAt: num(data.createdAt, Date.now()),
@@ -164,6 +201,15 @@ export interface AssessmentInput {
  * plank, 25% body fat) lands at Uninitiated, while a strong athlete (15
  * pull-ups, 60 push-ups, 3min plank, 10% body fat) starts around Gold.
  */
+/**
+ * The highest any single stat can start at from the onboarding assessment.
+ *
+ * Tier is the average of the four core stats, so this ceiling puts the best
+ * possible assessment at Gold (45) and keeps Platinum (68) and everything above
+ * it behind real logged training.
+ */
+export const ASSESSMENT_STAT_CEILING = 60;
+
 export function baselineStats(input: AssessmentInput): Stats {
   const pullUps = Math.max(0, num(input.maxPullUps, 0));
   const pushUps = Math.max(0, num(input.maxPushUps, 0));
@@ -183,11 +229,17 @@ export function baselineStats(input: AssessmentInput): Stats {
   // Everyone starts with a small Discipline floor for finishing the assessment.
   const discipline = round(4 + Math.min(pullUps * 0.4 + pushUps * 0.1, 12), 2);
 
+  // A self-reported form cannot hand out a rank. Even the strongest credible
+  // answers land inside Gold, leaving every tier above it to be earned by
+  // logging actual training. Nothing here is verified, so nothing here should
+  // be able to finish the game.
+  const cap = (value: number) => Math.max(0, Math.min(value, ASSESSMENT_STAT_CEILING));
+
   return {
-    strength: Math.max(0, strength),
-    endurance: Math.max(0, endurance),
-    aesthetics: Math.max(0, aesthetics),
-    discipline: Math.max(0, discipline),
+    strength: cap(strength),
+    endurance: cap(endurance),
+    aesthetics: cap(aesthetics),
+    discipline: cap(discipline),
   };
 }
 
@@ -201,7 +253,7 @@ export function newProfile(params: {
   const now = Date.now();
   return {
     uid: params.uid,
-    displayName: params.displayName.trim() || 'Unnamed Athlete',
+    displayName: sanitizeDisplayName(params.displayName),
     email: params.email,
     photoURL: params.photoURL,
     createdAt: now,

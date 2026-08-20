@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { AppShell, type ViewKey } from './components/layout/AppShell';
 import { LoadingScreen } from './components/ui/Primitives';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthView } from './views/AuthView';
 import { OnboardingView } from './views/OnboardingView';
 import { DashboardView } from './views/DashboardView';
@@ -56,7 +57,7 @@ function Router() {
 
   return (
     <AppShell profile={profile} view={view} onNavigate={setView}>
-      {renderView(view)}
+      <ErrorBoundary resetKey={view}>{renderView(view)}</ErrorBoundary>
     </AppShell>
   );
 

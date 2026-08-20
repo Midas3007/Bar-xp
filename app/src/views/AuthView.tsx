@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Dumbbell, Flame, Shield, TrendingUp, TriangleAlert } from 'lucide-react';
+import { Dumbbell, Flame, MailCheck, Shield, TrendingUp, TriangleAlert } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
 import { Button, Field, Input, Spinner } from '../components/ui/Primitives';
@@ -7,17 +7,26 @@ import { Button, Field, Input, Spinner } from '../components/ui/Primitives';
 type Mode = 'signin' | 'signup';
 
 export function AuthView() {
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail, authError, clearAuthError } = useAuth();
+  const {
+    signInWithGoogle,
+    signInWithEmail,
+    signUpWithEmail,
+    resetPassword,
+    authError,
+    clearAuthError,
+  } = useAuth();
 
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const switchMode = (next: Mode) => {
     setMode(next);
     clearAuthError();
+    setResetSent(false);
   };
 
   const onSubmit = async (event: FormEvent) => {
@@ -30,6 +39,16 @@ export function AuthView() {
       } else {
         await signUpWithEmail(email, password, displayName);
       }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onForgotPassword = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      setResetSent(await resetPassword(email));
     } finally {
       setBusy(false);
     }
@@ -134,7 +153,10 @@ export function AuthView() {
                 <Input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setResetSent(false);
+                  }}
                   placeholder="you@example.com"
                   autoComplete="email"
                   required
@@ -155,6 +177,29 @@ export function AuthView() {
                   required
                 />
               </Field>
+
+              {mode === 'signin' ? (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void onForgotPassword()}
+                    disabled={busy}
+                    className="text-xs text-slate-500 transition hover:text-forge-300 disabled:text-slate-700"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              ) : null}
+
+              {resetSent ? (
+                <div className="flex items-start gap-2.5 rounded-xl bg-emerald-500/10 p-3 ring-1 ring-emerald-500/25">
+                  <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" aria-hidden />
+                  <p className="text-xs leading-relaxed text-emerald-200">
+                    If an account exists for that address, a reset link is on its way. Check your
+                    spam folder.
+                  </p>
+                </div>
+              ) : null}
 
               {authError ? (
                 <div className="flex items-start gap-2.5 rounded-xl bg-rose-500/10 p-3 ring-1 ring-rose-500/25">

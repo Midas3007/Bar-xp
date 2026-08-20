@@ -102,7 +102,7 @@ export function LeaderboardView({ profile }: { profile: Profile }) {
                       {row.streak > 0 ? (
                         <span className="flex items-center gap-1 text-[11px] text-ember-400/80">
                           <Flame className="h-3 w-3" aria-hidden />
-                          {fmt(row.streak)}d
+                          {fmt(row.streak)}w
                         </span>
                       ) : null}
                     </div>

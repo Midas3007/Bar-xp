@@ -22,9 +22,18 @@ export const LIMITS = {
   MAX_SESSION_VOLUME: 5000,
   MAX_ENTRIES: 12,
   /** Assessment bounds. */
-  MAX_ASSESS_PULL_UPS: 100,
-  MAX_ASSESS_PUSH_UPS: 300,
-  MAX_ASSESS_PLANK: 3599,
+  /*
+   * Assessment ceilings.
+   *
+   * These were 100 / 300 / 3599. Combined with `baselineStats`, entering the
+   * maxima produced an average stat around 414 — against a Legend threshold of
+   * 175 — so the top rank in the game was obtainable on the signup screen
+   * without logging a rep. These are now set near the edge of credible human
+   * performance, and `baselineStats` additionally clamps its own output.
+   */
+  MAX_ASSESS_PULL_UPS: 60,
+  MAX_ASSESS_PUSH_UPS: 150,
+  MAX_ASSESS_PLANK: 1800,
   MIN_BODY_FAT: 3,
   MAX_BODY_FAT: 60,
   /** Custom exercise XP-per-unit bounds. */
