@@ -30,6 +30,7 @@ import { Achievements } from '../components/Achievements';
 import { MeasurementsCard } from '../components/MeasurementsCard';
 import { MuscleMap } from '../components/MuscleMap';
 import { SettingsCard } from '../components/SettingsCard';
+import { SeasonHistoryCard } from '../components/social/SeasonHistoryCard';
 import { PhysiqueLab } from '../components/PhysiqueLab';
 import {
   IdentityChip,
@@ -130,6 +131,8 @@ export function ProfileView({ profile }: { profile: Profile }) {
       <PhysiqueLab profile={profile} />
 
       <Achievements profile={profile} />
+
+      <SeasonHistoryCard profile={profile} />
 
       <DataCard profile={profile} />
     </div>

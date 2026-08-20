@@ -49,6 +49,8 @@ import { bestSet, entryVolume, normalizeReps } from './game/sets';
 import { newlyEarned, type Achievement } from './game/achievements';
 import { normalizeMeasurementValues } from './game/measurements';
 import { applyReversal, reversalOf } from './game/correction';
+import { friendCardFrom, pushRecentDay, searchKey } from './game/friends';
+import { accrueSeason, rolloverSeason, seasonIdFor } from './game/season';
 import { buildRoutine, removeRoutine, upsertRoutine } from './game/routines';
 import { LIMITS } from './game/validation';
 
@@ -83,8 +85,35 @@ export function publicProfileFrom(profile: Profile): Record<string, unknown> {
     streak: Math.max(0, int(profile.streak?.current, 0)),
     activeCosmetic: profile.activeCosmetic ?? null,
     cosmetics: arr<string>(profile.inventory?.cosmetics).slice(0, 20),
+    // Lowercased name for prefix search: Firestore has no case-insensitive
+    // comparison, so the searchable form has to be a stored field.
+    searchName: searchKey(profile.displayName),
+    seasonId: str(profile.season?.id, ''),
+    seasonXp: Math.max(0, num(profile.season?.xp, 0)),
+    // Keeps a finished season's ladder computable after its athletes have
+    // rolled over into the next one.
+    lastSeasonId: str(profile.seasonHistory?.[0]?.id, ''),
+    lastSeasonXp: Math.max(0, num(profile.seasonHistory?.[0]?.xp, 0)),
     updatedAt: Date.now(),
   };
+}
+
+export function friendCardRef(uid: string) {
+  return doc(getDbOrThrow(), COLLECTIONS.friendCards, uid);
+}
+
+/**
+ * Mirror the friend projection — the richer view a friendship unlocks.
+ *
+ * Same swallow-and-log failure mode as `syncPublicProfile`: a stale friend card
+ * is never worth failing the athlete's actual action over.
+ */
+export async function syncFriendCard(profile: Profile): Promise<void> {
+  try {
+    await setDoc(friendCardRef(profile.uid), friendCardFrom(profile));
+  } catch (error) {
+    console.error('[data] failed to sync friend card', error);
+  }
 }
 
 /**
@@ -166,6 +195,9 @@ export async function ensureProfile(user: User, preferredName?: string): Promise
     // Mirror the *repaired* profile, not the one that was read — otherwise the
     // leaderboard keeps showing the leaked name until the next workout.
     await syncPublicProfile(repaired);
+    // An account that has never logged a session still needs a readable card,
+    // or a new friend sees nothing at all.
+    await syncFriendCard(repaired);
 
     return repaired;
   }
@@ -192,6 +224,7 @@ export async function ensureProfile(user: User, preferredName?: string): Promise
   } = fresh;
   await setDoc(ref, stripUndefined(document));
   await syncPublicProfile(fresh);
+  await syncFriendCard(fresh);
   return fresh;
 }
 
@@ -412,6 +445,14 @@ export async function logWorkout(
   const newTotalXp = previousTotalXp + xpEarned;
   const grossAfter = Math.max(0, num(profile.grossXp, previousTotalXp)) + xpEarned;
   const previousLevel = levelFromTotalXp(previousTotalXp);
+
+  // Season counters ride along in the same batch — no extra round trip, no
+  // second commit. A rollover here touches nothing above it: lifetime XP,
+  // level, coins, stats, personal bests, inventory and muscle volume are all
+  // computed exactly as they were before seasons existed.
+  const rolled = rolloverSeason(profile.season, profile.seasonHistory, seasonIdFor(), now);
+  const season = accrueSeason(rolled.season, xpEarned, now);
+  const recentDays = pushRecentDay(profile.recentDays, today);
   const newLevel = levelFromTotalXp(newTotalXp);
 
   // Stat growth, plus a discipline bonus that scales with the live streak.
@@ -477,6 +518,9 @@ export async function logWorkout(
     workoutCount: Math.max(0, int(profile.workoutCount, 0)) + 1,
     totalReps,
     muscleVolume,
+    season,
+    seasonHistory: rolled.history,
+    recentDays,
     updatedAt: now,
   });
 
@@ -488,6 +532,11 @@ export async function logWorkout(
     totalXp: newTotalXp,
     tier: tierAfter.name,
     streak: streakAfter.current,
+    seasonId: season.id,
+    seasonXp: season.xp,
+    ...(rolled.changed && rolled.history[0]
+      ? { lastSeasonId: rolled.history[0].id, lastSeasonXp: rolled.history[0].xp }
+      : {}),
     updatedAt: now,
   });
 
@@ -509,8 +558,15 @@ export async function logWorkout(
     workoutCount: Math.max(0, int(profile.workoutCount, 0)) + 1,
     totalReps,
     muscleVolume,
+    season,
+    seasonHistory: rolled.history,
+    recentDays,
   };
   const newAchievements = newlyEarned(profile, profileAfter);
+
+  // Fifth write: the friend projection, so a friend's head-to-head is current
+  // the moment this session lands.
+  batch.set(friendCardRef(profile.uid), friendCardFrom(profileAfter, now));
 
   batch.set(snapshotRef, {
     uid: profile.uid,
@@ -1083,6 +1139,8 @@ export async function fetchLeaderboard(max = 50): Promise<LeaderboardRow[]> {
       // Only honour a cosmetic the row genuinely owns.
       activeCosmetic: active && cosmetics.includes(active) ? active : null,
       cosmetics,
+      seasonId: str(data.seasonId, ''),
+      seasonXp: Math.max(0, num(data.seasonXp, 0)),
     };
   });
 }

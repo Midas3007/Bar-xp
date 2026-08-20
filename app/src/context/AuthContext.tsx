@@ -28,6 +28,8 @@ import { COLLECTIONS, getAuthOrThrow, getDbOrThrow, googleProvider, isFirebaseCo
 import type { Profile } from '../lib/types';
 import { normalizeProfile, sanitizeDisplayName, UNNAMED_ATHLETE } from '../lib/game/profile';
 import { ensureProfile, eraseAccountData, persistRecalculation, decayPatch } from '../lib/data';
+import { rolloverSeason, seasonIdFor, seasonLabel } from '../lib/game/season';
+import { resolvePendingSeasonPlacements } from '../lib/social';
 import { applyStreakDecay, dayKey, safeStreak } from '../lib/game/streak';
 import { identityForStreak, tierForStats } from '../lib/game/constants';
 import { int } from '../lib/safe';
@@ -268,6 +270,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // A season boundary resets one counter and nothing else. `rolloverSeason`
+      // returns only season fields, so lifetime XP, level, stats, tier, coins,
+      // inventory and personal bests cannot be touched from here.
+      const rolled = rolloverSeason(
+        current.season,
+        current.seasonHistory,
+        seasonIdFor(),
+        Date.now(),
+      );
+      if (rolled.changed) {
+        patch.season = rolled.season;
+        patch.seasonHistory = rolled.history;
+        if (rolled.history[0]?.pending) {
+          notices.push(
+            `Season ${seasonLabel(rolled.history[0].id)} has ended. Your placement is being tallied.`,
+          );
+        }
+      }
+
       // Tier and identity are derived for display but still persisted, since the
       // leaderboard reads other users' stored tier. Compare the freshly derived
       // value against what is actually in the document and correct any drift —
@@ -284,10 +305,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       if (identity !== current.storedIdentity) patch.identity = identity;
 
-      if (Object.keys(patch).length === 0) return;
+      if (Object.keys(patch).length > 0) {
+        await persistRecalculation(current.uid, patch);
+        if (mountedRef.current && notices.length > 0) setBackgroundNotice(notices.join(' '));
+      }
 
-      await persistRecalculation(current.uid, patch);
-      if (mountedRef.current && notices.length > 0) setBackgroundNotice(notices.join(' '));
+      // Separate, and after the patch is persisted: this does network reads and
+      // must never block the streak or tier correction. A failure is logged and
+      // retried on the next pass, like everything else in here.
+      try {
+        const patchedHistory = await resolvePendingSeasonPlacements({
+          ...current,
+          seasonHistory: rolled.changed ? rolled.history : current.seasonHistory,
+          season: rolled.changed ? rolled.season : current.season,
+        });
+        if (patchedHistory) {
+          await persistRecalculation(current.uid, { seasonHistory: patchedHistory });
+        }
+      } catch (error) {
+        console.error('[auth] season placement resolution failed', error);
+      }
     } catch (error) {
       // A failed background pass is not worth interrupting the user over — the
       // next tick will retry.

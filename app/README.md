@@ -211,6 +211,80 @@ and no way for the badge list to drift out of sync with reality.
 
 ---
 
+## Competing
+
+### Friends
+
+A friend request has **no status field**: its existence is the pending state.
+Accepting creates the friendship and deletes the request; declining or
+cancelling deletes it. With no mutable state there is nothing to forge, and no
+"who may set `status: accepted`" question — which is where friend systems
+usually leak.
+
+The friendship's document id is the two uids sorted and joined (`alice__bob`),
+so a pair has exactly one address, checkable from a rule without a query, and a
+duplicate friendship is impossible. Creating one requires that
+`friend_requests/{them}__{you}` exists — and a request can only be created by
+its sender, so you cannot manufacture your own invitation. That single
+`exists()` is the hinge of the whole design.
+
+### What a friend can see
+
+`public_profiles` stays exactly as narrow as it was — the nine leaderboard
+fields plus the five season/search fields, still enforced with `hasOnly`. The
+richer view lives in a **separate collection**, `friend_cards`, readable only by
+someone holding an accepted friendship. A second, consent-gated door rather than
+a wider version of the first one.
+
+The card carries level, XP, tier, the four core stats, lifetime reps, session
+count, streaks and the last fourteen training days. It carries nothing about the
+body, the assessment, personal bests, goals, custom movements, coins or
+inventory, and `FRIEND_CARD_FIELDS` in `game/friends.ts` is an explicit
+allow-list mirrored by the rules and asserted by a test — all three change
+together or not at all.
+
+### Challenges
+
+Time-boxed contests between two friends over the current week or month:
+sessions, volume, XP, or the volume of one movement. `sessions` counts distinct
+*days*, so splitting one workout into five logs wins nothing.
+
+**No result is ever stored.** Each athlete writes their own score to
+`challenges/{id}/scores/{uid}`, and both clients derive the same winner from the
+same two documents. There is nothing to forge, no rule deciding who may declare
+victory, and no way for the two sides to disagree about a stored answer. A tie
+stays a tie — with self-reported numbers, a tiebreak is theatre.
+
+Every number in Bar XP is self-reported and unverifiable, and the interface says
+so on every card, with the time each score was last computed. What the rules
+guarantee is narrower and actually achievable: **nobody writes anybody else's
+number.**
+
+### Seasons
+
+Rank was a ratchet: stats only ever increase, tier is their average, so a rank
+you cannot lose and cannot be overtaken in stops being a competition — and
+whoever installed the app first wins the lifetime ladder permanently.
+
+A season is one calendar quarter, **derived from the calendar** by every client
+independently, so there is no server, no scheduler and no admin document.
+Season XP is a second counter beside lifetime XP. At a boundary the finished
+season is recorded permanently on the profile and the counter resets.
+
+Lifetime XP, level, stats, tier, coins, unlocks and personal bests are
+untouched, and the rule that `totalXp` can never decrease is unchanged —
+`rolloverSeason` takes none of them as inputs and cannot return them, which a
+test asserts structurally rather than leaving to memory. Profiles written before
+seasons existed carry no season field, read as the start of the current one, and
+gain **no invented history**.
+
+A finished season's placement is resolved from the union of two queries — live
+`seasonId` and `lastSeasonId` — so an athlete who opens the app a week into the
+new season is ranked against the real field rather than told they came first in
+a field of one.
+
+---
+
 ## Not losing data
 
 ### Routing
@@ -325,6 +399,10 @@ src/
       aesthetics.ts     Physique trait ratings, tips, and the two grade vocabularies
       measurements.ts   Measurement sites, metric/imperial conversion, coercion
       correction.ts     Reversal maths for voiding a logged session
+      friends.ts        Pair keys, the friend-card allow-list, recent days
+      season.ts         Season calendar, rollover and standings maths
+      challenges.ts     Challenge templates, windows, scoring and resolution
+    social.ts           Every Firestore read and write for the social layer
     routing.ts          ViewKey <-> path table and the History API hook
     draft.ts            The in-progress session, in localStorage
     export.ts           JSON and CSV export builders
@@ -404,6 +482,11 @@ reduced — that `xpVoided` is monotonic and can never exceed it, and that
 | `public_profiles/{uid}` | Readable by any signed-in user. Exactly the nine fields the leaderboard renders, enforced with `hasOnly`. Mirrored from the user document on every write that changes one. |
 | `workouts/{id}` | Private to the owner. Create-only and **never updated**; deletable only by the owner, for account erasure. |
 | `stats_history/{id}` | Private to the owner. Append-only audit trail, and where body measurements are recorded. Owner-deletable for erasure. |
+| `friend_requests/{from}__{to}` | Readable by its two parties. No mutable state — its existence *is* "pending". Created only by the sender; deleted by either. |
+| `friendships/{a}__{b}` | Readable by its two members. Id is the sorted pair, so a pair has one address. Created only by the recipient of a matching request. |
+| `friend_cards/{uid}` | The richer projection — core stats, volume, streak, training days. Readable by an accepted friend; writable only by its owner. |
+| `challenges/{id}` | Readable by its two members. Only the *invited* member may set `status`, and only once. |
+| `challenges/{id}/scores/{uid}` | One document per athlete, named after them. The rule stopping you writing your opponent's number is the document id. |
 
 The split matters: an earlier version let any signed-in user read whole user
 documents, on the reasoning that the client only rendered safe fields. That was
@@ -417,7 +500,7 @@ UI would not have helped; the data had to move.
 npm run test:rules
 ```
 
-Runs 68 assertions against the Firestore emulator, which executes the real
+Runs 97 assertions against the Firestore emulator, which executes the real
 rules engine — the rules are enforced, not merely inspected. Needs the Firebase
 CLI on your PATH and a JVM. Coverage includes cross-user read/write denial,
 XP monotonicity, immutability of `workouts` and `stats_history`, the anti-cheat

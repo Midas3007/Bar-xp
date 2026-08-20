@@ -25,6 +25,7 @@ const SOURCES = [
   'src/lib/game/goals.ts', 'src/lib/game/achievements.ts', 'src/lib/game/muscles.ts',
   'src/lib/game/measurements.ts', 'src/lib/game/aesthetics.ts',
   'src/lib/game/correction.ts',
+  'src/lib/game/friends.ts', 'src/lib/game/season.ts', 'src/lib/game/challenges.ts',
   'src/lib/share/shareCard.ts',
 ];
 

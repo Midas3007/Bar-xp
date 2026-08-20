@@ -4,16 +4,56 @@
       "collectionGroup": "workouts",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "uid", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "uid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "stats_history",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "uid", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "uid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "public_profiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "seasonId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "seasonXp",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "public_profiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "lastSeasonId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "lastSeasonXp",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],
