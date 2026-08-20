@@ -1681,8 +1681,13 @@ test('REGRESSION: a long streak does not instantly complete a fresh streak goal'
     baseline: 30,
   };
   const out = advanceGoals([goal], 1, { ...GOAL_INPUT, streak: 30 });
+  // Assert on this goal, never on `completed.length`: the hand is refilled from
+  // a random roll and a filler goal can complete in the same pass.
+  assert.ok(
+    !out.completed.some((g) => g.id === 'streak_test'),
+    'standing still cannot complete a streak goal',
+  );
   const survivor = out.goals.find((g) => g.id === 'streak_test');
-  assert.equal(out.completed.length, 0, 'standing still cannot complete a streak goal');
   assert.ok(survivor, 'the goal survives');
   assert.equal(survivor.progress, 0);
 });
@@ -1700,7 +1705,10 @@ test('a streak goal completes once the streak actually grows', () => {
     baseline: 30,
   };
   const out = advanceGoals([goal], 1, { ...GOAL_INPUT, streak: 37 });
-  assert.equal(out.completed.length, 1, 'seven more days is the goal met');
+  assert.ok(
+    out.completed.some((g) => g.id === 'streak_test'),
+    'seven more days is the goal met',
+  );
 });
 
 test('a streak goal written before baselines existed still works', () => {
@@ -1711,7 +1719,7 @@ test('a streak goal written before baselines existed still works', () => {
     progress: 0, rewardXp: 50, rewardCoins: 20, createdAt: Date.now(),
   };
   const out = advanceGoals([legacy], 1, { ...GOAL_INPUT, streak: 5 });
-  assert.equal(out.completed.length, 1);
+  assert.ok(out.completed.some((g) => g.id === 'legacy'));
 });
 
 test('achievements derive from the profile and never need storing', () => {
