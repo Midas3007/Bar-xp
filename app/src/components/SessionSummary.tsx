@@ -89,13 +89,13 @@ export function SessionSummary({
     order += 1;
     return style;
   };
-  const panel = `rounded-2xl border border-white/5 bg-ink-900/70 p-5 ${
+  const panel = `rounded-2xl border border-line bg-surface-sunken/70 p-5 ${
     reduced ? '' : 'animate-fade-up'
   }`;
 
   return (
     <div
-      className="fixed inset-0 z-[60] overflow-y-auto bg-ink-950/95 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] overflow-y-auto bg-surface-base/95 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="session-summary-title"
@@ -110,11 +110,11 @@ export function SessionSummary({
         <div className={reduced ? '' : 'animate-fade-up'} style={stagger()}>
           <h2
             id="session-summary-title"
-            className="font-display text-3xl font-bold tracking-tight text-slate-50"
+            className="font-display text-3xl font-bold tracking-tight text-content-strong"
           >
             Session complete
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-content-muted">
             <NeonName
               name={str(profile.displayName, 'Athlete')}
               activeCosmetic={profile.activeCosmetic}
@@ -128,7 +128,7 @@ export function SessionSummary({
         <div className={panel} style={stagger()}>
           <p
             aria-hidden="true"
-            className="bg-gradient-to-r from-forge-400 to-arcane-400 bg-clip-text font-display text-5xl font-bold text-transparent"
+            className="bg-gradient-to-r from-forge-vivid to-arcane bg-clip-text font-display text-5xl font-bold text-transparent"
           >
             +{fmt(result.xpEarned)} XP
           </p>
@@ -148,13 +148,13 @@ export function SessionSummary({
 
         <div className={panel} style={stagger()}>
           {result.levelsGained > 0 ? (
-            <div className="mb-4 flex items-start gap-3 rounded-xl bg-forge-500/10 p-3 ring-1 ring-inset ring-forge-400/30">
-              <Trophy className="mt-0.5 h-5 w-5 shrink-0 text-forge-300" />
+            <div className="mb-4 flex items-start gap-3 rounded-xl bg-forge/10 p-3 ring-1 ring-inset ring-forge/30">
+              <Trophy className="mt-0.5 h-5 w-5 shrink-0 text-forge" />
               <div>
-                <p className="font-display font-semibold text-slate-50">
+                <p className="font-display font-semibold text-content-strong">
                   Level {fmt(result.newLevel)} reached
                 </p>
-                <p className="mt-0.5 text-xs text-slate-400">
+                <p className="mt-0.5 text-xs text-content-muted">
                   {result.levelsGained > 1
                     ? `${fmt(result.levelsGained)} levels in one session. New movements may have unlocked in the logger.`
                     : 'New movements may have unlocked in the logger.'}
@@ -167,12 +167,12 @@ export function SessionSummary({
 
         {result.tierChanged ? (
           <div className={panel} style={stagger()}>
-            <p className="font-display text-xs font-semibold uppercase tracking-widest text-slate-500">
+            <p className="font-display text-xs font-semibold uppercase tracking-widest text-content-muted">
               New rank
             </p>
             <div className="mt-2 flex items-center gap-3">
               <TierBadge tierName={result.tierBefore} size="sm" />
-              <span aria-hidden="true" className="text-slate-600">
+              <span aria-hidden="true" className="text-content-subtle">
                 &rarr;
               </span>
               <TierBadge tierName={result.newTier} />
@@ -182,13 +182,13 @@ export function SessionSummary({
 
         <div className={panel} style={stagger()}>
           <div className="flex items-center gap-3">
-            <Coins className="h-5 w-5 shrink-0 text-amber-400" />
-            <p className="font-display text-lg font-semibold text-slate-50">
+            <Coins className="h-5 w-5 shrink-0 text-warn" />
+            <p className="font-display text-lg font-semibold text-content-strong">
               +{fmt(result.coinsEarned)} Bar Coins
             </p>
           </div>
           {result.goalRewardCoins > 0 ? (
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-content-muted">
               {fmt(result.sessionCoins)} from the session · {fmt(result.goalRewardCoins)} from goals
             </p>
           ) : null}
@@ -196,7 +196,7 @@ export function SessionSummary({
 
         {result.completedGoals.length > 0 ? (
           <div className={panel} style={stagger()}>
-            <p className="font-display text-xs font-semibold uppercase tracking-widest text-slate-500">
+            <p className="font-display text-xs font-semibold uppercase tracking-widest text-content-muted">
               Goal{result.completedGoals.length === 1 ? '' : 's'} complete
             </p>
             <ul className="mt-2 space-y-2">
@@ -205,8 +205,8 @@ export function SessionSummary({
                   key={`${goal.title}-${i}`}
                   className="flex items-baseline justify-between gap-3"
                 >
-                  <span className="text-sm text-slate-200">{goal.title}</span>
-                  <span className="shrink-0 font-mono text-xs text-slate-500">
+                  <span className="text-sm text-content">{goal.title}</span>
+                  <span className="shrink-0 font-mono text-xs text-content-muted">
                     +{fmt(goal.rewardXp)} XP · +{fmt(goal.rewardCoins)} coins
                   </span>
                 </li>
@@ -217,19 +217,19 @@ export function SessionSummary({
 
         {result.newPersonalBests.length > 0 ? (
           <div className={panel} style={stagger()}>
-            <p className="font-display text-xs font-semibold uppercase tracking-widest text-slate-500">
+            <p className="font-display text-xs font-semibold uppercase tracking-widest text-content-muted">
               Personal best{result.newPersonalBests.length === 1 ? '' : 's'}
             </p>
             <ul className="mt-2 space-y-2">
               {result.newPersonalBests.map((pb) => (
                 <li key={pb.exerciseId} className="flex items-baseline justify-between gap-3">
-                  <span className="flex items-center gap-2 text-sm text-slate-200">
-                    <Zap className="h-4 w-4 shrink-0 text-amber-400" />
+                  <span className="flex items-center gap-2 text-sm text-content">
+                    <Zap className="h-4 w-4 shrink-0 text-warn" />
                     {pb.exerciseName}
                   </span>
-                  <span className="shrink-0 font-mono text-xs text-slate-400">
+                  <span className="shrink-0 font-mono text-xs text-content-muted">
                     {fmt(pb.value)} {pb.unit === 'seconds' ? 'sec' : 'reps'}
-                    <span className="text-slate-600"> · beat {fmt(pb.previousValue)}</span>
+                    <span className="text-content-subtle"> · beat {fmt(pb.previousValue)}</span>
                   </span>
                 </li>
               ))}
@@ -239,7 +239,7 @@ export function SessionSummary({
 
         {badges.length > 0 ? (
           <div className={panel} style={stagger()}>
-            <p className="font-display text-xs font-semibold uppercase tracking-widest text-slate-500">
+            <p className="font-display text-xs font-semibold uppercase tracking-widest text-content-muted">
               Achievement{badges.length === 1 ? '' : 's'} unlocked
             </p>
             <ul className="mt-2 space-y-3">
@@ -247,12 +247,12 @@ export function SessionSummary({
                 const Icon = ICONS[badge.icon] ?? Sparkles;
                 return (
                   <li key={badge.id} className="flex items-start gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-arcane-500/15 ring-1 ring-inset ring-arcane-400/30">
-                      <Icon className="h-4 w-4 text-arcane-300" />
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-arcane-vivid/15 ring-1 ring-inset ring-arcane/30">
+                      <Icon className="h-4 w-4 text-arcane" />
                     </span>
                     <div>
-                      <p className="text-sm font-medium text-slate-100">{badge.name}</p>
-                      <p className="text-xs text-slate-500">{badge.description}</p>
+                      <p className="text-sm font-medium text-content-strong">{badge.name}</p>
+                      <p className="text-xs text-content-muted">{badge.description}</p>
                     </div>
                   </li>
                 );
@@ -283,8 +283,8 @@ export function SessionSummary({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="shrink-0 font-mono text-slate-300">{value}</dd>
+      <dt className="text-content-muted">{label}</dt>
+      <dd className="shrink-0 font-mono text-content">{value}</dd>
     </div>
   );
 }

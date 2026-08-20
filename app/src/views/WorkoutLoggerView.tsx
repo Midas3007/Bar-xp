@@ -47,6 +47,7 @@ import {
 import {
   EQUIPMENT_META,
   MUSCLE_META,
+  muscleHex,
   SETUPS,
   equipmentFor,
   matchesSetup,
@@ -66,6 +67,7 @@ import {
 import { deleteRoutine, logWorkout, saveRoutine, type LogWorkoutResult } from '../lib/data';
 import { validateEntry, validateRoutine, validateSession, validateSetLadder, LIMITS } from '../lib/game/validation';
 import { useToast } from '../context/ToastContext';
+import { useTheme } from '../context/ThemeContext';
 import { clearDraft, loadDraft, saveDraft } from '../lib/draft';
 
 type Tab = 'log' | 'routines' | 'library';
@@ -306,17 +308,17 @@ export function WorkoutLoggerView({
   return (
     <div className="mx-auto max-w-6xl space-y-5 pb-28 lg:pb-0">
       <div>
-        <h1 className="font-display text-2xl font-bold tracking-tight text-slate-50">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-content-strong">
           Log a Session
         </h1>
-        <p className="mt-1.5 text-sm text-slate-500">
+        <p className="mt-1.5 text-sm text-content-muted">
           {available.length} movement{available.length === 1 ? '' : 's'} available
           {locked.length > 0 ? ` · ${locked.length} still locked` : ''}.
         </p>
       </div>
 
       {/* --- Tabs --- */}
-      <div className="grid grid-cols-3 gap-1 rounded-xl bg-ink-900 p-1 ring-1 ring-white/5 sm:inline-grid sm:auto-cols-max sm:grid-flow-col">
+      <div className="grid grid-cols-3 gap-1 rounded-xl bg-surface-sunken p-1 ring-1 ring-line sm:inline-grid sm:auto-cols-max sm:grid-flow-col">
         <TabButton active={tab === 'log'} onClick={() => setTab('log')}>
           <Dumbbell className="h-4 w-4" aria-hidden />
           Log
@@ -358,7 +360,7 @@ export function WorkoutLoggerView({
             <div className="space-y-5">
               <RoutineList profile={profile} onStart={startRoutine} />
               <div>
-                <h2 className="mb-3 font-display text-sm font-semibold uppercase tracking-widest text-slate-400">
+                <h2 className="mb-3 font-display text-sm font-semibold uppercase tracking-widest text-content-muted">
                   Built-in routines
                 </h2>
                 <PresetList profile={profile} setup={setup} onLoad={loadPreset} />
@@ -393,7 +395,7 @@ export function WorkoutLoggerView({
                   <button
                     type="button"
                     onClick={clearSession}
-                    className="text-xs font-medium text-slate-500 transition hover:text-rose-300"
+                    className="text-xs font-medium text-content-muted transition hover:text-danger"
                   >
                     Clear
                   </button>
@@ -409,26 +411,26 @@ export function WorkoutLoggerView({
               />
             ) : (
               <>
-                <ul className="divide-y divide-white/5">
+                <ul className="divide-y divide-line">
                   {entries.map((entry, index) => (
                     <li key={`${entry.exerciseId}-${index}`} className="flex items-center gap-3 p-4">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-slate-200">
+                        <p className="truncate text-sm font-medium text-content">
                           {entry.exerciseName}
                         </p>
-                        <p className="mt-0.5 font-mono text-[11px] text-slate-500">
+                        <p className="mt-0.5 font-mono text-[11px] text-content-muted">
                           {formatSetLadder(entry)}
                           {entry.unit === 'seconds' ? 's' : ' reps'} = {fmt(entryVolume(entry))}{' '}
                           {entry.unit === 'seconds' ? 'sec' : 'reps'}
                         </p>
                       </div>
-                      <span className="shrink-0 font-mono text-sm font-semibold text-forge-300">
+                      <span className="shrink-0 font-mono text-sm font-semibold text-forge">
                         +{fmt(entry.xp)}
                       </span>
                       <button
                         type="button"
                         onClick={() => removeEntry(index)}
-                        className="shrink-0 rounded-lg p-1.5 text-slate-600 transition hover:bg-white/5 hover:text-rose-300"
+                        className="shrink-0 rounded-lg p-1.5 text-content-subtle transition hover:bg-surface-hover hover:text-danger"
                         aria-label={`Remove ${entry.exerciseName}`}
                       >
                         <Trash2 className="h-4 w-4" aria-hidden />
@@ -437,38 +439,38 @@ export function WorkoutLoggerView({
                   ))}
                 </ul>
 
-                <div className="space-y-3 border-t border-white/5 p-5">
+                <div className="space-y-3 border-t border-line p-5">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">Base XP</span>
-                    <span className="font-mono text-slate-300">{fmt(baseXp)}</span>
+                    <span className="text-content-muted">Base XP</span>
+                    <span className="font-mono text-content">{fmt(baseXp)}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">
+                    <span className="text-content-muted">
                       Streak bonus ({fmt(profile.streak.current)}w)
                     </span>
-                    <span className="font-mono text-ember-300">×{fmtDecimal(multiplier, 2)}</span>
+                    <span className="font-mono text-ember">×{fmtDecimal(multiplier, 2)}</span>
                   </div>
-                  <div className="flex items-center justify-between border-t border-white/5 pt-3">
-                    <span className="font-display text-xs font-semibold uppercase tracking-widest text-slate-400">
+                  <div className="flex items-center justify-between border-t border-line pt-3">
+                    <span className="font-display text-xs font-semibold uppercase tracking-widest text-content-muted">
                       Projected
                     </span>
-                    <span className="font-mono text-lg font-bold text-forge-300">
+                    <span className="font-mono text-lg font-bold text-forge">
                       +{fmt(projectedXp)} XP
                     </span>
                   </div>
 
                   {sessionError ? (
-                    <div className="flex items-start gap-2 rounded-xl bg-rose-500/10 p-3 ring-1 ring-rose-500/25">
+                    <div className="flex items-start gap-2 rounded-xl bg-danger/10 p-3 ring-1 ring-danger/25">
                       <TriangleAlert
-                        className="mt-0.5 h-4 w-4 shrink-0 text-rose-400"
+                        className="mt-0.5 h-4 w-4 shrink-0 text-danger"
                         aria-hidden
                       />
-                      <p className="text-xs leading-relaxed text-rose-200">{sessionError}</p>
+                      <p className="text-xs leading-relaxed text-danger">{sessionError}</p>
                     </div>
                   ) : null}
 
                   {routineOpen ? (
-                    <div className="space-y-2 rounded-xl bg-ink-900/60 p-3 ring-1 ring-white/5">
+                    <div className="space-y-2 rounded-xl bg-surface-sunken/60 p-3 ring-1 ring-line">
                       <Input
                         value={routineName}
                         onChange={(e) => setRoutineName(e.target.value)}
@@ -490,7 +492,7 @@ export function WorkoutLoggerView({
                           Cancel
                         </Button>
                       </div>
-                      <p className="text-[11px] leading-relaxed text-slate-600">
+                      <p className="text-[11px] leading-relaxed text-content-subtle">
                         Saving under a name you already use replaces that routine.
                       </p>
                     </div>
@@ -533,15 +535,15 @@ export function WorkoutLoggerView({
                 subtitle="Tap any of them to see exactly how to train for it."
                 icon={<Lock className="h-4 w-4" aria-hidden />}
               />
-              <ul className="divide-y divide-white/5">
+              <ul className="divide-y divide-line">
                 {locked.map((exercise) => (
                   <li key={exercise.id}>
                     <button
                       type="button"
                       onClick={() => setSheetExercise(exercise)}
-                      className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-white/[0.03]"
+                      className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-surface-hover"
                     >
-                      <div className="shrink-0 text-slate-600">
+                      <div className="shrink-0 text-content-subtle">
                         <ExerciseDiagram
                           diagram={exercise.diagram}
                           className="h-12 w-16"
@@ -549,15 +551,15 @@ export function WorkoutLoggerView({
                         />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="flex items-center gap-1.5 text-sm font-medium text-slate-400">
-                          <Lock className="h-3 w-3 shrink-0 text-slate-600" aria-hidden />
+                        <p className="flex items-center gap-1.5 text-sm font-medium text-content-muted">
+                          <Lock className="h-3 w-3 shrink-0 text-content-subtle" aria-hidden />
                           {exercise.name}
                         </p>
-                        <p className="mt-0.5 text-[11px] text-slate-600">
+                        <p className="mt-0.5 text-[11px] text-content-subtle">
                           {lockReason(exercise, profile)}
                         </p>
                       </div>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-600" aria-hidden />
+                      <ChevronRight className="h-4 w-4 shrink-0 text-content-subtle" aria-hidden />
                     </button>
                   </li>
                 ))}
@@ -569,7 +571,7 @@ export function WorkoutLoggerView({
 
       {/* --- Sticky mobile summary: always-visible proof the add worked --- */}
       {entries.length > 0 ? (
-        <div className="fixed inset-x-0 bottom-[57px] z-30 border-t border-white/10 bg-ink-900/95 px-4 py-2.5 backdrop-blur-xl lg:hidden">
+        <div className="fixed inset-x-0 bottom-nav z-30 border-t border-line-strong bg-surface-sunken/95 px-4 py-2.5 backdrop-blur-xl lg:hidden">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -578,10 +580,10 @@ export function WorkoutLoggerView({
               }
               className="min-w-0 flex-1 text-left"
             >
-              <p className="text-xs font-semibold text-slate-200">
+              <p className="text-xs font-semibold text-content">
                 {fmt(entries.length)} movement{entries.length === 1 ? '' : 's'} queued
               </p>
-              <p className="font-mono text-[11px] text-forge-300">+{fmt(projectedXp)} XP</p>
+              <p className="font-mono text-[11px] text-forge">+{fmt(projectedXp)} XP</p>
             </button>
             <Button size="sm" onClick={() => void finish()} disabled={busy}>
               {busy ? <Spinner className="h-3.5 w-3.5" /> : null}
@@ -630,7 +632,7 @@ function SetupFilter({
   const active = SETUPS.find((s) => s.key === setup) ?? SETUPS[0];
   return (
     <Card className="p-4">
-      <p className="mb-2.5 font-display text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+      <p className="mb-2.5 font-display text-[11px] font-semibold uppercase tracking-widest text-content-muted">
         What have you got access to?
       </p>
       <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
@@ -641,21 +643,22 @@ function SetupFilter({
             onClick={() => onChange(option.key)}
             className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
               setup === option.key
-                ? 'bg-forge-500/15 text-forge-300 ring-1 ring-forge-500/30'
-                : 'bg-white/5 text-slate-500 ring-1 ring-white/5 hover:text-slate-300'
+                ? 'bg-forge/15 text-forge ring-1 ring-forge/30'
+                : 'bg-surface-hover text-content-muted ring-1 ring-line hover:text-content'
             }`}
           >
             {option.label}
           </button>
         ))}
       </div>
-      <p className="mt-2 text-[11px] text-slate-600">{active.description}</p>
+      <p className="mt-2 text-[11px] text-content-subtle">{active.description}</p>
     </Card>
   );
 }
 
 /** The muscles a movement trains, primary highlighted. */
 function MuscleChips({ exerciseId }: { exerciseId: string }) {
+  const { resolved } = useTheme();
   const profile = muscleProfileFor(exerciseId);
   if (profile.primary.length === 0) return null;
   return (
@@ -664,13 +667,16 @@ function MuscleChips({ exerciseId }: { exerciseId: string }) {
         <span
           key={m}
           className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
-          style={{ color: MUSCLE_META[m].hex, backgroundColor: `${MUSCLE_META[m].hex}1f` }}
+          style={{
+            color: muscleHex(m, resolved),
+            backgroundColor: `${muscleHex(m, resolved)}1f`,
+          }}
         >
           {MUSCLE_META[m].label}
         </span>
       ))}
       {profile.secondary.map((m: MuscleKey) => (
-        <span key={m} className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500">
+        <span key={m} className="rounded bg-surface-hover px-1.5 py-0.5 text-[10px] text-content-muted">
           {MUSCLE_META[m].label}
         </span>
       ))}
@@ -791,7 +797,7 @@ function ExercisePicker({
               setAmount(next?.unit === 'seconds' ? '30' : '10');
               setLadder(null);
             }}
-            className="w-full rounded-xl bg-ink-900 px-3.5 py-3 text-sm text-slate-100 ring-1 ring-white/10 transition focus:outline-none focus:ring-2 focus:ring-forge-500"
+            className="w-full rounded-xl bg-surface-sunken px-3.5 py-3 text-sm text-content-strong ring-1 ring-line-strong transition focus:ring-2 focus:ring-forge"
           >
             {CATEGORY_ORDER.map((category) => {
               const group = available.filter((e) => e.category === category);
@@ -815,9 +821,9 @@ function ExercisePicker({
           <button
             type="button"
             onClick={() => onInspect(selected)}
-            className="flex w-full items-center gap-3 rounded-xl bg-ink-900/60 p-3 text-left ring-1 ring-white/5 transition hover:ring-white/15"
+            className="flex w-full items-center gap-3 rounded-xl bg-surface-sunken/60 p-3 text-left ring-1 ring-line transition hover:ring-line-strong"
           >
-            <div className="shrink-0 text-forge-300">
+            <div className="shrink-0 text-forge">
               <ExerciseDiagram
                 diagram={selected.diagram}
                 className="h-14 w-20"
@@ -829,12 +835,12 @@ function ExercisePicker({
                 <Chip className={`${CATEGORY_META[selected.category].ring} ${CATEGORY_META[selected.category].color}`}>
                   {CATEGORY_META[selected.category].label}
                 </Chip>
-                <Chip className="bg-white/5 text-slate-400 ring-white/10">
+                <Chip className="bg-surface-hover text-content-muted ring-line-strong">
                   {fmtDecimal(selected.xpPerUnit, 2)} XP/
                   {selected.unit === 'seconds' ? 'sec' : 'rep'}
                 </Chip>
                 {selected.custom ? (
-                  <Chip className="bg-arcane-500/10 text-arcane-300 ring-arcane-500/30">
+                  <Chip className="bg-arcane/10 text-arcane ring-arcane/30">
                     <Sparkles className="h-3 w-3" aria-hidden />
                     Custom
                   </Chip>
@@ -843,7 +849,7 @@ function ExercisePicker({
               <div className="mt-1.5">
                 <MuscleChips exerciseId={selected.id} />
               </div>
-              <p className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-forge-300">
+              <p className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-forge">
                 <Info className="h-3 w-3" aria-hidden />
                 How to do it · needs {EQUIPMENT_META[equipmentFor(selected)].short}
               </p>
@@ -896,7 +902,7 @@ function ExercisePicker({
             <div className="space-y-2">
               {ladder.map((value, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <span className="w-12 shrink-0 font-mono text-[11px] text-slate-600">
+                  <span className="w-12 shrink-0 font-mono text-[11px] text-content-subtle">
                     Set {i + 1}
                   </span>
                   <Input
@@ -921,7 +927,7 @@ function ExercisePicker({
                       setError(null);
                     }}
                     disabled={ladder.length <= 1}
-                    className="shrink-0 rounded-lg p-2 text-slate-600 transition hover:bg-white/5 hover:text-rose-300 disabled:opacity-30"
+                    className="shrink-0 rounded-lg p-2 text-content-subtle transition hover:bg-surface-hover hover:text-danger disabled:opacity-30"
                     aria-label={`Remove set ${i + 1}`}
                   >
                     <Trash2 className="h-4 w-4" aria-hidden />
@@ -959,16 +965,16 @@ function ExercisePicker({
             }
             setError(null);
           }}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-forge-300 transition hover:text-forge-200"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-forge transition hover:text-forge"
         >
           <ListOrdered className="h-3.5 w-3.5" aria-hidden />
           {ladder === null ? 'Per-set reps' : 'Same reps every set'}
         </button>
 
         {error ? (
-          <div className="flex items-start gap-2 rounded-xl bg-rose-500/10 p-3 ring-1 ring-rose-500/25">
-            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" aria-hidden />
-            <p className="text-xs leading-relaxed text-rose-200">{error}</p>
+          <div className="flex items-start gap-2 rounded-xl bg-danger/10 p-3 ring-1 ring-danger/25">
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-danger" aria-hidden />
+            <p className="text-xs leading-relaxed text-danger">{error}</p>
           </div>
         ) : null}
 
@@ -978,13 +984,13 @@ function ExercisePicker({
         </Button>
 
         {disabled ? (
-          <p className="text-xs text-amber-400/80">
+          <p className="text-xs text-warn/80">
             This session is full at {LIMITS.MAX_ENTRIES} movements. Finish it and log another.
           </p>
         ) : null}
 
         {profile.customExercises.length === 0 ? (
-          <p className="text-center text-[11px] leading-relaxed text-slate-600">
+          <p className="text-center text-[11px] leading-relaxed text-content-subtle">
             Missing a movement? Add your own from the Profile tab.
           </p>
         ) : null}
@@ -1010,7 +1016,7 @@ function Stepper({
       <button
         type="button"
         onClick={() => onStep(-1)}
-        className="w-11 shrink-0 rounded-xl bg-ink-750 font-mono text-lg font-bold text-slate-300 ring-1 ring-white/10 transition active:bg-ink-700"
+        className="w-11 shrink-0 rounded-xl bg-surface-inset font-mono text-lg font-bold text-content ring-1 ring-line-strong transition active:bg-surface-strong"
         aria-label="Decrease"
       >
         −
@@ -1027,7 +1033,7 @@ function Stepper({
       <button
         type="button"
         onClick={() => onStep(1)}
-        className="w-11 shrink-0 rounded-xl bg-ink-750 font-mono text-lg font-bold text-slate-300 ring-1 ring-white/10 transition active:bg-ink-700"
+        className="w-11 shrink-0 rounded-xl bg-surface-inset font-mono text-lg font-bold text-content ring-1 ring-line-strong transition active:bg-surface-strong"
         aria-label="Increase"
       >
         +
@@ -1049,6 +1055,7 @@ function LibraryList({
   setup: SetupKey;
   onInspect: (exercise: Exercise) => void;
 }) {
+  const { resolved } = useTheme();
   const [muscle, setMuscle] = useState<MuscleKey | 'all'>('all');
 
   const catalog = useMemo(
@@ -1062,11 +1069,11 @@ function LibraryList({
   return (
     <div className="space-y-5">
       <Card className="p-4">
-        <p className="text-xs leading-relaxed text-slate-500">
+        <p className="text-xs leading-relaxed text-content-muted">
           Every movement, with form cues, common mistakes and — for the elite skills — a
           step-by-step route to earning them. Tap any movement for the full breakdown.
         </p>
-        <p className="mb-2 mt-4 font-display text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+        <p className="mb-2 mt-4 font-display text-[11px] font-semibold uppercase tracking-widest text-content-muted">
           Filter by muscle
         </p>
         <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
@@ -1075,8 +1082,8 @@ function LibraryList({
             onClick={() => setMuscle('all')}
             className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition ${
               muscle === 'all'
-                ? 'bg-forge-500/15 text-forge-300 ring-1 ring-forge-500/30'
-                : 'bg-white/5 text-slate-500 ring-1 ring-white/5'
+                ? 'bg-forge/15 text-forge ring-1 ring-forge/30'
+                : 'bg-surface-hover text-content-muted ring-1 ring-line'
             }`}
           >
             All
@@ -1086,15 +1093,17 @@ function LibraryList({
               key={key}
               type="button"
               onClick={() => setMuscle(key)}
-              className="shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-medium ring-1 transition"
+              className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-medium ring-1 ring-line transition ${
+                muscle === key ? '' : 'bg-surface-hover text-content-muted'
+              }`}
               style={
                 muscle === key
                   ? {
-                      color: MUSCLE_META[key].hex,
-                      backgroundColor: `${MUSCLE_META[key].hex}26`,
+                      color: muscleHex(key, resolved),
+                      backgroundColor: `${muscleHex(key, resolved)}26`,
                       borderColor: 'transparent',
                     }
-                  : { color: '#64748b', backgroundColor: 'rgba(255,255,255,0.04)' }
+                  : undefined
               }
             >
               {MUSCLE_META[key].label}
@@ -1120,7 +1129,7 @@ function LibraryList({
         return (
           <Card key={category}>
             <CardHeader title={meta.label} subtitle={`${group.length} movements`} />
-            <ul className="divide-y divide-white/5">
+            <ul className="divide-y divide-line">
               {group.map((exercise) => {
                 const unlocked = isUnlocked(exercise, profile);
                 const grade = GRADE_META[exercise.grade];
@@ -1129,9 +1138,9 @@ function LibraryList({
                     <button
                       type="button"
                       onClick={() => onInspect(exercise)}
-                      className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-white/[0.03]"
+                      className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-surface-hover"
                     >
-                      <div className={`shrink-0 ${unlocked ? meta.color : 'text-slate-700'}`}>
+                      <div className={`shrink-0 ${unlocked ? meta.color : 'text-content-faint'}`}>
                         <ExerciseDiagram
                           diagram={exercise.diagram}
                           className="h-12 w-16"
@@ -1141,11 +1150,11 @@ function LibraryList({
                       <div className="min-w-0 flex-1">
                         <p
                           className={`flex items-center gap-1.5 text-sm font-medium ${
-                            unlocked ? 'text-slate-200' : 'text-slate-500'
+                            unlocked ? 'text-content' : 'text-content-muted'
                           }`}
                         >
                           {!unlocked ? (
-                            <Lock className="h-3 w-3 shrink-0 text-slate-600" aria-hidden />
+                            <Lock className="h-3 w-3 shrink-0 text-content-subtle" aria-hidden />
                           ) : null}
                           {exercise.name}
                         </p>
@@ -1155,7 +1164,7 @@ function LibraryList({
                           >
                             {grade.label}
                           </span>
-                          <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500">
+                          <span className="rounded bg-surface-hover px-1.5 py-0.5 text-[10px] text-content-muted">
                             {EQUIPMENT_META[equipmentFor(exercise)].short}
                           </span>
                         </div>
@@ -1163,7 +1172,7 @@ function LibraryList({
                           <MuscleChips exerciseId={exercise.id} />
                         </div>
                       </div>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-600" aria-hidden />
+                      <ChevronRight className="h-4 w-4 shrink-0 text-content-subtle" aria-hidden />
                     </button>
                   </li>
                 );
@@ -1218,7 +1227,7 @@ function RoutineList({
           message="Build a session, then tap Save as routine. It will be waiting here next time."
         />
       ) : (
-        <ul className="divide-y divide-white/5">
+        <ul className="divide-y divide-line">
           {routines.map((routine) => {
             const resolved = routine.items
               .map((item) => catalog.find((e) => e.id === item.exerciseId))
@@ -1234,7 +1243,7 @@ function RoutineList({
             return (
               <li key={routine.id} className="p-5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-display text-base font-semibold text-slate-100">
+                  <h3 className="font-display text-base font-semibold text-content-strong">
                     {routine.name}
                   </h3>
                   {focus ? (
@@ -1242,7 +1251,7 @@ function RoutineList({
                       {CATEGORY_META[focus].label}
                     </Chip>
                   ) : null}
-                  <Chip className="bg-white/5 text-slate-400 ring-white/10">
+                  <Chip className="bg-surface-hover text-content-muted ring-line-strong">
                     ≈ {fmt(routineVolume(routine))} units
                   </Chip>
                 </div>
@@ -1253,12 +1262,12 @@ function RoutineList({
                     return (
                       <li
                         key={`${item.exerciseId}-${i}`}
-                        className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.03] px-3 py-2"
+                        className="flex items-center justify-between gap-3 rounded-lg bg-surface-hover px-3 py-2"
                       >
-                        <span className="min-w-0 truncate text-xs text-slate-300">
+                        <span className="min-w-0 truncate text-xs text-content">
                           {exercise?.name ?? item.exerciseId}
                         </span>
-                        <span className="shrink-0 font-mono text-[11px] text-slate-500">
+                        <span className="shrink-0 font-mono text-[11px] text-content-muted">
                           {formatSetLadder({ reps: item.reps })}
                           {exercise?.unit === 'seconds' ? 's' : ''}
                         </span>
@@ -1343,7 +1352,7 @@ function PresetList({
           <Card key={preset.id} className="overflow-hidden">
             <div className="p-5">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-display text-base font-semibold text-slate-100">
+                <h3 className="font-display text-base font-semibold text-content-strong">
                   {preset.name}
                 </h3>
                 <Chip
@@ -1352,12 +1361,12 @@ function PresetList({
                   {CATEGORY_META[preset.focus].label}
                 </Chip>
                 {belowLevel ? (
-                  <Chip className="bg-amber-500/10 text-amber-300 ring-amber-500/30">
+                  <Chip className="bg-warn/10 text-warn ring-warn/30">
                     Suggested Lv {fmt(preset.recommendedLevel)}+
                   </Chip>
                 ) : null}
               </div>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">{preset.description}</p>
+              <p className="mt-2 text-sm leading-relaxed text-content-muted">{preset.description}</p>
               <div className="mt-2.5 flex flex-wrap gap-1">
                 {preset.targets.map((t) => {
                   const meta = MUSCLE_META[t as MuscleKey];
@@ -1375,7 +1384,7 @@ function PresetList({
               </div>
             </div>
 
-            <ul className="divide-y divide-white/5 border-t border-white/5">
+            <ul className="divide-y divide-line border-t border-line">
               {items.map(({ item, exercise, unlocked }) => (
                 <li
                   key={item.exerciseId}
@@ -1383,7 +1392,7 @@ function PresetList({
                 >
                   <p
                     className={`flex items-center gap-2 text-sm ${
-                      unlocked ? 'text-slate-300' : 'text-slate-600'
+                      unlocked ? 'text-content' : 'text-content-subtle'
                     }`}
                   >
                     {!unlocked ? <Lock className="h-3 w-3 shrink-0" aria-hidden /> : null}
@@ -1391,7 +1400,7 @@ function PresetList({
                   </p>
                   <span
                     className={`shrink-0 font-mono text-xs ${
-                      unlocked ? 'text-slate-500' : 'text-slate-700'
+                      unlocked ? 'text-content-muted' : 'text-content-faint'
                     }`}
                   >
                     {fmt(item.sets)} × {fmt(item.amount)}
@@ -1401,7 +1410,7 @@ function PresetList({
               ))}
             </ul>
 
-            <div className="border-t border-white/5 p-4">
+            <div className="border-t border-line p-4">
               <Button
                 variant={allLocked ? 'secondary' : 'primary'}
                 className="w-full"
@@ -1411,7 +1420,7 @@ function PresetList({
                 {allLocked ? 'All movements locked' : 'Load this session'}
               </Button>
               {lockedCount > 0 && !allLocked ? (
-                <p className="mt-2 text-center text-[11px] text-amber-400/80">
+                <p className="mt-2 text-center text-[11px] text-warn/80">
                   {lockedCount} locked movement{lockedCount === 1 ? '' : 's'} will be skipped.
                 </p>
               ) : null}
@@ -1437,7 +1446,7 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
-        active ? 'bg-ink-750 text-slate-100 shadow-sm' : 'text-slate-500 hover:text-slate-300'
+        active ? 'bg-surface-inset text-content-strong shadow-sm' : 'text-content-muted hover:text-content'
       }`}
     >
       {children}

@@ -88,11 +88,11 @@ export function MeasurementsCard({ profile }: { profile: Profile }) {
     <Card className="p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h2 className="flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-slate-300">
-            <Ruler className="h-4 w-4 text-slate-500" aria-hidden />
+          <h2 className="flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-content">
+            <Ruler className="h-4 w-4 text-content-muted" aria-hidden />
             Body Measurements
           </h2>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-content-muted">
             Tracked and charted. Never scored, never ranked, never compared to anyone.
           </p>
         </div>
@@ -123,14 +123,14 @@ export function MeasurementsCard({ profile }: { profile: Profile }) {
             </Field>
           ))}
 
-          {error ? <p className="text-xs text-rose-300">{error}</p> : null}
+          {error ? <p className="text-xs text-danger">{error}</p> : null}
 
           <div className="flex items-center gap-3">
             <Button onClick={() => void save()} disabled={busy}>
               {busy ? <Spinner className="h-4 w-4" /> : null}
               Record
             </Button>
-            <p className="text-xs text-slate-600">
+            <p className="text-xs text-content-subtle">
               Leave a field blank to skip it. Only what you fill in is recorded.
             </p>
           </div>
@@ -143,7 +143,7 @@ export function MeasurementsCard({ profile }: { profile: Profile }) {
             ))}
           </dl>
           {recordedAt > 0 ? (
-            <p className="mt-4 text-xs text-slate-600">
+            <p className="mt-4 text-xs text-content-subtle">
               Last recorded {new Date(recordedAt).toLocaleDateString()}.
             </p>
           ) : null}
@@ -164,18 +164,18 @@ function Reading({ site, profile }: { site: MeasurementKey; profile: Profile }) 
   const value = profile.measurements?.values?.[site];
   const known = typeof value === 'number';
   return (
-    <div className="flex items-baseline justify-between gap-2 border-b border-white/5 pb-2">
-      <dt className="text-xs text-slate-500">{meta.label}</dt>
-      <dd className="font-mono text-sm text-slate-200">
+    <div className="flex items-baseline justify-between gap-2 border-b border-line pb-2">
+      <dt className="text-xs text-content-muted">{meta.label}</dt>
+      <dd className="font-mono text-sm text-content">
         {known ? (
           <>
             {fmtDecimal(displayFromMetric(value, meta.kind, profile.unitSystem), 1)}
-            <span className="ml-1 text-xs text-slate-600">
+            <span className="ml-1 text-xs text-content-subtle">
               {unitLabel(meta.kind, profile.unitSystem)}
             </span>
           </>
         ) : (
-          <span className="text-slate-600">—</span>
+          <span className="text-content-subtle">—</span>
         )}
       </dd>
     </div>

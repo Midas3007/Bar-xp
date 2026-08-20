@@ -55,17 +55,17 @@ export function MuscleMap({ profile }: { profile: Profile }) {
           subtitle="Least-trained muscles relative to the rest of your body."
           icon={<TriangleAlert className="h-4 w-4" aria-hidden />}
         />
-        <ul className="divide-y divide-white/5">
+        <ul className="divide-y divide-line">
           {weakest.map((rating) => {
             const meta = MUSCLE_META[rating.muscle];
             const grade = MUSCLE_GRADE_META[rating.grade];
             return (
               <li key={rating.muscle} className="p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-slate-100">{meta.label}</p>
-                  <Chip className={`bg-white/5 ring-white/10 ${grade.color}`}>{grade.label}</Chip>
+                  <p className="text-sm font-semibold text-content-strong">{meta.label}</p>
+                  <Chip className={`bg-surface-hover ring-line-strong ${grade.color}`}>{grade.label}</Chip>
                 </div>
-                <p className="mt-1.5 text-xs leading-relaxed text-slate-400">
+                <p className="mt-1.5 text-xs leading-relaxed text-content-muted">
                   {MUSCLE_FIXES[rating.muscle]}
                 </p>
               </li>
@@ -81,25 +81,25 @@ export function MuscleMap({ profile }: { profile: Profile }) {
           subtitle="The ratios that keep you healthy and proportional."
           icon={<Scale className="h-4 w-4" aria-hidden />}
         />
-        <ul className="divide-y divide-white/5">
+        <ul className="divide-y divide-line">
           {balance.map((check) => (
             <li key={check.id} className="p-4">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-slate-200">{check.label}</p>
+                <p className="text-sm font-semibold text-content">{check.label}</p>
                 <span
                   className={`font-mono text-xs font-bold ${
                     check.status === 'good'
-                      ? 'text-vital-300'
+                      ? 'text-vital'
                       : check.status === 'high'
-                        ? 'text-amber-300'
-                        : 'text-forge-300'
+                        ? 'text-warn'
+                        : 'text-forge'
                   }`}
                 >
                   {fmtDecimal(check.ratio, 2)} : 1
                 </span>
               </div>
-              <p className="mt-1.5 text-xs leading-relaxed text-slate-500">{check.message}</p>
-              <p className="mt-1.5 font-mono text-[10px] text-slate-700">
+              <p className="mt-1.5 text-xs leading-relaxed text-content-muted">{check.message}</p>
+              <p className="mt-1.5 font-mono text-[10px] text-content-subtle">
                 Target range {fmtDecimal(check.ideal[0], 1)}–{fmtDecimal(check.ideal[1], 1)}
               </p>
             </li>
@@ -117,7 +117,7 @@ export function MuscleMap({ profile }: { profile: Profile }) {
             <button
               type="button"
               onClick={() => setShowAll((v) => !v)}
-              className="inline-flex items-center gap-1 text-xs font-medium text-forge-300 transition hover:text-forge-200"
+              className="inline-flex items-center gap-1 text-xs font-medium text-forge transition hover:text-forge"
             >
               {showAll ? 'Trained only' : 'Show all'}
               <ChevronDown
@@ -133,7 +133,7 @@ export function MuscleMap({ profile }: { profile: Profile }) {
             if (group.length === 0) return null;
             return (
               <div key={region}>
-                <p className="mb-2 font-display text-[10px] font-semibold uppercase tracking-widest text-slate-600">
+                <p className="mb-2 font-display text-[10px] font-semibold uppercase tracking-widest text-content-subtle">
                   {region === 'upper' ? 'Upper body' : region === 'core' ? 'Core' : 'Lower body'}
                 </p>
                 <ul className="space-y-2.5">
@@ -143,12 +143,12 @@ export function MuscleMap({ profile }: { profile: Profile }) {
                     return (
                       <li key={rating.muscle}>
                         <div className="mb-1 flex items-baseline justify-between gap-2">
-                          <span className="text-xs font-medium text-slate-300">{meta.label}</span>
+                          <span className="text-xs font-medium text-content">{meta.label}</span>
                           <span className="flex items-baseline gap-2">
                             <span className={`text-[10px] font-medium ${grade.color}`}>
                               {grade.label}
                             </span>
-                            <span className="font-mono text-[10px] text-slate-600">
+                            <span className="font-mono text-[10px] text-content-subtle">
                               {fmt(int(rating.volume, 0))}
                             </span>
                           </span>
@@ -168,7 +168,7 @@ export function MuscleMap({ profile }: { profile: Profile }) {
               </div>
             );
           })}
-          <p className="pt-1 text-[10px] leading-relaxed text-slate-600">
+          <p className="pt-1 text-[10px] leading-relaxed text-content-subtle">
             Volume counts reps of every movement that trains a muscle — assisting muscles at a third
             weight, and four seconds of a hold as one rep.
           </p>

@@ -40,7 +40,9 @@ export const SHOP_ITEMS: ShopItem[] = [
     kind: 'cosmetic',
     price: 1200,
     nameClass:
-      'bg-gradient-to-r from-cyan-300 via-sky-400 to-fuchsia-400 bg-clip-text text-transparent',
+      'bg-gradient-to-r from-prestige-diamond-deep via-prestige-mythic-deep to-prestige-violet-deep ' +
+      'dark:from-prestige-aqua dark:via-prestige-diamond dark:to-prestige-violet ' +
+      'bg-clip-text text-transparent',
     icon: 'sparkles',
   },
   {
@@ -50,7 +52,9 @@ export const SHOP_ITEMS: ShopItem[] = [
     kind: 'cosmetic',
     price: 1200,
     nameClass:
-      'bg-gradient-to-r from-amber-300 via-orange-400 to-rose-500 bg-clip-text text-transparent',
+      'bg-gradient-to-r from-prestige-bronze-deep via-prestige-legend-deep to-prestige-rose-deep ' +
+      'dark:from-prestige-amber dark:via-prestige-legend dark:to-prestige-rose ' +
+      'bg-clip-text text-transparent',
     icon: 'flame',
   },
   {
@@ -60,7 +64,9 @@ export const SHOP_ITEMS: ShopItem[] = [
     kind: 'cosmetic',
     price: 1600,
     nameClass:
-      'bg-gradient-to-r from-violet-400 via-purple-300 to-slate-200 bg-clip-text text-transparent',
+      'bg-gradient-to-r from-prestige-violet-deep via-prestige-mythic-deep to-prestige-stone-deep ' +
+      'dark:from-prestige-violet dark:via-prestige-mythic dark:to-prestige-silver ' +
+      'bg-clip-text text-transparent',
     icon: 'moon',
   },
 

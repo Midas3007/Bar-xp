@@ -22,11 +22,13 @@ import {
   TrendingUp,
 } from 'lucide-react';
 
-import type { Exercise, Profile, StatsSnapshot, Workout } from '../lib/types';
+import type { Exercise, Profile, StatKey, StatsSnapshot, Workout } from '../lib/types';
 import type { ViewKey } from '../components/layout/AppShell';
 import { Button, Card, CardHeader, Chip, EmptyState, SkeletonBlock, Spinner } from '../components/ui/Primitives';
 import { MeasurementCharts } from '../components/MeasurementCharts';
 import { STAT_META } from '../lib/game/constants';
+import { useTheme } from '../context/ThemeContext';
+import type { ResolvedTheme } from '../lib/theme';
 import { fetchStatsHistory, fetchWorkouts, voidWorkout } from '../lib/data';
 import { allExercisesFor } from '../lib/game/exercises';
 import { withinCorrectionWindow } from '../lib/game/correction';
@@ -36,8 +38,25 @@ import { fmt, fmtDecimal, num, round, str } from '../lib/safe';
 import { formatSetLadder } from '../lib/game/sets';
 
 /** Chart palette, aligned with the stat colors used across the app. */
-export const AXIS_COLOR = '#4a5266';
-export const GRID_COLOR = 'rgba(255,255,255,0.05)';
+/**
+ * Chart chrome, resolved per theme.
+ *
+ * Recharts takes literal colours rather than classes, so these cannot go
+ * through the token layer. They are the measured equivalents of
+ * `content-subtle` and a faint hairline on each surface.
+ */
+export function axisColor(theme: ResolvedTheme): string {
+  return theme === 'dark' ? '#8494ab' : '#57657c';
+}
+
+export function gridColor(theme: ResolvedTheme): string {
+  return theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.08)';
+}
+
+/** The stat's series colour for the active theme. */
+export function statHex(key: StatKey, theme: ResolvedTheme): string {
+  return theme === 'dark' ? STAT_META[key].hex : STAT_META[key].hexLight;
+}
 
 interface ChartPoint {
   label: string;
@@ -58,6 +77,10 @@ export function ProgressView({
   profile: Profile;
   onNavigate: (view: ViewKey) => void;
 }) {
+  const { resolved } = useTheme();
+  const axis = axisColor(resolved);
+  const grid = gridColor(resolved);
+
   const [history, setHistory] = useState<StatsSnapshot[] | null>(null);
   const [workouts, setWorkouts] = useState<Workout[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -163,7 +186,7 @@ export function ProgressView({
 
       {failed ? (
         <Card className="p-4">
-          <p className="text-sm text-amber-300">
+          <p className="text-sm text-warn">
             Some history could not be loaded. If this persists, check that the Firestore indexes in
             the README have been created.
           </p>
@@ -190,17 +213,17 @@ export function ProgressView({
             <div className="h-72 p-4 pr-5">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={points} margin={{ top: 8, right: 8, bottom: 4, left: -12 }}>
-                  <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+                  <CartesianGrid stroke={grid} vertical={false} />
                   <XAxis
                     dataKey="label"
-                    stroke={AXIS_COLOR}
+                    stroke={axis}
                     tick={{ fontSize: 11 }}
                     tickLine={false}
                     axisLine={false}
                     minTickGap={24}
                   />
                   <YAxis
-                    stroke={AXIS_COLOR}
+                    stroke={axis}
                     tick={{ fontSize: 11 }}
                     tickLine={false}
                     axisLine={false}
@@ -216,7 +239,7 @@ export function ProgressView({
                     type="monotone"
                     dataKey="strength"
                     name={STAT_META.strength.label}
-                    stroke={STAT_META.strength.hex}
+                    stroke={statHex('strength', resolved)}
                     strokeWidth={2}
                     dot={false}
                     activeDot={{ r: 4 }}
@@ -225,7 +248,7 @@ export function ProgressView({
                     type="monotone"
                     dataKey="endurance"
                     name={STAT_META.endurance.label}
-                    stroke={STAT_META.endurance.hex}
+                    stroke={statHex('endurance', resolved)}
                     strokeWidth={2}
                     dot={false}
                     activeDot={{ r: 4 }}
@@ -234,7 +257,7 @@ export function ProgressView({
                     type="monotone"
                     dataKey="aesthetics"
                     name={STAT_META.aesthetics.label}
-                    stroke={STAT_META.aesthetics.hex}
+                    stroke={statHex('aesthetics', resolved)}
                     strokeWidth={2}
                     dot={false}
                     activeDot={{ r: 4 }}
@@ -243,7 +266,7 @@ export function ProgressView({
                     type="monotone"
                     dataKey="discipline"
                     name={STAT_META.discipline.label}
-                    stroke={STAT_META.discipline.hex}
+                    stroke={statHex('discipline', resolved)}
                     strokeWidth={2}
                     dot={false}
                     activeDot={{ r: 4 }}
@@ -265,21 +288,21 @@ export function ProgressView({
                 <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 4, left: -12 }}>
                   <defs>
                     <linearGradient id="xpGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#38bdf8" stopOpacity={0.45} />
-                      <stop offset="100%" stopColor="#38bdf8" stopOpacity={0.02} />
+                      <stop offset="0%" stopColor={statHex('endurance', resolved)} stopOpacity={0.45} />
+                      <stop offset="100%" stopColor={statHex('endurance', resolved)} stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+                  <CartesianGrid stroke={grid} vertical={false} />
                   <XAxis
                     dataKey="label"
-                    stroke={AXIS_COLOR}
+                    stroke={axis}
                     tick={{ fontSize: 11 }}
                     tickLine={false}
                     axisLine={false}
                     minTickGap={24}
                   />
                   <YAxis
-                    stroke={AXIS_COLOR}
+                    stroke={axis}
                     tick={{ fontSize: 11 }}
                     tickLine={false}
                     axisLine={false}
@@ -291,7 +314,7 @@ export function ProgressView({
                     type="monotone"
                     dataKey="totalXp"
                     name="Total XP"
-                    stroke="#38bdf8"
+                    stroke={statHex('endurance', resolved)}
                     strokeWidth={2}
                     fill="url(#xpGradient)"
                   />
@@ -319,17 +342,17 @@ export function ProgressView({
                     data={bodyFatPoints}
                     margin={{ top: 8, right: 8, bottom: 4, left: -12 }}
                   >
-                    <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+                    <CartesianGrid stroke={grid} vertical={false} />
                     <XAxis
                       dataKey="label"
-                      stroke={AXIS_COLOR}
+                      stroke={axis}
                       tick={{ fontSize: 11 }}
                       tickLine={false}
                       axisLine={false}
                       minTickGap={24}
                     />
                     <YAxis
-                      stroke={AXIS_COLOR}
+                      stroke={axis}
                       tick={{ fontSize: 11 }}
                       tickLine={false}
                       axisLine={false}
@@ -342,9 +365,9 @@ export function ProgressView({
                       type="monotone"
                       dataKey="bodyFat"
                       name="Body fat"
-                      stroke={STAT_META.aesthetics.hex}
+                      stroke={statHex('aesthetics', resolved)}
                       strokeWidth={2}
-                      dot={{ r: 3, fill: STAT_META.aesthetics.hex }}
+                      dot={{ r: 3, fill: statHex('aesthetics', resolved) }}
                       activeDot={{ r: 5 }}
                     />
                   </LineChart>
@@ -372,17 +395,17 @@ export function ProgressView({
                     data={volumePoints}
                     margin={{ top: 8, right: 8, bottom: 4, left: -12 }}
                   >
-                    <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+                    <CartesianGrid stroke={grid} vertical={false} />
                     <XAxis
                       dataKey="label"
-                      stroke={AXIS_COLOR}
+                      stroke={axis}
                       tick={{ fontSize: 11 }}
                       tickLine={false}
                       axisLine={false}
                       minTickGap={20}
                     />
                     <YAxis
-                      stroke={AXIS_COLOR}
+                      stroke={axis}
                       tick={{ fontSize: 11 }}
                       tickLine={false}
                       axisLine={false}
@@ -393,7 +416,7 @@ export function ProgressView({
                     <Bar
                       dataKey="reps"
                       name="Total reps"
-                      fill="#a855f7"
+                      fill={statHex('discipline', resolved)}
                       radius={[4, 4, 0, 0]}
                       maxBarSize={36}
                     />
@@ -439,8 +462,8 @@ export function ProgressView({
 function Header() {
   return (
     <div>
-      <h1 className="font-display text-2xl font-bold tracking-tight text-slate-50">Progress</h1>
-      <p className="mt-1.5 text-sm text-slate-500">
+      <h1 className="font-display text-2xl font-bold tracking-tight text-content-strong">Progress</h1>
+      <p className="mt-1.5 text-sm text-content-muted">
         Every assessment and session writes a snapshot. This is the long view.
       </p>
     </div>
@@ -529,7 +552,7 @@ function WorkoutHistory({
           message="Every workout you log will appear here with its full breakdown."
         />
       ) : (
-        <ul className="divide-y divide-white/5">
+        <ul className="divide-y divide-line">
           {ordered.map((workout) => {
             const open = expanded === workout.id;
             const corrected = corrections.has(workout.id);
@@ -542,11 +565,11 @@ function WorkoutHistory({
                 <button
                   type="button"
                   onClick={() => setExpanded(open ? null : workout.id)}
-                  className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-white/[0.03]"
+                  className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-surface-hover"
                   aria-expanded={open}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-2 truncate text-sm font-medium text-slate-200">
+                    <p className="flex items-center gap-2 truncate text-sm font-medium text-content">
                       <span className="truncate">
                         {formatShortDay(workout.day, workout.createdAt)} ·{' '}
                         {workout.entries.length} movement
@@ -554,15 +577,15 @@ function WorkoutHistory({
                       </span>
                       {corrected ? <Chip>Corrected</Chip> : null}
                     </p>
-                    <p className="mt-0.5 font-mono text-[11px] text-slate-600">
+                    <p className="mt-0.5 font-mono text-[11px] text-content-subtle">
                       {fmt(workout.totalVolume)} units · {fmt(workout.totalReps)} reps
                     </p>
                   </div>
-                  <span className="shrink-0 font-mono text-sm font-semibold text-forge-300">
+                  <span className="shrink-0 font-mono text-sm font-semibold text-forge">
                     +{fmt(workout.xpEarned)}
                   </span>
                   <ChevronDown
-                    className={`h-4 w-4 shrink-0 text-slate-600 transition-transform ${
+                    className={`h-4 w-4 shrink-0 text-content-subtle transition-transform ${
                       open ? 'rotate-180' : ''
                     }`}
                     aria-hidden
@@ -570,17 +593,17 @@ function WorkoutHistory({
                 </button>
 
                 {open ? (
-                  <div className="animate-fade-up bg-ink-900/40 px-4 pb-4 pt-1">
+                  <div className="animate-fade-up bg-surface-sunken/40 px-4 pb-4 pt-1">
                     <ul className="space-y-1.5">
                       {workout.entries.map((entry, i) => (
                         <li
                           key={`${entry.exerciseId}-${i}`}
-                          className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.03] px-3 py-2"
+                          className="flex items-center justify-between gap-3 rounded-lg bg-surface-hover px-3 py-2"
                         >
-                          <span className="min-w-0 truncate text-xs text-slate-300">
+                          <span className="min-w-0 truncate text-xs text-content">
                             {entry.exerciseName}
                           </span>
-                          <span className="shrink-0 font-mono text-[11px] text-slate-500">
+                          <span className="shrink-0 font-mono text-[11px] text-content-muted">
                             {formatSetLadder(entry)}
                             {entry.unit === 'seconds' ? 's' : ''} · +{fmt(entry.xp)} XP
                           </span>
@@ -589,14 +612,14 @@ function WorkoutHistory({
                     </ul>
 
                     {corrected ? (
-                      <p className="mt-3 text-[11px] text-slate-600">
+                      <p className="mt-3 text-[11px] text-content-subtle">
                         This session was corrected. Its XP, coins, stats, reps and muscle volume
                         have already come back off.
                       </p>
                     ) : correctable ? (
                       <div className="mt-3">
                         {armed ? (
-                          <p className="mb-2 text-[11px] leading-relaxed text-amber-200">
+                          <p className="mb-2 text-[11px] leading-relaxed text-warn">
                             XP, coins, stats, reps and muscle volume are reversed. Personal bests,
                             streak and goal progress are not.
                             {armed === 'fix'
@@ -636,7 +659,7 @@ function WorkoutHistory({
                         </div>
                       </div>
                     ) : (
-                      <p className="mt-3 text-[11px] text-slate-600">
+                      <p className="mt-3 text-[11px] text-content-subtle">
                         Sessions can be corrected for 48 hours.
                       </p>
                     )}
@@ -654,11 +677,11 @@ function WorkoutHistory({
 function Summary({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div>
-      <p className="font-display text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+      <p className="font-display text-[11px] font-semibold uppercase tracking-widest text-content-muted">
         {label}
       </p>
-      <p className="mt-1 font-display text-xl font-bold text-slate-100">{value}</p>
-      {hint ? <p className="mt-0.5 text-[11px] text-slate-600">{hint}</p> : null}
+      <p className="mt-1 font-display text-xl font-bold text-content-strong">{value}</p>
+      {hint ? <p className="mt-0.5 text-[11px] text-content-subtle">{hint}</p> : null}
     </div>
   );
 }
@@ -694,8 +717,8 @@ export function ChartTooltip({
   if (!active || !payload || payload.length === 0) return null;
 
   return (
-    <div className="rounded-xl bg-ink-800/95 p-3 shadow-glow ring-1 ring-white/10 backdrop-blur-xl">
-      <p className="mb-1.5 font-display text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+    <div className="rounded-xl bg-surface-overlay/95 p-3 shadow-glow ring-1 ring-line-strong backdrop-blur-xl">
+      <p className="mb-1.5 font-display text-[11px] font-semibold uppercase tracking-widest text-content-muted">
         {String(label ?? '')}
       </p>
       <ul className="space-y-1">
@@ -703,11 +726,11 @@ export function ChartTooltip({
           <li key={index} className="flex items-center gap-2 text-xs">
             <span
               className="h-2 w-2 shrink-0 rounded-full"
-              style={{ backgroundColor: entry.color ?? '#64748b' }}
+              style={{ backgroundColor: entry.color ?? 'currentColor' }}
               aria-hidden
             />
-            <span className="text-slate-400">{String(entry.name ?? '')}</span>
-            <span className="ml-auto font-mono font-semibold text-slate-100">
+            <span className="text-content-muted">{String(entry.name ?? '')}</span>
+            <span className="ml-auto font-mono font-semibold text-content-strong">
               {fmtDecimal(entry.value, entry.value !== undefined && num(entry.value, 0) % 1 === 0 ? 0 : 1)}
               {suffix}
             </span>

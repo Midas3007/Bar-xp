@@ -93,14 +93,14 @@ export function LeaderboardView({ profile }: { profile: Profile }) {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
-        <h1 className="font-display text-2xl font-bold tracking-tight text-slate-50">Compete</h1>
-        <p className="mt-1.5 text-sm text-slate-500">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-content-strong">Compete</h1>
+        <p className="mt-1.5 text-sm text-content-muted">
           Lifetime rank, your friends, this season, and whatever you have bet on.
           {tab === 'global' && myRank >= 0 ? ` You are #${fmt(myRank + 1)} overall.` : ''}
         </p>
       </div>
 
-      <div className="flex gap-1 overflow-x-auto rounded-xl bg-ink-900 p-1 ring-1 ring-inset ring-white/5">
+      <div className="flex gap-1 overflow-x-auto rounded-xl bg-surface-sunken p-1 ring-1 ring-inset ring-line">
         {TABS.map((item) => {
           const Icon = item.icon;
           const active = tab === item.key;
@@ -112,8 +112,8 @@ export function LeaderboardView({ profile }: { profile: Profile }) {
               aria-pressed={active}
               className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium transition ${
                 active
-                  ? 'bg-forge-500/20 text-forge-200 ring-1 ring-inset ring-forge-400/30'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-forge-vivid/20 text-forge ring-1 ring-inset ring-forge/30'
+                  : 'text-content-muted hover:text-content'
               }`}
             >
               <Icon className="h-3.5 w-3.5" aria-hidden />
@@ -144,7 +144,7 @@ export function LeaderboardView({ profile }: { profile: Profile }) {
               message={error ?? 'Nobody has logged any XP. Be the first name on the board.'}
             />
           ) : (
-            <ul className="divide-y divide-white/5">
+            <ul className="divide-y divide-line">
               {rows.map((row, index) => {
                 const isMe = row.uid === profile.uid;
                 const addable =
@@ -187,7 +187,7 @@ export function LeaderboardView({ profile }: { profile: Profile }) {
 
       {tab === 'challenges' ? <ChallengesPanel profile={profile} graph={graph} /> : null}
 
-      <p className="text-center text-xs leading-relaxed text-slate-600">
+      <p className="text-center text-xs leading-relaxed text-content-subtle">
         Only your name, rank, level, streak and XP are public. Friends additionally see your core
         stats, volume and training days. Workouts, personal bests and anything about your body stay
         private to your account.

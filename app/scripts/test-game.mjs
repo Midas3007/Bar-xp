@@ -18,7 +18,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const out = mkdtempSync(join(tmpdir(), 'barxp-game-'));
 
 const SOURCES = [
-  'src/lib/safe.ts', 'src/lib/types.ts',
+  'src/lib/safe.ts', 'src/lib/types.ts', 'src/lib/theme.ts',
   'src/lib/game/constants.ts', 'src/lib/game/xp.ts', 'src/lib/game/streak.ts',
   'src/lib/game/sets.ts', 'src/lib/game/routines.ts',
   'src/lib/game/profile.ts', 'src/lib/game/validation.ts', 'src/lib/game/shop.ts',

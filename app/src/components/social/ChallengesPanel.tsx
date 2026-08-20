@@ -131,26 +131,26 @@ export function ChallengesPanel({ profile, graph }: { profile: Profile; graph: F
     <div className="space-y-5">
       {/* --- New challenge --- */}
       <Card className="p-5">
-        <h3 className="mb-1 flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-slate-300">
-          <Swords className="h-4 w-4 text-slate-500" aria-hidden />
+        <h3 className="mb-1 flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-content">
+          <Swords className="h-4 w-4 text-content-muted" aria-hidden />
           New challenge
         </h3>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-content-muted">
           Runs over the week or month you are standing in, including days already trained.
         </p>
 
         {graph.friendUids.length === 0 ? (
-          <p className="mt-3 text-xs text-slate-600">
+          <p className="mt-3 text-xs text-content-subtle">
             Add a friend first — challenges are between friends only.
           </p>
         ) : (
           <div className="mt-4 space-y-3">
             <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-slate-400">Opponent</span>
+              <span className="mb-1.5 block text-xs font-medium text-content-muted">Opponent</span>
               <select
                 value={friendUid}
                 onChange={(e) => setFriendUid(e.target.value)}
-                className="w-full rounded-xl bg-ink-900 px-3 py-2.5 text-sm text-slate-200 ring-1 ring-inset ring-white/10 focus:outline-none focus:ring-forge-500/50"
+                className="w-full rounded-xl bg-surface-sunken px-3 py-2.5 text-sm text-content ring-1 ring-inset ring-line-strong focus:ring-2 focus:ring-forge/50"
               >
                 <option value="">Pick a friend…</option>
                 {graph.rows.map((row) => (
@@ -162,11 +162,11 @@ export function ChallengesPanel({ profile, graph }: { profile: Profile; graph: F
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-slate-400">Contest</span>
+              <span className="mb-1.5 block text-xs font-medium text-content-muted">Contest</span>
               <select
                 value={templateId}
                 onChange={(e) => setTemplateId(e.target.value)}
-                className="w-full rounded-xl bg-ink-900 px-3 py-2.5 text-sm text-slate-200 ring-1 ring-inset ring-white/10 focus:outline-none focus:ring-forge-500/50"
+                className="w-full rounded-xl bg-surface-sunken px-3 py-2.5 text-sm text-content ring-1 ring-inset ring-line-strong focus:ring-2 focus:ring-forge/50"
               >
                 {CHALLENGE_TEMPLATES.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -176,7 +176,7 @@ export function ChallengesPanel({ profile, graph }: { profile: Profile; graph: F
               </select>
             </label>
 
-            <p className="text-[11px] leading-relaxed text-slate-600">
+            <p className="text-[11px] leading-relaxed text-content-subtle">
               {templateById(templateId)?.blurb}
             </p>
 
@@ -241,7 +241,7 @@ function Group({
       {challenges.length === 0 ? (
         <EmptyState title={empty} message="" />
       ) : (
-        <ul className="divide-y divide-white/5">
+        <ul className="divide-y divide-line">
           {challenges.map((challenge) => (
             <ChallengeCard
               key={challenge.id}
@@ -293,8 +293,8 @@ function ChallengeCard({
     <li className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-slate-200">{challenge.title}</p>
-          <p className="mt-0.5 text-[11px] text-slate-600">
+          <p className="truncate text-sm font-medium text-content">{challenge.title}</p>
+          <p className="mt-0.5 text-[11px] text-content-subtle">
             {challenge.startDay} — {challenge.endDay} · versus {nameFor(opponent)}
           </p>
         </div>
@@ -304,7 +304,7 @@ function ChallengeCard({
       {state === 'active' || state === 'ended' ? (
         <div className="mt-3 flex items-center gap-4">
           <Score label="You" value={mine} unit={unit} winning={mine > theirs} />
-          <span className="text-[11px] text-slate-700">vs</span>
+          <span className="text-[11px] text-content-subtle">vs</span>
           <Score
             label={nameFor(opponent)}
             value={theirs}
@@ -314,7 +314,7 @@ function ChallengeCard({
         </div>
       ) : null}
 
-      <p className="mt-3 text-[11px] leading-relaxed text-slate-600">
+      <p className="mt-3 text-[11px] leading-relaxed text-content-subtle">
         Scores are self-reported.
         {lastUpdated > 0 ? ` Last updated ${relativeTime(lastUpdated)}.` : ' Not yet computed.'}
       </p>
@@ -387,12 +387,12 @@ function Score({
 }) {
   return (
     <div className="min-w-0 flex-1">
-      <p className="truncate text-[11px] text-slate-500">{label}</p>
+      <p className="truncate text-[11px] text-content-muted">{label}</p>
       <p
-        className={`font-mono text-lg font-bold ${winning ? 'text-vital-300' : 'text-slate-300'}`}
+        className={`font-mono text-lg font-bold ${winning ? 'text-vital' : 'text-content'}`}
       >
         {fmt(value)}
-        <span className="ml-1 text-[11px] font-normal text-slate-600">{unit}</span>
+        <span className="ml-1 text-[11px] font-normal text-content-subtle">{unit}</span>
       </p>
     </div>
   );

@@ -22,7 +22,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-2xl bg-ink-850/80 ring-1 ring-white/5 backdrop-blur-sm transition duration-300 ${
+      className={`rounded-2xl bg-surface-raised/80 ring-1 ring-line backdrop-blur-sm transition duration-300 ${
         glow ? 'shadow-glow' : ''
       } ${className}`}
     >
@@ -43,14 +43,14 @@ export function CardHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-white/5 p-5">
+    <div className="flex items-start justify-between gap-4 border-b border-line p-5">
       <div className="flex min-w-0 items-start gap-3">
-        {icon ? <div className="mt-0.5 shrink-0 text-slate-400">{icon}</div> : null}
+        {icon ? <div className="mt-0.5 shrink-0 text-content-muted">{icon}</div> : null}
         <div className="min-w-0">
-          <h2 className="font-display text-sm font-semibold uppercase tracking-widest text-slate-200">
+          <h2 className="font-display text-sm font-semibold uppercase tracking-widest text-content">
             {title}
           </h2>
-          {subtitle ? <p className="mt-1 text-xs text-slate-500">{subtitle}</p> : null}
+          {subtitle ? <p className="mt-1 text-xs text-content-muted">{subtitle}</p> : null}
         </div>
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
@@ -67,12 +67,12 @@ type ButtonSize = 'sm' | 'md' | 'lg';
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary:
-    'bg-gradient-to-r from-forge-500 to-forge-400 text-ink-950 font-semibold hover:from-forge-400 hover:to-forge-300 shadow-glow-forge disabled:from-ink-700 disabled:to-ink-700 disabled:text-slate-500 disabled:shadow-none',
+    'bg-gradient-to-r from-forge-vivid to-forge text-on-accent font-semibold hover:from-forge-vivid hover:to-forge shadow-glow-forge disabled:from-surface-strong disabled:to-surface-strong disabled:text-content-muted disabled:shadow-none',
   secondary:
-    'bg-ink-750 text-slate-200 ring-1 ring-white/10 hover:bg-ink-700 hover:text-white disabled:text-slate-600',
-  ghost: 'text-slate-400 hover:bg-white/5 hover:text-slate-100 disabled:text-slate-600',
+    'bg-surface-inset text-content ring-1 ring-line-strong hover:bg-surface-strong hover:text-content-strong disabled:text-content-subtle',
+  ghost: 'text-content-muted hover:bg-surface-hover hover:text-content-strong disabled:text-content-subtle',
   danger:
-    'bg-rose-500/10 text-rose-300 ring-1 ring-rose-500/30 hover:bg-rose-500/20 disabled:text-slate-600',
+    'bg-danger/10 text-danger ring-1 ring-danger/30 hover:bg-danger/20 disabled:text-content-subtle',
 };
 
 const SIZES: Record<ButtonSize, string> = {
@@ -93,7 +93,7 @@ export function Button({
 }) {
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-forge-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950 disabled:cursor-not-allowed ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-all duration-200 disabled:cursor-not-allowed ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
       {...props}
     >
       {children}
@@ -118,14 +118,14 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-slate-400">
+      <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-content-muted">
         {label}
       </span>
       {children}
       {error ? (
-        <span className="mt-1.5 block text-xs text-rose-400">{error}</span>
+        <span className="mt-1.5 block text-xs text-danger">{error}</span>
       ) : hint ? (
-        <span className="mt-1.5 block text-xs text-slate-500">{hint}</span>
+        <span className="mt-1.5 block text-xs text-content-muted">{hint}</span>
       ) : null}
     </label>
   );
@@ -134,7 +134,7 @@ export function Field({
 export function Input({ className = '', ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`w-full rounded-xl bg-ink-900 px-3.5 py-2.5 text-sm text-slate-100 ring-1 ring-white/10 transition placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-forge-500 disabled:text-slate-500 ${className}`}
+      className={`w-full rounded-xl bg-surface-sunken px-3.5 py-2.5 text-sm text-content-strong ring-1 ring-line-strong transition placeholder:text-content-subtle focus:ring-2 focus:ring-forge disabled:text-content-muted ${className}`}
       {...props}
     />
   );
@@ -151,7 +151,7 @@ export function Input({ className = '', ...props }: InputHTMLAttributes<HTMLInpu
 export function ProgressBar({
   value,
   max,
-  gradient = 'from-forge-500 to-forge-300',
+  gradient = 'from-forge-vivid to-forge',
   height = 'h-2',
   animated = true,
   transition = true,
@@ -169,7 +169,7 @@ export function ProgressBar({
   const percent = pct(value, max);
   return (
     <div
-      className={`relative w-full overflow-hidden rounded-full bg-ink-900 ring-1 ring-inset ring-white/5 ${height}`}
+      className={`relative w-full overflow-hidden rounded-full bg-surface-sunken ring-1 ring-inset ring-line ${height}`}
       role="progressbar"
       aria-valuenow={Math.round(percent)}
       aria-valuemin={0}
@@ -214,11 +214,11 @@ export function Toggle({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full ring-1 ring-inset transition disabled:opacity-50 ${
-        checked ? 'bg-forge-500 ring-forge-400/40' : 'bg-ink-700 ring-white/10'
+        checked ? 'bg-forge-vivid ring-forge/40' : 'bg-surface-strong ring-line-strong'
       }`}
     >
       <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-slate-50 shadow transition ${
+        className={`inline-block h-4 w-4 transform rounded-full bg-surface-raised shadow transition ${
           checked ? 'translate-x-6' : 'translate-x-1'
         }`}
         aria-hidden
@@ -264,9 +264,9 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
-      {icon ? <div className="mb-4 text-slate-600">{icon}</div> : null}
-      <h3 className="font-display text-base font-semibold text-slate-300">{title}</h3>
-      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-slate-500">{message}</p>
+      {icon ? <div className="mb-4 text-content-subtle">{icon}</div> : null}
+      <h3 className="font-display text-base font-semibold text-content">{title}</h3>
+      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-content-muted">{message}</p>
       {action ? <div className="mt-5">{action}</div> : null}
     </div>
   );
@@ -289,8 +289,8 @@ export function Spinner({ className = 'h-5 w-5' }: { className?: string }) {
 
 export function LoadingScreen({ message = 'Loading' }: { message?: string }) {
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-slate-500">
-      <Spinner className="h-8 w-8 text-forge-400" />
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-content-muted">
+      <Spinner className="h-8 w-8 text-forge" />
       <p className="text-sm tracking-wide">{message}</p>
     </div>
   );
@@ -299,7 +299,7 @@ export function LoadingScreen({ message = 'Loading' }: { message?: string }) {
 export function SkeletonBlock({ className = 'h-24' }: { className?: string }) {
   return (
     <div
-      className={`animate-shimmer rounded-2xl bg-[linear-gradient(90deg,#0f1119,#1a1f2e,#0f1119)] bg-[length:200%_100%] ${className}`}
+      className={`animate-shimmer rounded-2xl bg-[linear-gradient(90deg,rgb(var(--skeleton-a)),rgb(var(--skeleton-b)),rgb(var(--skeleton-a)))] bg-[length:200%_100%] ${className}`}
     />
   );
 }

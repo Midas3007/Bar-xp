@@ -9,6 +9,7 @@ import {
   Plus,
   Shield,
   Sparkles,
+  Sun,
   Trash2,
   TriangleAlert,
 } from 'lucide-react';
@@ -52,6 +53,8 @@ import {
 } from '../lib/data';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { THEME_PREFERENCES } from '../lib/theme';
 import { buildExport, bundleToCsv, downloadFile, exportFilename } from '../lib/export';
 import { arr, fmt, fmtDecimal, int, num } from '../lib/safe';
 
@@ -67,11 +70,11 @@ export function ProfileView({ profile }: { profile: Profile }) {
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-6">
           <Card className="p-5">
-            <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-widest text-slate-300">
+            <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-widest text-content">
               Core Stats
             </h2>
             <StatGrid stats={profile.stats} />
-            <div className="mt-5 border-t border-white/5 pt-5">
+            <div className="mt-5 border-t border-line pt-5">
               <TierProgress stats={profile.stats} />
             </div>
           </Card>
@@ -95,23 +98,23 @@ export function ProfileView({ profile }: { profile: Profile }) {
                 message="Log a movement twice and the better set becomes your PR."
               />
             ) : (
-              <ul className="divide-y divide-white/5">
+              <ul className="divide-y divide-line">
                 {personalBests.map((pb) => (
                   <li
                     key={pb.exerciseId}
                     className="flex items-center justify-between gap-4 px-5 py-3.5"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-slate-200">
+                      <p className="truncate text-sm font-medium text-content">
                         {pb.exerciseName}
                       </p>
-                      <p className="mt-0.5 text-[11px] text-slate-600">
+                      <p className="mt-0.5 text-[11px] text-content-subtle">
                         {formatDate(pb.achievedAt)}
                       </p>
                     </div>
-                    <span className="shrink-0 font-mono text-sm font-bold text-ember-300">
+                    <span className="shrink-0 font-mono text-sm font-bold text-ember">
                       {fmt(pb.value)}
-                      <span className="ml-1 text-[11px] font-normal text-slate-500">
+                      <span className="ml-1 text-[11px] font-normal text-content-muted">
                         {pb.unit === 'seconds' ? 'sec' : 'reps'}
                       </span>
                     </span>
@@ -122,6 +125,7 @@ export function ProfileView({ profile }: { profile: Profile }) {
           </Card>
 
           <CustomExercisesCard profile={profile} />
+          <AppearanceCard />
           <SettingsCard profile={profile} />
         </div>
       </div>
@@ -174,7 +178,7 @@ function ProfileHeader({ profile }: { profile: Profile }) {
         className="p-6 sm:p-8"
         style={{
           background:
-            'radial-gradient(600px 300px at 0% 0%, rgba(168,85,247,0.10), transparent 65%)',
+            'radial-gradient(600px 300px at 0% 0%, rgb(var(--wash-arcane) / var(--wash-alpha)), transparent 65%)',
         }}
       >
         <div className="flex flex-wrap items-start gap-5">
@@ -215,7 +219,7 @@ function ProfileHeader({ profile }: { profile: Profile }) {
                 <button
                   type="button"
                   onClick={() => setEditing(true)}
-                  className="rounded-lg p-1.5 text-slate-600 transition hover:bg-white/5 hover:text-slate-300"
+                  className="rounded-lg p-1.5 text-content-subtle transition hover:bg-surface-hover hover:text-content"
                   aria-label="Edit display name"
                 >
                   <Pencil className="h-3.5 w-3.5" aria-hidden />
@@ -223,13 +227,13 @@ function ProfileHeader({ profile }: { profile: Profile }) {
               </div>
             )}
 
-            <p className="mt-1 truncate text-xs text-slate-600">{profile.email}</p>
+            <p className="mt-1 truncate text-xs text-content-subtle">{profile.email}</p>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <TierBadge tierName={profile.tier} />
               <IdentityChip streak={profile.streak.current} />
               {profile.inventory.streakShields > 0 ? (
-                <Chip className="bg-forge-500/10 text-forge-300 ring-forge-500/30">
+                <Chip className="bg-forge/10 text-forge ring-forge/30">
                   <Shield className="h-3 w-3" aria-hidden />
                   {fmt(profile.inventory.streakShields)} shield
                   {profile.inventory.streakShields === 1 ? '' : 's'}
@@ -243,13 +247,13 @@ function ProfileHeader({ profile }: { profile: Profile }) {
           <LevelBar totalXp={profile.totalXp} />
         </div>
 
-        <div className="mt-7 grid grid-cols-2 gap-5 border-t border-white/5 pt-6 sm:grid-cols-4">
+        <div className="mt-7 grid grid-cols-2 gap-5 border-t border-line pt-6 sm:grid-cols-4">
           <StatReadout label="Sessions" value={fmt(profile.workoutCount)} />
           <StatReadout label="Lifetime reps" value={fmt(profile.totalReps)} />
           <StatReadout
             label="Best streak"
             value={`${fmt(profile.streak.best)}w`}
-            accent="text-ember-300"
+            accent="text-ember"
           />
           <StatReadout
             label="Shields used"
@@ -273,7 +277,7 @@ function DisciplineCard({ profile }: { profile: Profile }) {
   return (
     <Card className="p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="font-display text-sm font-semibold uppercase tracking-widest text-slate-300">
+        <h2 className="font-display text-sm font-semibold uppercase tracking-widest text-content">
           Discipline
         </h2>
         <span className={`font-display text-2xl font-bold ${STAT_META.discipline.color}`}>
@@ -284,17 +288,17 @@ function DisciplineCard({ profile }: { profile: Profile }) {
       <ProgressBar
         value={discipline}
         max={250}
-        gradient="from-arcane-500 to-arcane-300"
+        gradient="from-arcane-vivid to-arcane"
         height="h-2"
         animated={false}
         label="Discipline"
       />
 
-      <p className="mt-3 text-xs leading-relaxed text-slate-500">
+      <p className="mt-3 text-xs leading-relaxed text-content-muted">
         {STAT_META.discipline.blurb}
       </p>
 
-      <div className="mt-5 grid grid-cols-3 gap-4 border-t border-white/5 pt-5">
+      <div className="mt-5 grid grid-cols-3 gap-4 border-t border-line pt-5">
         <StatReadout
           label="Current"
           value={`${fmt(profile.streak.current)}w`}
@@ -304,7 +308,7 @@ function DisciplineCard({ profile }: { profile: Profile }) {
         <StatReadout label="Identity" value={identity.label} accent={identity.text} />
       </div>
 
-      <p className="mt-4 text-[11px] italic leading-relaxed text-slate-600">{identity.blurb}</p>
+      <p className="mt-4 text-[11px] italic leading-relaxed text-content-subtle">{identity.blurb}</p>
     </Card>
   );
 }
@@ -343,16 +347,16 @@ function BodyFatCard({ profile }: { profile: Profile }) {
   return (
     <Card className="p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-slate-300">
-          <Percent className="h-4 w-4 text-slate-500" aria-hidden />
+        <h2 className="flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-content">
+          <Percent className="h-4 w-4 text-content-muted" aria-hidden />
           Body Composition
         </h2>
-        <span className="font-display text-2xl font-bold text-vital-300">
+        <span className="font-display text-2xl font-bold text-vital">
           {profile.bodyFat > 0 ? `${fmtDecimal(profile.bodyFat, 1)}%` : '—'}
         </span>
       </div>
 
-      <p className="text-xs leading-relaxed text-slate-500">
+      <p className="text-xs leading-relaxed text-content-muted">
         Recording a leaner reading raises your Aesthetics floor and adds a point to the progress
         chart. It never lowers a stat you have already earned.
       </p>
@@ -472,7 +476,7 @@ function CustomExercisesCard({ profile }: { profile: Profile }) {
       />
 
       {open ? (
-        <div className="space-y-4 border-b border-white/5 bg-ink-900/40 p-5">
+        <div className="space-y-4 border-b border-line bg-surface-sunken/40 p-5">
           <Field label="Movement name">
             <Input
               value={name}
@@ -490,7 +494,7 @@ function CustomExercisesCard({ profile }: { profile: Profile }) {
               <select
                 value={unit}
                 onChange={(e) => setUnit(e.target.value === 'seconds' ? 'seconds' : 'reps')}
-                className="w-full rounded-xl bg-ink-900 px-3.5 py-2.5 text-sm text-slate-100 ring-1 ring-white/10 focus:outline-none focus:ring-2 focus:ring-forge-500"
+                className="w-full rounded-xl bg-surface-sunken px-3.5 py-2.5 text-sm text-content-strong ring-1 ring-line-strong focus:ring-2 focus:ring-forge"
               >
                 <option value="reps">Reps</option>
                 <option value="seconds">Seconds (hold)</option>
@@ -501,7 +505,7 @@ function CustomExercisesCard({ profile }: { profile: Profile }) {
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as ExerciseCategory)}
-                className="w-full rounded-xl bg-ink-900 px-3.5 py-2.5 text-sm text-slate-100 ring-1 ring-white/10 focus:outline-none focus:ring-2 focus:ring-forge-500"
+                className="w-full rounded-xl bg-surface-sunken px-3.5 py-2.5 text-sm text-content-strong ring-1 ring-line-strong focus:ring-2 focus:ring-forge"
               >
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>
@@ -531,9 +535,9 @@ function CustomExercisesCard({ profile }: { profile: Profile }) {
           </Field>
 
           {error ? (
-            <div className="flex items-start gap-2 rounded-xl bg-rose-500/10 p-3 ring-1 ring-rose-500/25">
-              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" aria-hidden />
-              <p className="text-xs leading-relaxed text-rose-200">{error}</p>
+            <div className="flex items-start gap-2 rounded-xl bg-danger/10 p-3 ring-1 ring-danger/25">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-danger" aria-hidden />
+              <p className="text-xs leading-relaxed text-danger">{error}</p>
             </div>
           ) : null}
 
@@ -556,12 +560,12 @@ function CustomExercisesCard({ profile }: { profile: Profile }) {
           message="Add anything the catalog is missing — weighted variations, rings work, or your own inventions."
         />
       ) : (
-        <ul className="divide-y divide-white/5">
+        <ul className="divide-y divide-line">
           {custom.map((exercise) => (
             <li key={exercise.id} className="flex items-center gap-3 px-5 py-3.5">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-slate-200">{exercise.name}</p>
-                <p className="mt-0.5 font-mono text-[11px] text-slate-600">
+                <p className="truncate text-sm font-medium text-content">{exercise.name}</p>
+                <p className="mt-0.5 font-mono text-[11px] text-content-subtle">
                   {fmtDecimal(exercise.xpPerUnit, 2)} XP per{' '}
                   {exercise.unit === 'seconds' ? 'second' : 'rep'} ·{' '}
                   {CATEGORY_META[exercise.category].label}
@@ -570,7 +574,7 @@ function CustomExercisesCard({ profile }: { profile: Profile }) {
               <button
                 type="button"
                 onClick={() => void remove(exercise.id, exercise.name)}
-                className="shrink-0 rounded-lg p-1.5 text-slate-600 transition hover:bg-white/5 hover:text-rose-300"
+                className="shrink-0 rounded-lg p-1.5 text-content-subtle transition hover:bg-surface-hover hover:text-danger"
                 aria-label={`Remove ${exercise.name}`}
               >
                 <Trash2 className="h-4 w-4" aria-hidden />
@@ -654,11 +658,11 @@ function DataCard({ profile }: { profile: Profile }) {
 
   return (
     <Card className="p-5">
-      <h2 className="mb-1 flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-slate-300">
-        <Database className="h-4 w-4 text-slate-500" aria-hidden />
+      <h2 className="mb-1 flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-widest text-content">
+        <Database className="h-4 w-4 text-content-muted" aria-hidden />
         Your Data
       </h2>
-      <p className="text-xs leading-relaxed text-slate-500">
+      <p className="text-xs leading-relaxed text-content-muted">
         Everything you have logged, in a file you own. The CSV has one row per exercise entry; the
         JSON has the whole thing including your profile and stat history.
       </p>
@@ -674,10 +678,10 @@ function DataCard({ profile }: { profile: Profile }) {
         </Button>
       </div>
 
-      <div className="mt-5 border-t border-white/5 pt-5">
+      <div className="mt-5 border-t border-line pt-5">
         {open ? (
           <div className="space-y-3">
-            <p className="text-xs leading-relaxed text-rose-200">
+            <p className="text-xs leading-relaxed text-danger">
               Your profile, every logged session, every stats snapshot, your leaderboard row and
               your sign-in are permanently removed. Export first if you want a copy.
             </p>
@@ -707,7 +711,7 @@ function DataCard({ profile }: { profile: Profile }) {
                 />
               </Field>
             ) : error ? (
-              <p className="text-xs text-rose-300">{error}</p>
+              <p className="text-xs text-danger">{error}</p>
             ) : null}
 
             <div className="flex flex-wrap gap-2">
@@ -740,6 +744,48 @@ function DataCard({ profile }: { profile: Profile }) {
             Delete account
           </Button>
         )}
+      </div>
+    </Card>
+  );
+}
+
+
+/**
+ * Light / System / Dark.
+ *
+ * A `radiogroup` rather than a checkbox so "System" is a first-class choice
+ * rather than the absence of one. The preference lives in `localStorage` only:
+ * it is genuinely per-device, and a Firestore field would buy a schema change
+ * and a live migration for nothing.
+ */
+function AppearanceCard() {
+  const { preference, setPreference } = useTheme();
+  return (
+    <Card>
+      <CardHeader
+        title="Appearance"
+        subtitle="System follows your device setting."
+        icon={<Sun className="h-4 w-4" aria-hidden />}
+      />
+      <div className="p-5">
+        <div role="radiogroup" aria-label="Colour theme" className="flex gap-2">
+          {THEME_PREFERENCES.map((option) => (
+            <button
+              key={option}
+              type="button"
+              role="radio"
+              aria-checked={preference === option}
+              onClick={() => setPreference(option)}
+              className={`flex-1 rounded-xl px-3 py-2 text-sm font-medium capitalize ring-1 transition ${
+                preference === option
+                  ? 'bg-forge/10 text-forge ring-forge/30'
+                  : 'bg-surface-inset text-content-muted ring-line hover:text-content'
+              }`}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
       </div>
     </Card>
   );

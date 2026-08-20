@@ -409,6 +409,58 @@ Notifications or a wake lock, which are deliberately out of scope.
 
 ---
 
+## Design system
+
+Colour lives in one place. `src/index.css` defines two layers of CSS custom
+properties — surfaces, four text levels, hairlines, seven brand hues and eleven
+rank tones — and `tailwind.config.js` exposes them as semantic utilities. A
+component names meaning (`text-content-muted`, `bg-surface-raised`) rather than
+pigment, which is what makes a second theme a second block of values instead of
+a `dark:` variant on every element.
+
+Before this, the app carried two colour systems at once: five brand ramps plus
+thirteen stock Tailwind palettes used directly across the views, 752 colour
+utilities in all. Nothing tied them together, so "secondary text" was written
+four different ways in four files, and four call sites reached past the end of
+the `forge` ramp for shades that were never defined — emitting no class at all
+and leaving those hover states silently dead.
+
+**Contrast is measured, not assumed.** The three worst offenders sat at 1.82:1,
+2.49:1 and 3.96:1 against the card surface across 126 uses carrying real content
+— achievement descriptions, the reason a movement is locked, input placeholders,
+empty states. Every text token now clears 4.5:1 on every surface in both themes,
+and the tests assert the ratios for all fourteen muscle colours and all four
+stat colours rather than trusting them. `content-faint` is the one decorative
+token: never put words in it.
+
+**Themes.** Light, Dark or System, chosen from Profile → Appearance and stored
+per device in `localStorage` — not in Firestore, which would buy a schema change
+and a live migration for a per-device preference. A small blocking script in
+`index.html` applies the class before first paint, so there is no flash. It
+duplicates the storage key on purpose: it has to run before any module loads.
+
+**Focus.** A blanket `:focus-visible { outline: none }` in the base layer had
+left roughly 35 of 36 interactive elements with no keyboard affordance at all.
+One zero-specificity `:where(...)` rule now gives every one of them a 2px
+outline, and a component can still override it deliberately.
+
+**Dialogs.** The movement sheet and the navigation drawer are real dialogs
+through one ~90-line primitive (`components/ui/Modal.tsx`): `role="dialog"`,
+`aria-modal`, `aria-labelledby`, Escape, a focus trap, body scroll lock and
+focus restoration on close. The scrim is an `aria-hidden` div rather than a
+focusable button — a full-viewport tab stop inside a focus trap is worse than
+the problem it solves.
+
+**Mobile navigation.** Six destinations at a 56px hit target, with
+`env(safe-area-inset-bottom)` so the labels clear the home indicator on a
+notched phone, a short label ("Ranks") so all six fit at 320px, and an active
+indicator bar so the current tab is not signalled by colour alone. The bar's
+height is a spacing token (`nav`), which the logger's sticky session summary
+reads too — it used to be a hardcoded `bottom-[57px]` guess that detached
+whenever the nav's padding changed.
+
+---
+
 ## Architecture
 
 ```
@@ -436,10 +488,12 @@ src/
       season.ts         Season calendar, rollover and standings maths
       challenges.ts     Challenge templates, windows, scoring and resolution
     social.ts           Every Firestore read and write for the social layer
+    theme.ts            Theme preference resolution (pure)
     routing.ts          ViewKey <-> path table and the History API hook
     draft.ts            The in-progress session, in localStorage
     export.ts           JSON and CSV export builders
   context/
+    ThemeContext.tsx    Light/System/Dark preference and the `.dark` class
     AuthContext.tsx     Auth state, profile listener, hourly recalculation, erasure
     ToastContext.tsx    Toast notifications
     RestTimerContext.tsx App-level rest timer: deadline, sound, persistence

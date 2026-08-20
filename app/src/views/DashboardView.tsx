@@ -67,13 +67,13 @@ export function DashboardView({
     <div className="mx-auto max-w-6xl space-y-6">
       {/* --- Background notice (streak shield consumed, rank recalculated) --- */}
       {backgroundNotice ? (
-        <div className="flex animate-fade-up items-start gap-3 rounded-2xl bg-forge-500/10 p-4 ring-1 ring-forge-500/25">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-forge-300" aria-hidden />
-          <p className="flex-1 text-sm leading-relaxed text-forge-100">{backgroundNotice}</p>
+        <div className="flex animate-fade-up items-start gap-3 rounded-2xl bg-forge/10 p-4 ring-1 ring-forge/25">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-forge" aria-hidden />
+          <p className="flex-1 text-sm leading-relaxed text-forge">{backgroundNotice}</p>
           <button
             type="button"
             onClick={dismissBackgroundNotice}
-            className="text-xs font-medium text-forge-300 transition hover:text-forge-200"
+            className="text-xs font-medium text-forge transition hover:text-forge"
           >
             Dismiss
           </button>
@@ -86,12 +86,12 @@ export function DashboardView({
           className="relative p-6 sm:p-8"
           style={{
             background:
-              'radial-gradient(600px 300px at 0% 0%, rgba(56,189,248,0.10), transparent 65%)',
+              'radial-gradient(600px 300px at 0% 0%, rgb(var(--wash-forge) / var(--wash-alpha)), transparent 65%)',
           }}
         >
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-widest text-slate-500">
+              <p className="text-xs uppercase tracking-widest text-content-muted">
                 {didTrainToday ? 'Session logged today' : 'Ready to train'}
               </p>
               <h1 className="mt-1.5 font-display text-3xl font-bold tracking-tight sm:text-4xl">
@@ -114,7 +114,7 @@ export function DashboardView({
             </Button>
           </div>
 
-          <p className="mt-4 max-w-xl text-sm italic leading-relaxed text-slate-500">
+          <p className="mt-4 max-w-xl text-sm italic leading-relaxed text-content-muted">
             {identity.blurb} {tier.blurb}
           </p>
 
@@ -122,18 +122,18 @@ export function DashboardView({
             <LevelBar totalXp={profile.totalXp} />
           </div>
 
-          <div className="mt-7 grid grid-cols-2 gap-5 border-t border-white/5 pt-6 sm:grid-cols-4">
+          <div className="mt-7 grid grid-cols-2 gap-5 border-t border-line pt-6 sm:grid-cols-4">
             <StatReadout
               label="Total XP"
               value={fmt(profile.totalXp)}
               sub="lifetime"
-              accent="text-forge-300"
+              accent="text-forge"
             />
             <StatReadout
               label="Bar Coins"
               value={fmt(profile.coins)}
               sub="spendable"
-              accent="text-amber-300"
+              accent="text-warn"
             />
             <StatReadout
               label="Sessions"
@@ -148,7 +148,7 @@ export function DashboardView({
                   ? `from a ${fmt(profile.streak.current)}-day streak`
                   : 'train today to start one'
               }
-              accent={multiplier > 1 ? 'text-ember-300' : 'text-slate-400'}
+              accent={multiplier > 1 ? 'text-ember' : 'text-content-muted'}
             />
           </div>
         </div>
@@ -163,7 +163,7 @@ export function DashboardView({
             <button
               type="button"
               onClick={() => onNavigate('progress')}
-              className="inline-flex items-center gap-1 text-xs font-medium text-forge-300 transition hover:text-forge-200"
+              className="inline-flex items-center gap-1 text-xs font-medium text-forge transition hover:text-forge"
             >
               View progression
               <ArrowRight className="h-3 w-3" aria-hidden />
@@ -185,7 +185,7 @@ export function DashboardView({
               subtitle="Completed goals pay out instantly and are replaced."
               icon={<Target className="h-4 w-4" aria-hidden />}
             />
-            <div className="divide-y divide-white/5">
+            <div className="divide-y divide-line">
               {goals.length === 0 ? (
                 <EmptyState
                   icon={<Target className="h-8 w-8" aria-hidden />}
@@ -199,16 +199,16 @@ export function DashboardView({
                     <div key={goal.id} className="p-5">
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-100">{goal.title}</p>
-                          <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
+                          <p className="text-sm font-semibold text-content-strong">{goal.title}</p>
+                          <p className="mt-0.5 text-xs leading-relaxed text-content-muted">
                             {goal.description}
                           </p>
                         </div>
                         <div className="shrink-0 text-right">
-                          <p className="font-mono text-xs text-slate-400">
+                          <p className="font-mono text-xs text-content-muted">
                             {fmt(goal.progress)} / {fmt(goal.target)}
                           </p>
-                          <p className="mt-0.5 text-[11px] text-amber-400/80">
+                          <p className="mt-0.5 text-[11px] text-warn/80">
                             +{fmt(goal.rewardXp)} XP · +{fmt(goal.rewardCoins)}
                           </p>
                         </div>
@@ -219,8 +219,8 @@ export function DashboardView({
                           max={goal.target}
                           gradient={
                             percent >= 100
-                              ? 'from-vital-500 to-vital-300'
-                              : 'from-arcane-500 to-forge-400'
+                              ? 'from-vital-vivid to-vital'
+                              : 'from-arcane-vivid to-forge'
                           }
                           height="h-2"
                           label={goal.title}
@@ -260,16 +260,16 @@ export function DashboardView({
                 }
               />
             ) : (
-              <ul className="divide-y divide-white/5">
+              <ul className="divide-y divide-line">
                 {recent.map((workout) => (
                   <li key={workout.id} className="flex items-center justify-between gap-3 p-4">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-slate-200">
+                      <p className="truncate text-sm font-medium text-content">
                         {arr(workout.entries).length} exercise
                         {arr(workout.entries).length === 1 ? '' : 's'} ·{' '}
                         {fmt(workout.totalVolume)} units
                       </p>
-                      <p className="mt-0.5 text-[11px] text-slate-600">
+                      <p className="mt-0.5 text-[11px] text-content-subtle">
                         {formatDay(workout.day)} ·{' '}
                         {arr<{ exerciseName: string }>(workout.entries)
                           .slice(0, 2)
@@ -278,10 +278,10 @@ export function DashboardView({
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="font-mono text-sm font-semibold text-forge-300">
+                      <p className="font-mono text-sm font-semibold text-forge">
                         +{fmt(workout.xpEarned)}
                       </p>
-                      <p className="flex items-center justify-end gap-1 text-[11px] text-amber-400/80">
+                      <p className="flex items-center justify-end gap-1 text-[11px] text-warn/80">
                         <Coins className="h-3 w-3" aria-hidden />
                         {fmt(workout.coinsEarned)}
                       </p>
@@ -326,7 +326,7 @@ function SectionTitle({
 }) {
   return (
     <div className="mb-3 flex items-center justify-between gap-4">
-      <div className="flex items-center gap-2 text-slate-400">
+      <div className="flex items-center gap-2 text-content-muted">
         {icon}
         <h2 className="font-display text-sm font-semibold uppercase tracking-widest">{title}</h2>
       </div>
@@ -349,15 +349,15 @@ function NudgeCard({
   onClick: () => void;
 }) {
   return (
-    <Card className="group cursor-pointer p-5 transition hover:ring-white/10" >
+    <Card className="group cursor-pointer p-5 transition hover:ring-line-strong" >
       <button type="button" onClick={onClick} className="flex w-full items-start gap-4 text-left">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-forge-300 ring-1 ring-white/10">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-hover text-forge ring-1 ring-line-strong">
           {icon}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-slate-100">{title}</p>
-          <p className="mt-1 text-xs leading-relaxed text-slate-500">{body}</p>
-          <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-forge-300 transition group-hover:gap-1.5">
+          <p className="text-sm font-semibold text-content-strong">{title}</p>
+          <p className="mt-1 text-xs leading-relaxed text-content-muted">{body}</p>
+          <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-forge transition group-hover:gap-1.5">
             {cta}
             <ArrowRight className="h-3 w-3" aria-hidden />
           </span>

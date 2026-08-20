@@ -2,9 +2,152 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * The colour system.
+ *
+ * Two layers. Primitives are literal hexes and are only ever written in this
+ * file. Semantics are CSS custom properties that Tailwind exposes as utilities,
+ * so components name meaning rather than pigment — and a second theme is a
+ * second block of values rather than a `dark:` variant on every element.
+ *
+ * Channels are stored as space-separated RGB triples so Tailwind's
+ * `<alpha-value>` still works (`bg-surface-raised/80`). The few tokens that
+ * carry their own alpha — hover, active, scrim, hairlines — are complete
+ * `rgb()` values and must be used without an alpha modifier.
+ */
+
 @layer base {
+  /* ---- Light theme (default) --------------------------------------------- */
   :root {
+    color-scheme: light;
+
+    /* Surfaces */
+    --surface-base: 241 244 249;
+    --surface-sunken: 231 235 243;
+    --surface-raised: 255 255 255;
+    --surface-overlay: 255 255 255;
+    --surface-inset: 226 232 240;
+    --surface-strong: 203 213 225;
+    --surface-hover: rgb(15 23 42 / 0.05);
+    --surface-active: rgb(15 23 42 / 0.09);
+    --surface-scrim: rgb(15 23 42 / 0.45);
+
+    /* Hairlines */
+    --line: rgb(15 23 42 / 0.1);
+    --line-strong: rgb(15 23 42 / 0.18);
+
+    /* Text. strong/DEFAULT/muted/subtle all clear 4.5:1 on every surface
+       above. `faint` is decorative only — never put words in it. */
+    --content-strong: 11 18 32;
+    --content: 36 48 67;
+    --content-muted: 71 86 109;
+    --content-subtle: 87 101 124;
+    --content-faint: 148 163 184;
+    --on-accent: 255 255 255;
+
+    /* Hues. `X` is the text-safe value; `X-vivid` is the fill value used for
+       gradients, bar fills, filled badges and chart series. */
+    --forge: 7 89 133;
+    --forge-vivid: 3 105 161;
+    --ember: 168 52 8;
+    --ember-vivid: 194 65 12;
+    --vital: 18 102 45;
+    --vital-vivid: 21 128 61;
+    --arcane: 115 38 184;
+    --arcane-vivid: 147 51 234;
+    --tide: 13 95 89;
+    --tide-vivid: 15 118 110;
+    --danger: 179 18 58;
+    --danger-vivid: 190 18 60;
+    --warn: 138 81 8;
+    --warn-vivid: 180 83 9;
+
+    --ring-focus: 3 105 161;
+
+    /* Rank label tones (tier names rendered as text) */
+    --rank-stone: 75 91 112;
+    --rank-bronze: 138 81 8;
+    --rank-silver: 75 91 112;
+    --rank-gold: 122 90 6;
+    --rank-platinum: 15 106 99;
+    --rank-diamond: 3 105 161;
+    --rank-mythic: 162 28 175;
+    --rank-legend: 168 66 10;
+    --rank-ascendant: 15 118 110;
+    --rank-immortal: 109 40 217;
+    --rank-apex: 138 101 8;
+
+    /* Ambient background washes */
+    --wash-forge: 2 132 199;
+    --wash-arcane: 147 51 234;
+    --wash-warn: 217 119 6;
+    --wash-alpha: 0.14;
+
+    /* Skeleton shimmer stops */
+    --skeleton-a: 231 235 243;
+    --skeleton-b: 255 255 255;
+  }
+
+  /* ---- Dark theme --------------------------------------------------------- */
+  .dark {
     color-scheme: dark;
+
+    --surface-base: 7 8 13;
+    --surface-sunken: 11 13 20;
+    --surface-raised: 15 17 25;
+    --surface-overlay: 20 24 36;
+    --surface-inset: 26 31 46;
+    --surface-strong: 35 40 56;
+    --surface-hover: rgb(255 255 255 / 0.06);
+    --surface-active: rgb(255 255 255 / 0.1);
+    --surface-scrim: rgb(7 8 13 / 0.82);
+
+    --line: rgb(255 255 255 / 0.07);
+    --line-strong: rgb(255 255 255 / 0.13);
+
+    --content-strong: 248 250 252;
+    --content: 203 213 225;
+    --content-muted: 159 176 199;
+    --content-subtle: 132 148 171;
+    --content-faint: 71 85 105;
+    --on-accent: 7 8 13;
+
+    --forge: 56 189 248;
+    --forge-vivid: 14 165 233;
+    --ember: 251 146 60;
+    --ember-vivid: 249 115 22;
+    --vital: 74 222 128;
+    --vital-vivid: 34 197 94;
+    --arcane: 192 132 252;
+    --arcane-vivid: 168 85 247;
+    --tide: 45 212 191;
+    --tide-vivid: 20 184 166;
+    --danger: 251 113 133;
+    --danger-vivid: 244 63 94;
+    --warn: 251 191 36;
+    --warn-vivid: 245 158 11;
+
+    --ring-focus: 125 211 252;
+
+    --rank-stone: 148 163 184;
+    --rank-bronze: 251 191 36;
+    --rank-silver: 226 232 240;
+    --rank-gold: 252 211 77;
+    --rank-platinum: 94 234 212;
+    --rank-diamond: 125 211 252;
+    --rank-mythic: 240 171 252;
+    --rank-legend: 253 186 116;
+    --rank-ascendant: 153 246 228;
+    --rank-immortal: 221 214 254;
+    --rank-apex: 253 230 138;
+
+    --wash-forge: 56 189 248;
+    --wash-arcane: 168 85 247;
+    --wash-warn: 251 191 36;
+    --wash-alpha: 0.1;
+
+    --skeleton-a: 15 17 25;
+    --skeleton-b: 26 31 46;
   }
 
   html {
@@ -12,14 +155,14 @@
   }
 
   body {
-    @apply bg-ink-950 font-sans text-slate-100;
+    @apply bg-surface-base font-sans text-content;
     text-rendering: optimizeLegibility;
   }
 
   /* Firefox */
   * {
     scrollbar-width: thin;
-    scrollbar-color: #333a4d transparent;
+    scrollbar-color: rgb(var(--surface-strong)) transparent;
   }
 
   /* WebKit */
@@ -31,17 +174,17 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-ink-700;
+    @apply rounded-full bg-surface-strong;
     border: 3px solid transparent;
     background-clip: content-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-ink-600;
+    @apply bg-content-faint;
     border: 3px solid transparent;
     background-clip: content-box;
   }
 
-  /* Number inputs: hide the spinners, they fight the dark theme. */
+  /* Number inputs: hide the spinners, they fight the surfaces. */
   input[type='number']::-webkit-outer-spin-button,
   input[type='number']::-webkit-inner-spin-button {
     -webkit-appearance: none;
@@ -52,9 +195,10 @@
     appearance: textfield;
   }
 
-  /* Native select arrow, restyled for the dark surfaces. */
+  /* Native select arrow. `currentColor` inherits the select's own text colour,
+     so it works in both themes; the old rule baked in a dark-only hex. */
   select {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%234a5266'%3E%3Cpath d='M4.5 6.5 8 10l3.5-3.5z'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='currentColor'%3E%3Cpath d='M4.5 6.5 8 10l3.5-3.5z'/%3E%3C/svg%3E");
     background-position: right 0.75rem center;
     background-repeat: no-repeat;
     background-size: 16px;
@@ -64,11 +208,27 @@
     appearance: none;
   }
   select option {
-    @apply bg-ink-850 text-slate-100;
+    @apply bg-surface-raised text-content-strong;
   }
 
-  :focus-visible {
-    outline: none;
+  /* One rule gives every interactive element a focus ring. `:where()` has zero
+     specificity, so a component can still override it deliberately. This
+     replaces a blanket `:focus-visible { outline: none }` that had left roughly
+     35 of 36 interactive elements with no keyboard affordance at all. */
+  :where(
+      a[href],
+      area,
+      button,
+      input,
+      select,
+      textarea,
+      summary,
+      [role='button'],
+      [role='tab'],
+      [tabindex]:not([tabindex='-1'])
+    ):focus-visible {
+    outline: 2px solid rgb(var(--ring-focus));
+    outline-offset: 2px;
   }
 }
 
@@ -85,8 +245,11 @@
   }
 }
 
-/* Recharts renders a focus outline on its wrapper; suppress it. */
+/* Recharts renders a focus outline on its wrapper; suppress it, including
+   against the new global rule. */
 .recharts-wrapper:focus,
-.recharts-surface:focus {
+.recharts-surface:focus,
+.recharts-wrapper:focus-visible,
+.recharts-surface:focus-visible {
   outline: none;
 }
