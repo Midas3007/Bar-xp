@@ -1,5 +1,6 @@
 import type { Exercise, ExerciseCategory, Goal, WorkoutEntry } from '../types';
 import { arr, int, num, pct } from '../safe';
+import { entryVolume } from './sets';
 
 /** How many goals a user carries at once. */
 export const ACTIVE_GOAL_SLOTS = 3;
@@ -226,7 +227,7 @@ export function advanceGoals(
     const exercise = input.resolve(entry.exerciseId);
     if (!exercise) continue;
     const prev = categoryVolume.get(exercise.category) ?? 0;
-    categoryVolume.set(exercise.category, prev + Math.max(0, num(entry.volume, 0)));
+    categoryVolume.set(exercise.category, prev + entryVolume(entry));
   }
 
   for (const goal of active) {

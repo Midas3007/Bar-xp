@@ -115,6 +115,12 @@ service cloud.firestore {
           && (d.get('activeCosmetic', null) == null || isShortString(d.activeCosmetic, 40))
           && d.goals is list && d.goals.size() <= 10
           && d.customExercises is list && d.customExercises.size() <= 20
+          // User-authored routines. Mirrors LIMITS.MAX_ROUTINES.
+          // `get` with a default is required: every existing user document
+          // lacks the field, and an update validates the *merged* document, so
+          // a plain `d.routines` would reject every write from an account that
+          // has never saved one.
+          && d.get('routines', []) is list && d.get('routines', []).size() <= 12
           && d.personalBests is map && d.personalBests.size() <= 200
           // Per-muscle lifetime volume. Bounded so it cannot be used as storage.
           && d.get('muscleVolume', {}) is map

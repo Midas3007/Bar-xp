@@ -63,6 +63,7 @@ function userDoc(overrides = {}) {
     activeCosmetic: null,
     personalBests: {},
     customExercises: [],
+    routines: [],
     goals: [],
     workoutCount: 0,
     totalReps: 0,
@@ -240,6 +241,37 @@ await test('the nameFixedAt repair marker is accepted on the user document', asy
   );
 });
 
+await test('accepts a routine list', async () => {
+  const routines = [
+    {
+      id: 'routine_abc',
+      name: 'Push Day',
+      items: [{ exerciseId: 'push_up', reps: [12, 10, 8] }],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    },
+  ];
+  await assertSucceeds(setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, routines })));
+});
+
+await test('rejects more routines than the limit', async () => {
+  const routines = Array.from({ length: 13 }, (_, i) => ({
+    id: `routine_${i}`,
+    name: `Day ${i}`,
+    items: [{ exerciseId: 'push_up', reps: [10] }],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  }));
+  await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ totalXp: 6000, routines })));
+});
+
+await test('a document without routines is still valid', async () => {
+  // The live-data guarantee: no account has this field until it saves one.
+  const withoutRoutines = userDoc({ totalXp: 6000 });
+  delete withoutRoutines.routines;
+  await assertSucceeds(setDoc(doc(alice, 'users', ALICE), withoutRoutines));
+});
+
 await test('profiles cannot be deleted', async () => {
   const { deleteDoc } = await import('firebase/firestore');
   await assertFails(deleteDoc(doc(alice, 'users', ALICE)));
@@ -284,6 +316,16 @@ section('workouts — private and immutable');
 
 await test('owner can create a workout', async () => {
   await assertSucceeds(setDoc(doc(alice, 'workouts', 'w1'), workoutDoc(ALICE)));
+});
+
+await test('accepts a workout entry carrying a per-set ladder', async () => {
+  const entries = [
+    { exerciseId: 'push_up', exerciseName: 'Push-up', unit: 'reps',
+      sets: 3, amount: 12, volume: 30, reps: [12, 10, 8], xp: 30 },
+  ];
+  await assertSucceeds(
+    setDoc(doc(alice, 'workouts', 'w_ladder'), workoutDoc(ALICE, { entries })),
+  );
 });
 
 await test('owner can read their own workout', async () => {

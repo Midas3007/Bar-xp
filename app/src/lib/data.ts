@@ -20,6 +20,8 @@ import type {
   LeaderboardRow,
   PersonalBest,
   Profile,
+  Routine,
+  RoutineItem,
   StatsSnapshot,
   Workout,
   WorkoutEntry,
@@ -39,6 +41,8 @@ import { advanceGoals, ensureGoals } from './game/goals';
 import { aestheticsFromBodyFat, scoreSession } from './game/xp';
 import { findShopItem, type ShopItem } from './game/shop';
 import { mergeMuscleVolume, sessionMuscleVolume } from './game/muscles';
+import { bestSet, entryVolume, normalizeReps } from './game/sets';
+import { buildRoutine, removeRoutine, upsertRoutine } from './game/routines';
 import { LIMITS } from './game/validation';
 
 /* -------------------------------------------------------------------------- */
@@ -342,15 +346,22 @@ export async function logWorkout(
     uid: profile.uid,
     day: today,
     createdAt: now,
-    entries: entries.map((e) => ({
-      exerciseId: str(e.exerciseId, ''),
-      exerciseName: str(e.exerciseName, ''),
-      unit: e.unit === 'seconds' ? 'seconds' : 'reps',
-      sets: Math.max(0, int(e.sets, 0)),
-      amount: Math.max(0, int(e.amount, 0)),
-      volume: Math.max(0, int(e.volume, 0)),
-      xp: Math.max(0, int(e.xp, 0)),
-    })),
+    entries: entries.map((e) => {
+      const reps = normalizeReps(e.reps);
+      return {
+        exerciseId: str(e.exerciseId, ''),
+        exerciseName: str(e.exerciseName, ''),
+        unit: e.unit === 'seconds' ? 'seconds' : 'reps',
+        sets: Math.max(0, int(e.sets, 0)),
+        amount: Math.max(0, int(e.amount, 0)),
+        volume: Math.max(0, int(entryVolume(e))),
+        // A single-set ladder carries no information the uniform shape lacks,
+        // so it is stored without the array and the document stays identical
+        // to one written before this field existed.
+        ...(reps.length > 1 ? { reps } : {}),
+        xp: Math.max(0, int(e.xp, 0)),
+      };
+    }),
     xpEarned,
     coinsEarned,
     totalVolume: Math.max(0, int(totals.totalVolume, 0)),
@@ -428,8 +439,9 @@ function mergePersonalBests(
   for (const entry of entries) {
     const id = str(entry.exerciseId, '');
     if (!id) continue;
-    // A PR is the best *single set*, not the session total.
-    const value = Math.max(0, int(entry.amount, 0));
+    // A PR is the best *single set*, not the session total. With a ladder
+    // stored that is the hardest set in it, not the last one performed.
+    const value = bestSet(entry);
     if (value <= 0) continue;
 
     const current = personalBests[id];
@@ -605,6 +617,45 @@ export async function removeCustomExercise(profile: Profile, id: string): Promis
   });
 }
 
+/**
+ * Insert or replace a routine.
+ *
+ * Matching by name as well as id is what makes "save under the same name" the
+ * edit path: it overwrites rather than accumulating near-duplicates.
+ */
+export async function saveRoutine(
+  profile: Profile,
+  input: { id?: string; name: string; items: RoutineItem[] },
+): Promise<void> {
+  const existing = arr<Routine>(profile.routines);
+  const now = Date.now();
+  const matched =
+    existing.find((r) => r.id === input.id) ??
+    existing.find((r) => r.name.trim().toLowerCase() === input.name.trim().toLowerCase());
+
+  const routine = buildRoutine({
+    // Short by construction: `workouts.presetId` is capped at 40 characters in
+    // the rules and this is about 21.
+    id: matched?.id ?? `routine_${now.toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+    name: input.name,
+    items: input.items,
+    createdAt: matched?.createdAt ?? now,
+    updatedAt: now,
+  });
+
+  await updateDoc(userDocRef(profile.uid), {
+    routines: upsertRoutine(existing, routine),
+    updatedAt: now,
+  });
+}
+
+export async function deleteRoutine(profile: Profile, id: string): Promise<void> {
+  await updateDoc(userDocRef(profile.uid), {
+    routines: removeRoutine(profile.routines, id),
+    updatedAt: Date.now(),
+  });
+}
+
 /** Rename the athlete. Kept short so leaderboard rows stay tidy. */
 export async function updateDisplayName(profile: Profile, name: string): Promise<void> {
   const requested = str(name, '').trim();
@@ -710,15 +761,19 @@ function normalizeWorkout(id: string, raw: unknown): Workout {
     uid: str(data.uid, ''),
     day: str(data.day, ''),
     createdAt: num(data.createdAt, 0),
-    entries: arr<Record<string, unknown>>(data.entries).map((e) => ({
-      exerciseId: str(e.exerciseId, ''),
-      exerciseName: str(e.exerciseName, 'Exercise'),
-      unit: e.unit === 'seconds' ? 'seconds' : 'reps',
-      sets: Math.max(0, int(e.sets, 0)),
-      amount: Math.max(0, int(e.amount, 0)),
-      volume: Math.max(0, int(e.volume, 0)),
-      xp: Math.max(0, int(e.xp, 0)),
-    })),
+    entries: arr<Record<string, unknown>>(data.entries).map((e) => {
+      const reps = normalizeReps(e.reps);
+      return {
+        exerciseId: str(e.exerciseId, ''),
+        exerciseName: str(e.exerciseName, 'Exercise'),
+        unit: e.unit === 'seconds' ? 'seconds' : ('reps' as const),
+        sets: Math.max(0, int(e.sets, 0)),
+        amount: Math.max(0, int(e.amount, 0)),
+        volume: Math.max(0, int(e.volume, 0)),
+        ...(reps.length > 1 ? { reps } : {}),
+        xp: Math.max(0, int(e.xp, 0)),
+      };
+    }),
     xpEarned: Math.max(0, int(data.xpEarned, 0)),
     coinsEarned: Math.max(0, int(data.coinsEarned, 0)),
     totalVolume: Math.max(0, int(data.totalVolume, 0)),

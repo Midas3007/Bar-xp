@@ -17,7 +17,17 @@ import {
   streakMultiplier, safeStreak, migrateLegacyStreak, daysRemainingThisWeek,
   EMPTY_STREAK,
 } from '../streak.js';
-import { volumeMultiplier, DIMINISHING_THRESHOLD, scoreSession, coinsForSession } from '../xp.js';
+import {
+  volumeMultiplier, DIMINISHING_THRESHOLD, scoreSession, coinsForSession,
+  buildEntry, buildEntryFromReps, entryXp, volumeXp,
+} from '../xp.js';
+import {
+  normalizeReps, entryReps, entryVolume, bestSet, formatSetLadder,
+} from '../sets.js';
+import {
+  normalizeRoutines, upsertRoutine, removeRoutine, loadRoutine, routineVolume,
+  routineItemsFromEntries, buildRoutine,
+} from '../routines.js';
 import {
   baselineStats,
   ASSESSMENT_STAT_CEILING,
@@ -26,7 +36,7 @@ import {
   MAX_DISPLAY_NAME,
   UNNAMED_ATHLETE,
 } from '../profile.js';
-import { LIMITS } from '../validation.js';
+import { LIMITS, validateSetLadder, validateRoutine, validateSession } from '../validation.js';
 
 /* -------------------------------------------------------------------------- */
 /* The migration guarantee                                                     */
@@ -347,4 +357,198 @@ test('REGRESSION: a long Google name cannot break profile creation', () => {
     photoURL: '',
   });
   assert.equal(profile.displayName.length, MAX_DISPLAY_NAME);
+});
+
+/* -------------------------------------------------------------------------- */
+/* Set ladders — per-set reps                                                 */
+/* -------------------------------------------------------------------------- */
+
+test('MIGRATION: an old-format entry and a ladder of the same volume score identically', () => {
+  const legacy = { exerciseId: 'push_up', exerciseName: 'Push-up', unit: 'reps',
+                   sets: 3, amount: 10, volume: 30, xp: 30 };
+  const ladder = { exerciseId: 'push_up', exerciseName: 'Push-up', unit: 'reps',
+                   sets: 3, amount: 12, volume: 30, reps: [12, 10, 8], xp: 30 };
+  const a = scoreSession([legacy], resolve, 0);
+  const b = scoreSession([ladder], resolve, 0);
+  assert.equal(b.xp, a.xp);
+  assert.equal(b.totalVolume, a.totalVolume);
+  assert.equal(b.totalReps, a.totalReps);
+  assert.equal(a.xp, 30, 'and the figure is the one the old code produced');
+});
+
+test('a uniform ladder collapses to the legacy shape and stores no reps array', () => {
+  const built = buildEntryFromReps(PUSH_UP, [10, 10, 10]);
+  assert.deepEqual(built, buildEntry(PUSH_UP, 3, 10));
+  assert.ok(!('reps' in built), 'a uniform entry must not carry a ladder');
+});
+
+test('a varied ladder records its sets, hardest set and true volume', () => {
+  const built = buildEntryFromReps(PUSH_UP, [12, 10, 8]);
+  assert.equal(built.sets, 3);
+  assert.equal(built.amount, 12, 'amount is the hardest set');
+  assert.equal(built.volume, 30, 'volume is the sum, not sets * amount');
+  assert.deepEqual(built.reps, [12, 10, 8]);
+});
+
+test('diminishing returns still bite on a ladder', () => {
+  const ladder = buildEntryFromReps(PUSH_UP, [50, 50, 50]);
+  assert.equal(ladder.xp, entryXp(PUSH_UP, 1, 150));
+  assert.ok(ladder.xp < 150, 'a 150-rep block must not be worth 150 XP');
+});
+
+test('entryVolume prefers a ladder, then the stored volume, and never re-derives', () => {
+  assert.equal(entryVolume({ reps: [12, 10, 8] }), 30);
+  assert.equal(entryVolume({ volume: 30 }), 30);
+  // Deliberately 0: falling back to sets * amount would rescore old documents.
+  assert.equal(entryVolume({ sets: 3, amount: 10 }), 0);
+  for (const junk of [{ volume: NaN }, { reps: 'x' }, undefined, {}]) {
+    const v = entryVolume(junk);
+    assert.ok(Number.isFinite(v) && v >= 0, `not finite for ${JSON.stringify(junk)}`);
+  }
+});
+
+test('normalizeReps drops blanks, floors decimals and caps the length', () => {
+  assert.deepEqual(normalizeReps([12, 0, 8]), [12, 8]);
+  assert.deepEqual(normalizeReps([10.7, 'x', null, 5]), [10, 5]);
+  assert.equal(normalizeReps(Array.from({ length: 40 }, () => 5)).length, 20);
+  assert.deepEqual(normalizeReps(undefined), []);
+});
+
+test('entryReps expands a uniform entry and returns a stored ladder as-is', () => {
+  assert.deepEqual(entryReps({ reps: [12, 10, 8] }), [12, 10, 8]);
+  assert.deepEqual(entryReps({ sets: 3, amount: 10 }), [10, 10, 10]);
+  assert.deepEqual(entryReps({ sets: 0, amount: 0 }), []);
+});
+
+test('bestSet is the hardest set, not the last or the total', () => {
+  assert.equal(bestSet({ reps: [12, 10, 8] }), 12);
+  assert.equal(bestSet({ sets: 3, amount: 10 }), 10);
+});
+
+test('formatSetLadder renders both shapes and truncates a long ladder', () => {
+  assert.equal(formatSetLadder({ sets: 3, amount: 10 }), '3 × 10');
+  assert.equal(formatSetLadder({ reps: [12, 10, 8] }), '12 / 10 / 8');
+  const long = formatSetLadder({ reps: Array.from({ length: 12 }, (_, i) => i + 1) });
+  assert.ok(long.endsWith('+4'), `expected a +4 tail, got ${long}`);
+});
+
+test('validateSetLadder enforces the same bounds as the uniform path', () => {
+  assert.ok(validateSetLadder(PUSH_UP, [12, 10, 8]).ok);
+  assert.ok(!validateSetLadder(PUSH_UP, []).ok);
+  assert.ok(!validateSetLadder(PUSH_UP, Array.from({ length: 21 }, () => 5)).ok);
+  assert.ok(!validateSetLadder(PUSH_UP, [12, 0, 8]).ok);
+  assert.ok(!validateSetLadder(PUSH_UP, [500]).ok);
+  const HOLD = { ...PUSH_UP, id: 'plank', unit: 'seconds' };
+  assert.ok(!validateSetLadder(HOLD, [3600]).ok);
+  assert.ok(validateSetLadder(HOLD, [45, 40]).ok);
+});
+
+test('validateSession measures a ladder by its true total', () => {
+  const cheat = [{ volume: 30, reps: Array.from({ length: 20 }, () => 300) }];
+  assert.ok(!validateSession(cheat).ok, 'a 6000-rep ladder must not pass as volume 30');
+});
+
+/* -------------------------------------------------------------------------- */
+/* Routines                                                                   */
+/* -------------------------------------------------------------------------- */
+
+const routine = (over = {}) => buildRoutine({
+  id: 'r1', name: 'Push Day',
+  items: [{ exerciseId: 'push_up', reps: [12, 10, 8] }],
+  createdAt: 100, updatedAt: 100, ...over,
+});
+
+test('upsertRoutine replaces by id and preserves the original identity', () => {
+  const list = [routine()];
+  const next = upsertRoutine(list, routine({ name: 'Renamed', updatedAt: 200 }));
+  assert.equal(next.length, 1);
+  assert.equal(next[0].name, 'Renamed');
+  assert.equal(next[0].id, 'r1');
+  assert.equal(next[0].createdAt, 100, 'createdAt survives an edit');
+});
+
+test('upsertRoutine replaces by case-insensitive name', () => {
+  const list = [routine()];
+  const next = upsertRoutine(list, routine({ id: 'r2', name: 'push day' }));
+  assert.equal(next.length, 1, 'saving under an existing name must not duplicate');
+  assert.equal(next[0].id, 'r1', 'the stored id wins so logged workouts still point at it');
+});
+
+test('upsertRoutine appends otherwise and refuses to pass the cap', () => {
+  const list = [routine()];
+  assert.equal(upsertRoutine(list, routine({ id: 'r2', name: 'Pull Day' })).length, 2);
+
+  const full = Array.from({ length: LIMITS.MAX_ROUTINES }, (_, i) =>
+    routine({ id: `r${i}`, name: `Day ${i}` }));
+  const over = upsertRoutine(full, routine({ id: 'new', name: 'One More' }));
+  assert.equal(over.length, LIMITS.MAX_ROUTINES);
+});
+
+test('removeRoutine drops only the named routine', () => {
+  const list = [routine(), routine({ id: 'r2', name: 'Pull Day' })];
+  const next = removeRoutine(list, 'r1');
+  assert.equal(next.length, 1);
+  assert.equal(next[0].id, 'r2');
+});
+
+test('normalizeRoutines survives junk and drops empty routines', () => {
+  assert.deepEqual(normalizeRoutines(undefined), []);
+  assert.deepEqual(normalizeRoutines(42), []);
+  assert.deepEqual(normalizeRoutines([null]), []);
+  assert.deepEqual(normalizeRoutines([{ id: 'r', items: 'nope' }]), []);
+  assert.equal(normalizeRoutines([{ id: 'r', name: 'X', items: [{ exerciseId: 'push_up', reps: [10] }] }]).length, 1);
+});
+
+test('routineVolume totals the target work', () => {
+  assert.equal(routineVolume(routine()), 30);
+});
+
+test('loadRoutine builds ladder entries, and reports locked and missing movements', () => {
+  const r = buildRoutine({
+    id: 'r1', name: 'Mixed',
+    items: [
+      { exerciseId: 'push_up', reps: [12, 10, 8] },
+      { exerciseId: 'muscle_up', reps: [3] },
+      { exerciseId: 'ghost', reps: [5] },
+    ],
+    createdAt: 0, updatedAt: 0,
+  });
+  const MUSCLE_UP = { ...PUSH_UP, id: 'muscle_up', name: 'Muscle-up' };
+  const out = loadRoutine(
+    r,
+    (id) => (id === 'push_up' ? PUSH_UP : id === 'muscle_up' ? MUSCLE_UP : undefined),
+    (ex) => ex.id !== 'muscle_up',
+  );
+  assert.equal(out.entries.length, 1);
+  assert.deepEqual(out.entries[0].reps, [12, 10, 8]);
+  assert.deepEqual(out.locked, ['Muscle-up'], 'locked reports the name, not the id');
+  assert.deepEqual(out.missing, ['ghost']);
+});
+
+test('loadRoutine never returns more entries than a session can hold', () => {
+  const items = Array.from({ length: LIMITS.MAX_ROUTINE_ITEMS }, () => ({ exerciseId: 'push_up', reps: [10] }));
+  const out = loadRoutine(buildRoutine({ id: 'r', name: 'Long', items, createdAt: 0, updatedAt: 0 }),
+    () => PUSH_UP, () => true);
+  assert.ok(out.entries.length <= LIMITS.MAX_ENTRIES);
+});
+
+test('routineItemsFromEntries snapshots each entry ladder', () => {
+  const items = routineItemsFromEntries([
+    buildEntryFromReps(PUSH_UP, [12, 10, 8]),
+    buildEntry(PUSH_UP, 3, 10),
+  ]);
+  assert.deepEqual(items[0], { exerciseId: 'push_up', reps: [12, 10, 8] });
+  assert.deepEqual(items[1], { exerciseId: 'push_up', reps: [10, 10, 10] });
+});
+
+test('validateRoutine enforces the name, the item count and the cap', () => {
+  const items = [{ exerciseId: 'push_up', reps: [10] }];
+  assert.ok(validateRoutine({ name: 'Push Day', items, existingCount: 0 }).ok);
+  assert.ok(!validateRoutine({ name: 'x', items, existingCount: 0 }).ok);
+  assert.ok(!validateRoutine({ name: 'Push Day', items: [], existingCount: 0 }).ok);
+  const many = Array.from({ length: LIMITS.MAX_ROUTINE_ITEMS + 1 }, () => items[0]);
+  assert.ok(!validateRoutine({ name: 'Push Day', items: many, existingCount: 0 }).ok);
+  const atCap = validateRoutine({ name: 'Push Day', items, existingCount: LIMITS.MAX_ROUTINES });
+  assert.ok(!atCap.ok);
+  assert.ok(atCap.error.includes(String(LIMITS.MAX_ROUTINES)), 'the error names the limit');
 });

@@ -147,6 +147,26 @@ Bar Coins come from sessions (`15 + xp/12`) and completed goals. They buy:
 - **Movement unlocks** — early access to muscle-ups, planches, levers and more,
   bypassing their level gate
 
+### Sets and routines
+
+A workout entry can describe what actually happened set by set. An entry carries
+an optional `reps` ladder — `[12, 10, 8]` — stored *only* when the sets genuinely
+differ, so a uniform session writes exactly the document it wrote before the
+field existed. `volume` stays the single figure the scorer reads, and for a
+varied ladder it is deliberately less than `sets × amount`. Historical entries
+have no ladder and are scored from their stored volume untouched; `entryVolume`
+never falls back to re-deriving it, because `workouts` documents are immutable
+and whatever an old session was worth it is still worth.
+
+`amount` is the *hardest* set, which is what a personal best measures.
+
+Routines are the editable counterpart to the read-only built-in presets: an
+ordered list of movements with target reps per set, saved from whatever is in
+the session panel and started again in one tap. They live on the user document
+beside goals and custom exercises, bounded at twelve and mirrored by a size cap
+in the rules. Saving under a name that already exists replaces that routine,
+which is the whole editing story.
+
 ### Goals & achievements
 
 Three active goals at a time, rolled from templates filtered by level. A
@@ -265,7 +285,7 @@ UI would not have helped; the data had to move.
 npm run test:rules
 ```
 
-Runs 42 assertions against the Firestore emulator, which executes the real
+Runs 49 assertions against the Firestore emulator, which executes the real
 rules engine — the rules are enforced, not merely inspected. Needs the Firebase
 CLI on your PATH and a JVM. Coverage includes cross-user read/write denial,
 XP monotonicity, immutability of `workouts` and `stats_history`, the anti-cheat

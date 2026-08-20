@@ -1,5 +1,6 @@
 import type { Exercise, WorkoutEntry } from '../types';
 import { clamp, num, round } from '../safe';
+import { entryVolume } from './sets';
 
 /**
  * Muscle-group and equipment metadata.
@@ -233,7 +234,7 @@ export function sessionMuscleVolume(entries: WorkoutEntry[]): MuscleVolume {
   const out: MuscleVolume = {};
 
   for (const entry of entries) {
-    const raw = Math.max(0, num(entry.volume, 0));
+    const raw = entryVolume(entry);
     if (raw <= 0) continue;
     // 4 seconds of a hold ≈ 1 rep of work.
     const work = entry.unit === 'seconds' ? raw / 4 : raw;
