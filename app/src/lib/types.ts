@@ -265,8 +265,20 @@ export interface Streak {
   shieldsUsed: number;
   /** Monday of the week `daysThisWeek` refers to, `YYYY-MM-DD`. */
   weekKey: string | null;
-  /** Distinct days trained inside the current week. */
+  /**
+   * Distinct days trained inside the current week.
+   *
+   * No longer gates the counter — it feeds the weekly safety net that decides
+   * whether a gap breaks the run.
+   */
   daysThisWeek: number;
+  /**
+   * Which scheme `current` was written under.
+   *
+   * Absent means the weekly model, where `current` counted weeks. Documents are
+   * converted on read exactly once, and every write since carries the marker.
+   */
+  model?: 'daily';
 }
 
 export interface Profile {

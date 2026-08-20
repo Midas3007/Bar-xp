@@ -88,12 +88,21 @@ drives:
   ratio ranges that keep shoulders healthy and proportions even.
 - **The Physique Lab**, a private section rating eight physique traits with a
   specific next action for each. Collapsed by default, revealed by a local
-  toggle. Scores come only from logged data; body-fat guidance stops at healthy
-  ranges rather than rewarding ever-lower numbers. **Gym Bro Mode** — on by
-  default, toggled from the profile — reads the five grades as Chud / Normie /
-  Chad / GIGACHAD instead of Lagging / Building / Good / Standout. Only the
-  words change; the two vocabularies share one lookup table and the scores
-  behind them are untouched.
+  toggle. Body-fat guidance stops at healthy ranges rather than rewarding
+  ever-lower numbers. **Gym Bro Mode** — on by default, toggled from the profile
+  — reads the *overall* verdict as Chud / Normie / Chad / GIGACHAD instead of
+  Lagging / Building / Good / Standout. It reaches the headline and nothing
+  else: eight joke labels turn a breakdown meant to be read into noise, and
+  "Chud" against one lagging muscle group reads as an insult rather than a
+  diagnosis. Only the words change; the two vocabularies share one lookup table
+  and the scores behind them are untouched.
+
+  Most traits are scored from logged training volume. The **V-taper** trait is
+  the exception: where the athlete has recorded both a back and a waist
+  measurement, that ratio replaces the volume proxy, because a tape settles the
+  question a training estimate can only approximate. The curve has no ideal at
+  the top — it saturates rather than rewarding an ever-smaller waist — and no
+  other trait reads a measurement.
 
 ### Body measurements
 
@@ -114,10 +123,12 @@ Values are **always stored metric** — kilograms and centimetres. The unit
 system is a display preference converted at the UI boundary, so switching it
 never rewrites a document and never mixes scales on an axis.
 
-**Nothing here is scored.** There is no ideal ratio, no target range and no
-comparison against another athlete. A test asserts the physique trait ratings
-are identical with and without measurements present, so a later change cannot
-quietly turn a waist into a grade.
+**Almost nothing here is scored.** There is no target range and no comparison
+against another athlete. The single exception is the V-taper trait in the
+Physique Lab, which reads a recorded back-and-waist pair because that ratio is
+the one physique question a tape can actually settle; its curve saturates rather
+than rewarding an ever-smaller waist. A test pins the boundary — a measurement
+moves that trait and provably leaves every other one untouched.
 
 The girth charts are small multiples rather than one six-line overlay: six
 categorical hues bright enough for this surface cannot be told apart under
@@ -150,6 +161,21 @@ Rank comes from the **average of the four core stats**:
 
 ### Identities & streaks
 
+The streak counts **consecutive training days**, and it is protected by a
+weekly target rather than by having to train every single day:
+
+- Every distinct day you train adds one. A second session on a day already
+  logged is welcome but does not advance it.
+- A gap never breaks the run **while the week is still live** — you have until
+  Sunday to reach the target.
+- Once a week has elapsed, hitting **4 distinct days** in it carries the streak
+  through untouched. Falling short spends a **Streak Shield**; with no shield
+  left, the run resets.
+
+That is the whole point of the shape: four sessions a week keeps a streak alive
+indefinitely without punishing a rest day, while a week of nothing still costs
+you something.
+
 Consecutive training days map to an identity label:
 
 `0 → Fading` · `1 → Stirring` · `3 → Consistent` · `7 → Disciplined` ·
@@ -157,6 +183,13 @@ Consecutive training days map to an identity label:
 
 Streaks use **local calendar days** (`YYYY-MM-DD`), not timestamps, so a 23:50
 session and a 00:10 session correctly count as two days.
+
+The counter has been through three schemes — days, then weeks, then days again
+— and each stored shape is converted on read exactly once. Documents written
+under the weekly model carry no `model` marker; their week count converts at
+`weeks × 4`, the honest floor for what holding those weeks required, and `best`
+converts on the same scale so a record can never shrink. Every write since
+stamps `model: 'daily'`, which makes the conversion idempotent.
 
 ### Background recalculation
 

@@ -15,7 +15,7 @@ import {
 import {
   WEEKLY_TARGET, weekKey, weekKeyForDay, registerWorkout, settleStreak,
   streakMultiplier, safeStreak, migrateLegacyStreak, daysRemainingThisWeek,
-  EMPTY_STREAK,
+  EMPTY_STREAK, migrateStreakModel,
 } from '../streak.js';
 import {
   volumeMultiplier, DIMINISHING_THRESHOLD, scoreSession, coinsForSession,
@@ -45,7 +45,9 @@ import {
   MEASUREMENT_BOUNDS, displayFromMetric, metricFromDisplay,
   normalizeMeasurementValues, unitLabel,
 } from '../measurements.js';
-import { GRADE_LABELS, gradeLabel, overallAestheticScore, rateAesthetics } from '../aesthetics.js';
+import {
+  GRADE_LABELS, gradeLabel, measuredVTaper, overallAestheticScore, overallGrade, rateAesthetics,
+} from '../aesthetics.js';
 import {
   mergeMuscleVolume, sessionMuscleVolume, subtractMuscleVolume,
 } from '../muscles.js';
@@ -158,25 +160,30 @@ const MON = '2026-08-03', TUE = '2026-08-04', WED = '2026-08-05',
 const train = (days, start = EMPTY_STREAK) =>
   days.reduce((s, d) => registerWorkout(s, d, 0), start);
 
-test('REGRESSION: a Mon/Wed/Fri split builds a streak (it never could before)', () => {
-  // Under the old daily-chain model this left `current` pinned at 1 forever.
+test('every distinct training day advances the streak', () => {
+  // Days again, not weeks. A Mon/Wed/Fri/Sat week is four days on the counter,
+  // and the gaps between them do not break it — that is what the weekly target
+  // protects.
   const s = train([MON, WED, FRI, SAT]);
   assert.equal(s.daysThisWeek, 4);
-  assert.equal(s.current, 1, 'four distinct days in one week is one week of streak');
+  assert.equal(s.current, 4);
+  assert.equal(s.best, 4);
 });
 
-test('three days in a week is not enough', () => {
+test('a short week still counts its days while the week is live', () => {
+  // Three days is under the target, but the week has not ended, so nothing is
+  // broken yet and the counter reflects the work actually done.
   const s = train([MON, WED, FRI]);
-  assert.equal(s.current, 0);
-  assert.equal(daysRemainingThisWeek(s), 1);
+  assert.equal(s.current, 3);
+  assert.equal(daysRemainingThisWeek(s), 1, 'one more day secures the week');
 });
 
-test('consecutive weeks accumulate', () => {
+test('days accumulate across a week boundary once the target is met', () => {
   let s = train([MON, WED, FRI, SAT]);
-  assert.equal(s.current, 1);
+  assert.equal(s.current, 4);
   s = train([NEXT_MON, '2026-08-11', NEXT_WED, NEXT_FRI], s);
-  assert.equal(s.current, 2, 'a second week at target');
-  assert.equal(s.best, 2);
+  assert.equal(s.current, 8, 'four more days, and the first week protected the gap');
+  assert.equal(s.best, 8);
 });
 
 test('a missed week breaks the streak when no shield is held', () => {
@@ -187,14 +194,22 @@ test('a missed week breaks the streak when no shield is held', () => {
   assert.equal(settled.streak.current, 0);
 });
 
-test('a shield bridges a missed week', () => {
+test('hitting the weekly target protects the streak through the gap', () => {
+  // The whole point of the safety net: four days a week keeps the run alive
+  // without training every single day, and no shield is spent doing it.
   const s = train([MON, WED, FRI, SAT]);
-  const settled = settleStreak(s, 1, NEXT_MON + '');
-  assert.equal(settled.streak.current, 1, 'the completed week is still credited');
-  // Now skip a full week with one shield in hand.
-  const skipped = settleStreak(settled.streak, 1, '2026-08-17');
+  const settled = settleStreak(s, 0, NEXT_MON);
+  assert.equal(settled.broken, false);
+  assert.equal(settled.shieldsConsumed, 0);
+  assert.equal(settled.streak.current, 4, 'the run carries into the new week intact');
+});
+
+test('a shield bridges a week that missed the target', () => {
+  const short = train([MON, WED, FRI]);
+  const skipped = settleStreak(short, 1, NEXT_MON);
   assert.equal(skipped.broken, false);
   assert.equal(skipped.shieldsConsumed, 1);
+  assert.equal(skipped.streak.current, 3, 'the days already earned survive');
 });
 
 test('shields are not spent on a gap they cannot bridge', () => {
@@ -206,16 +221,16 @@ test('shields are not spent on a gap they cannot bridge', () => {
 
 test('a second session on the same day does not advance the streak', () => {
   const s = train([MON, MON, MON, MON, MON]);
-  assert.equal(s.daysThisWeek, 1, 'session spam cannot manufacture a week');
-  assert.equal(s.current, 0);
+  assert.equal(s.daysThisWeek, 1, 'session spam cannot manufacture days');
+  assert.equal(s.current, 1, 'one day trained is one day of streak');
 });
 
-test('logging settles an elapsed week without waiting for the background timer', () => {
+test('logging settles elapsed weeks without waiting for the background timer', () => {
   // The old code only ever settled from an hourly timer, so a shield bought to
   // save a streak routinely failed to spend before the streak had broken.
   const s = train([MON, WED, FRI, SAT]);
   const later = registerWorkout(s, '2026-08-31', 0);
-  assert.equal(later.current, 0, 'the missed weeks were resolved on the logging path');
+  assert.equal(later.current, 1, 'the empty weeks broke the run, and today restarts it');
   assert.equal(later.daysThisWeek, 1);
 });
 
@@ -228,19 +243,47 @@ test('week keys land on Monday and group a week together', () => {
 
 test('the streak bonus is reachable and capped', () => {
   assert.equal(streakMultiplier(0), 1);
-  assert.equal(streakMultiplier(1), 1.05);
-  assert.ok(Math.abs(streakMultiplier(9) - 1.45) < 1e-9, 'nine weeks reaches the cap');
+  assert.ok(Math.abs(streakMultiplier(1) - 1.03) < 1e-9);
+  assert.ok(Math.abs(streakMultiplier(15) - 1.45) < 1e-9, 'fifteen days reaches the cap');
   assert.equal(streakMultiplier(500), 1.45, 'and stops there');
   assert.equal(streakMultiplier('nonsense'), 1);
 });
 
-test('MIGRATION: a legacy day-streak converts generously and never loses its record', () => {
+test('MIGRATION: a pre-weekly day-streak is already in the right units', () => {
+  // The original model counted days, and so does this one, so the number
+  // carries over untouched — only the bookkeeping fields are filled in.
   const legacy = { current: 15, best: 20, lastWorkoutDay: MON, shieldsUsed: 2 };
-  const migrated = migrateLegacyStreak(safeStreak(legacy), MON);
-  assert.equal(migrated.current, 3, '15 days rounds up to 3 weeks');
+  const migrated = migrateStreakModel(safeStreak(legacy), MON);
+  assert.equal(migrated.current, 15);
   assert.equal(migrated.best, 20, 'the historical best is never reduced');
   assert.equal(migrated.shieldsUsed, 2);
   assert.equal(migrated.weekKey, MON);
+  assert.equal(migrated.model, 'daily');
+});
+
+test('MIGRATION: a weekly streak converts to the days it was actually earned with', () => {
+  // Holding N weeks required at least N * WEEKLY_TARGET training days, so that
+  // is the honest floor: nobody is handed a run they did not train for, and
+  // nobody loses one they did.
+  const weekly = {
+    current: 3, best: 5, lastWorkoutDay: WED, shieldsUsed: 1,
+    weekKey: MON, daysThisWeek: 2,
+  };
+  const migrated = migrateStreakModel(safeStreak(weekly), WED);
+  assert.equal(migrated.current, 3 * WEEKLY_TARGET);
+  assert.equal(migrated.best, 5 * WEEKLY_TARGET, 'best is converted too, never reduced');
+  assert.equal(migrated.daysThisWeek, 2, 'the live week is left alone');
+  assert.equal(migrated.model, 'daily');
+});
+
+test('MIGRATION: a converted streak is never converted twice', () => {
+  const weekly = {
+    current: 3, best: 5, lastWorkoutDay: WED, shieldsUsed: 0,
+    weekKey: MON, daysThisWeek: 2,
+  };
+  const once = migrateStreakModel(safeStreak(weekly), WED);
+  const twice = migrateStreakModel(safeStreak(once), WED);
+  assert.deepEqual(twice, once, 'the model marker makes the conversion idempotent');
 });
 
 test('safeStreak survives anything a stale document can hold', () => {
@@ -820,12 +863,16 @@ test('the two grade vocabularies cover the same five grades', () => {
 });
 
 /**
- * DESIGN INVARIANT: measurements are never scored.
+ * Measurements feed the V-taper trait and nothing else.
  *
- * This is the test that fails if a future change starts feeding a waist-to-
- * shoulder ratio into a grade.
+ * This replaces an earlier invariant that asserted measurements were never
+ * scored at all. That was the right default before the app had a use for them;
+ * the owner asked for the tape to count, and back-over-waist is the one
+ * physique ratio a tape can actually settle. The narrower guarantee still
+ * matters and is what this test now pins: a measurement changes the trait it
+ * genuinely describes and leaves every other trait untouched.
  */
-test('the physique ratings are identical with and without measurements', () => {
+test('measurements move the V-taper trait and only that trait', () => {
   const base = {
     ...newProfile({ uid: 'u1', displayName: 'Test', email: 't@example.com', photoURL: '' }),
     bodyFat: 14,
@@ -837,25 +884,56 @@ test('the physique ratings are identical with and without measurements', () => {
       hamstrings: 500, calves: 400, forearms: 300, lower_back: 300,
     },
   };
-  const withMeasurements = {
+  const measured = {
     ...base,
     measurements: {
-      values: {
-        bodyweight: 82.4, chest: 104, back: 112, waist: 80,
-        biceps: 38, thighs: 60, calves: 39,
-      },
+      values: { bodyweight: 82.4, chest: 104, back: 112, waist: 80, biceps: 38 },
       recordedAt: Date.now(),
     },
-    gymBroMode: false,
   };
 
-  assert.deepEqual(rateAesthetics(withMeasurements), rateAesthetics(base));
-  assert.equal(
-    overallAestheticScore(rateAesthetics(withMeasurements)),
-    overallAestheticScore(rateAesthetics(base)),
-  );
+  const before = rateAesthetics(base);
+  const after = rateAesthetics(measured);
+
+  for (let i = 0; i < before.length; i += 1) {
+    if (before[i].id === 'vtaper') continue;
+    assert.deepEqual(after[i], before[i], `${before[i].id} must not move`);
+  }
+  const taper = after.find((t) => t.id === 'vtaper');
+  assert.equal(taper.score, measuredVTaper(measured.measurements.values));
+  assert.notEqual(taper.score, before.find((t) => t.id === 'vtaper').score);
 });
 
+test('the V-taper ratio scores without inventing an ideal', () => {
+  // No tape data at all leaves the volume proxy in charge.
+  assert.equal(measuredVTaper(undefined), null);
+  assert.equal(measuredVTaper({ back: 112 }), null);
+  assert.equal(measuredVTaper({ waist: 80 }), null);
+
+  // A narrow taper floors rather than going negative; a wide one caps rather
+  // than rewarding an ever-smaller waist.
+  assert.equal(measuredVTaper({ back: 90, waist: 90 }), 0);
+  assert.equal(measuredVTaper({ back: 200, waist: 80 }), 100);
+  assert.equal(measuredVTaper({ back: 160, waist: 100 }), 100);
+
+  const mid = measuredVTaper({ back: 112, waist: 80 });
+  assert.ok(mid > 0 && mid < 100, `expected a mid-range score, got ${mid}`);
+});
+
+test('Gym Bro Mode is a label set, never a score', () => {
+  // The setting reaches one headline verdict. It must not be able to move a
+  // number anywhere.
+  assert.equal(gradeLabel('elite', 'bro'), 'GIGACHAD');
+  assert.equal(gradeLabel('elite', 'plain'), 'Standout');
+  assert.equal(overallGrade(82, true), 'elite');
+  assert.equal(overallGrade(82, false), 'unknown');
+  assert.equal(overallGrade(10, true), 'weak');
+  // Hostile input still lands on a real band rather than undefined.
+  for (const junk of [NaN, undefined, null, 'lots', Infinity, -50, 900]) {
+    const band = overallGrade(junk, true);
+    assert.ok(GRADE_LABELS.plain[band] !== undefined, `${String(junk)} -> ${band}`);
+  }
+});
 test('unitLabel names the unit the value is actually shown in', () => {
   assert.equal(unitLabel('mass', 'metric'), 'kg');
   assert.equal(unitLabel('mass', 'imperial'), 'lb');

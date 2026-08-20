@@ -7,6 +7,7 @@ import {
   GRADE_META,
   gradeLabel,
   labelSetFor,
+  overallGrade,
   LEVERS,
   hasEnoughData,
   overallAestheticScore,
@@ -27,7 +28,8 @@ const HIDDEN_KEY = 'barxp.physiqueLab.hidden';
  */
 export function PhysiqueLab({ profile }: { profile: Profile }) {
   const [hidden, setHidden] = useState(true);
-  // The whole mechanism: one lookup, resolved once. No gymBroMode ternaries in JSX.
+  // Gym Bro Mode reaches the headline verdict only — see `overallGrade`. The
+  // per-trait rows below are always read in plain language.
   const labelSet = labelSetFor(profile.gymBroMode);
 
   // Default to hidden, then restore the user's stored preference.
@@ -51,6 +53,10 @@ export function PhysiqueLab({ profile }: { profile: Profile }) {
 
   const traits = useMemo(() => rateAesthetics(profile), [profile]);
   const overall = useMemo(() => overallAestheticScore(traits), [traits]);
+  const overallBand = useMemo(
+    () => overallGrade(overall, traits.some((t) => t.grade !== 'unknown')),
+    [overall, traits],
+  );
   const priorities = useMemo(() => priorityTraits(traits, 3), [traits]);
   const ready = hasEnoughData(profile);
 
@@ -106,6 +112,9 @@ export function PhysiqueLab({ profile }: { profile: Profile }) {
                   {fmtDecimal(overall, 0)}
                   <span className="ml-1 text-base font-medium text-slate-600">/100</span>
                 </p>
+                <p className={`mt-1 font-display text-sm font-semibold ${GRADE_META[overallBand].color}`}>
+                  {gradeLabel(overallBand, labelSet)}
+                </p>
               </div>
               <p className="max-w-[55%] text-right text-[11px] leading-relaxed text-slate-600">
                 An average of the traits below. It measures your training, not you.
@@ -157,7 +166,7 @@ export function PhysiqueLab({ profile }: { profile: Profile }) {
                       <span className="text-sm font-medium text-slate-200">{trait.label}</span>
                       <span className="flex items-baseline gap-2">
                         <span className={`text-[10px] font-semibold ${grade.color}`}>
-                          {gradeLabel(trait.grade, labelSet)}
+                          {gradeLabel(trait.grade, 'plain')}
                         </span>
                         <span className="font-mono text-xs text-slate-500">
                           {trait.grade === 'unknown' ? '—' : fmtDecimal(trait.score, 0)}

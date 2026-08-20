@@ -1,6 +1,7 @@
 import type { Profile } from '../types';
 import { clamp, int, num, round } from '../safe';
 import { normalizeMuscleVolume, type MuscleKey } from './muscles';
+import { normalizeMeasurementValues } from './measurements';
 
 /**
  * Physique analysis — the "looksmaxxing" layer.
@@ -59,6 +60,18 @@ export function gradeLabel(grade: AestheticGrade, labelSet: LabelSet): string {
   return GRADE_LABELS[labelSet][grade];
 }
 
+/**
+ * The band the overall score falls in.
+ *
+ * Gym Bro Mode applies here and nowhere else: one headline verdict can carry a
+ * joke, but eight of them turn a breakdown meant to be read into a wall of
+ * noise — and "Chud" against a single lagging muscle group reads as an insult
+ * rather than a diagnosis. The per-trait rows stay in plain language.
+ */
+export function overallGrade(score: unknown, known: boolean): AestheticGrade {
+  return gradeFor(clamp(num(score, 0), 0, 100), known);
+}
+
 /** The profile flag, resolved to a label set in one place. */
 export function labelSetFor(gymBroMode: boolean): LabelSet {
   return gymBroMode ? 'bro' : 'plain';
@@ -74,6 +87,32 @@ export interface AestheticTrait {
   grade: AestheticGrade;
   /** The single most useful next action. */
   tip: string;
+}
+
+/**
+ * V-taper scored from a tape measure rather than from training volume.
+ *
+ * Back girth over waist girth is the one physique ratio a tape can actually
+ * settle, so where the athlete has recorded both, it replaces the volume proxy
+ * instead of being averaged with it — a measurement outranks an estimate of the
+ * same thing.
+ *
+ * The curve is deliberately gentle and has no "ideal" at the top: 1.2 and below
+ * scores low, 1.6 scores full marks, and nothing above that scores higher. The
+ * scale exists to show movement over time, not to hand anyone a target ratio to
+ * chase.
+ */
+export function measuredVTaper(values: unknown): number | null {
+  const clean = normalizeMeasurementValues(values);
+  const back = num(clean.back, 0);
+  const waist = num(clean.waist, 0);
+  if (back <= 0 || waist <= 0) return null;
+
+  const ratio = back / waist;
+  if (!Number.isFinite(ratio) || ratio <= 0) return null;
+
+  const span = (ratio - 1.2) / (1.6 - 1.2);
+  return round(clamp(span * 100, 0, 100), 1);
 }
 
 function gradeFor(score: number, known: boolean): AestheticGrade {
@@ -128,7 +167,11 @@ export function rateAesthetics(profile: Profile): AestheticTrait[] {
 
   /* --- V-taper: lats vs waist ----------------------------------------- */
   const latVolume = vol(volume, ['lats', 'upper_back']);
-  const vTaper = curve(latVolume, 900);
+  // A recorded back-and-waist pair is ground truth; the volume figure is only
+  // ever a proxy for it, so it yields when real numbers exist.
+  const measuredTaper = measuredVTaper(profile.measurements?.values);
+  const vTaper = measuredTaper ?? curve(latVolume, 900);
+  const vTaperKnown = measuredTaper !== null || hasVolume;
 
   /* --- Shoulder width ------------------------------------------------- */
   const shoulderVolume = vol(volume, ['shoulders']);
@@ -179,9 +222,12 @@ export function rateAesthetics(profile: Profile): AestheticTrait[] {
     {
       id: 'vtaper',
       label: 'V-Taper',
-      what: 'Lat and upper-back width against your waist. What creates the V shape.',
+      what:
+        measuredTaper !== null
+          ? 'Your recorded back measurement against your waist. What creates the V shape.'
+          : 'Lat and upper-back width against your waist. What creates the V shape.',
       score: round(vTaper, 1),
-      grade: gradeFor(vTaper, hasVolume),
+      grade: gradeFor(vTaper, vTaperKnown),
       tip:
         vTaper < 45
           ? 'Wide-grip pull-ups are the highest-leverage movement you can do for this. Three sets, three times a week.'
