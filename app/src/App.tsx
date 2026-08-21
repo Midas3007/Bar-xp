@@ -12,6 +12,7 @@ import { OnboardingView } from './views/OnboardingView';
 import { DashboardView } from './views/DashboardView';
 import { WorkoutLoggerView } from './views/WorkoutLoggerView';
 import { ProgressView } from './views/ProgressView';
+import { SkillTreeView } from './views/SkillTreeView';
 import { LeaderboardView } from './views/LeaderboardView';
 import { ShopView } from './views/ShopView';
 import { ProfileView } from './views/ProfileView';
@@ -92,6 +93,8 @@ function Router() {
         return <WorkoutLoggerView profile={profile} onNavigate={navigate} />;
       case 'progress':
         return <ProgressView profile={profile} onNavigate={navigate} />;
+      case 'skills':
+        return <SkillTreeView profile={profile} onNavigate={navigate} />;
       case 'leaderboard':
         return <LeaderboardView profile={profile} />;
       case 'shop':
@@ -119,6 +122,7 @@ function UnconfiguredRouter() {
         {view === 'dashboard' ? <DashboardView profile={profile} onNavigate={navigate} /> : null}
         {view === 'workout' ? <WorkoutLoggerView profile={profile} onNavigate={navigate} /> : null}
         {view === 'progress' ? <ProgressView profile={profile} onNavigate={navigate} /> : null}
+        {view === 'skills' ? <SkillTreeView profile={profile} onNavigate={navigate} /> : null}
         {view === 'leaderboard' ? <LeaderboardView profile={profile} /> : null}
         {view === 'shop' ? <ShopView profile={profile} /> : null}
         {view === 'profile' ? <ProfileView profile={profile} /> : null}

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   BarChart3,
+  Compass,
   Dumbbell,
   LayoutDashboard,
   LogOut,
@@ -21,7 +22,8 @@ import { Modal } from '../ui/Modal';
 import { levelProgress } from '../../lib/game/constants';
 import { formatClock, useRestTimer } from '../../context/RestTimerContext';
 
-export type ViewKey = 'dashboard' | 'workout' | 'progress' | 'leaderboard' | 'shop' | 'profile';
+export type ViewKey =
+  'dashboard' | 'workout' | 'progress' | 'skills' | 'leaderboard' | 'shop' | 'profile';
 
 interface NavItem {
   key: ViewKey;
@@ -29,16 +31,30 @@ interface NavItem {
   /** Used by the bottom bar, where six columns share a 320px screen. */
   shortLabel?: string;
   icon: typeof LayoutDashboard;
+  /**
+   * On the mobile bottom bar as well as in the sidebar.
+   *
+   * Six destinations already share a 320px screen at a 10px type size; a
+   * seventh column would make every label unreadable to save one tap. The
+   * skill tree is therefore a sidebar and drawer destination with its own URL,
+   * reached on a phone from the Progress screen. It wants a proper home
+   * whenever navigation is reworked.
+   */
+  primary: boolean;
 }
 
 const NAV: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { key: 'workout', label: 'Train', icon: Dumbbell },
-  { key: 'progress', label: 'Progress', icon: BarChart3 },
-  { key: 'leaderboard', label: 'Compete', shortLabel: 'Ranks', icon: Trophy },
-  { key: 'shop', label: 'Shop', icon: ShoppingBag },
-  { key: 'profile', label: 'Profile', icon: UserIcon },
+  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, primary: true },
+  { key: 'workout', label: 'Train', icon: Dumbbell, primary: true },
+  { key: 'progress', label: 'Progress', icon: BarChart3, primary: true },
+  { key: 'skills', label: 'Skill Tree', icon: Compass, primary: false },
+  { key: 'leaderboard', label: 'Compete', shortLabel: 'Ranks', icon: Trophy, primary: true },
+  { key: 'shop', label: 'Shop', icon: ShoppingBag, primary: true },
+  { key: 'profile', label: 'Profile', icon: UserIcon, primary: true },
 ];
+
+/** Exactly the six that fit across a phone. */
+const BOTTOM_NAV = NAV.filter((item) => item.primary);
 
 export function AppShell({
   profile,
@@ -195,12 +211,14 @@ export function AppShell({
         aria-label="Primary"
         className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface-sunken/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-xl lg:hidden"
       >
-        {/* All six destinations: Profile holds PRs, achievements and custom
-            movements, so burying it in the drawer made it unreachable. Making
-            six fit is the fix, not cutting one — hence the short label on
-            Compete and a 10px type size with truncation. */}
+        {/* All six primary destinations: Profile holds PRs, achievements and
+            custom movements, so burying it in the drawer made it unreachable.
+            Making six fit is the fix, not cutting one — hence the short label
+            on Compete and a 10px type size with truncation. A seventh would
+            undo that, so the skill tree lives in the sidebar and drawer and is
+            reached on a phone from the Progress screen. */}
         <div className="mx-auto flex h-14 max-w-lg items-stretch justify-around">
-          {NAV.map((item) => {
+          {BOTTOM_NAV.map((item) => {
             const Icon = item.icon;
             const active = view === item.key;
             return (

@@ -78,6 +78,7 @@ import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { clearDraft, loadDraft, saveDraft } from '../lib/draft';
+import { takeRequestedExercise } from '../lib/handoff';
 
 type Tab = 'log' | 'routines' | 'library';
 
@@ -114,6 +115,19 @@ export function WorkoutLoggerView({
 
   /** Set once the stored draft has been consulted; guards the save effect. */
   const restoredRef = useRef(false);
+
+  // Something elsewhere — the skill tree — asked for a movement on the way
+  // here. Reading it clears it, so StrictMode's second invocation finds nothing
+  // and the guard leaves the state from the first alone.
+  useEffect(() => {
+    const requested = takeRequestedExercise();
+    if (requested) {
+      setTab('log');
+      setPickedId(requested);
+    }
+    // Mount only: a handoff is consumed once, by whoever mounts first.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const draft = loadDraft(profile.uid);

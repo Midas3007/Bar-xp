@@ -16,6 +16,8 @@ import {
 import {
   BarChart3,
   ChevronDown,
+  ChevronRight,
+  Compass,
   History,
   LineChart as LineChartIcon,
   Percent,
@@ -191,6 +193,32 @@ export function ProgressView({
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <Header />
+
+      {/* The skill tree has no room on the phone's bottom bar — six
+          destinations already share a 320px screen — so this is how it is
+          reached there. It wants a proper home when navigation is reworked. */}
+      <button
+        type="button"
+        onClick={() => onNavigate('skills')}
+        className="group flex w-full items-center gap-4 rounded-2xl bg-surface-raised p-4 text-left ring-1 ring-line transition hover:bg-surface-hover hover:ring-line-strong"
+      >
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-arcane/10 text-arcane ring-1 ring-arcane/25">
+          <Compass className="h-5 w-5" aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-sm font-semibold text-content-strong">
+            Skill Tree
+          </span>
+          <span className="mt-0.5 block text-xs leading-relaxed text-content-muted">
+            Every movement in the game and the drill-by-drill route to the muscle-up, the front
+            lever and the planche.
+          </span>
+        </span>
+        <ChevronRight
+          className="h-4 w-4 shrink-0 text-content-subtle transition group-hover:translate-x-0.5 group-hover:text-content"
+          aria-hidden
+        />
+      </button>
 
       {failed ? (
         <Card className="p-4">

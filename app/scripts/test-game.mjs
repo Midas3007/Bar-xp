@@ -36,6 +36,7 @@ const SOURCES = [
   'src/lib/game/aesthetics.ts',
   'src/lib/game/correction.ts',
   'src/lib/game/exercises.ts',
+  'src/lib/game/skillTree.ts',
   'src/lib/demo/fixture.ts',
   'src/lib/game/friends.ts',
   'src/lib/game/season.ts',

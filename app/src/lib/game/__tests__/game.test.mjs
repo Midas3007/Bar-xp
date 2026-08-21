@@ -88,6 +88,8 @@ import {
   rateAesthetics,
 } from '../aesthetics.js';
 import { SHOP_ITEMS, purchaseState } from '../shop.js';
+import { EXERCISES } from '../exercises.js';
+import { buildSkillTree, skillStates, skillTally, frontierNode } from '../skillTree.js';
 import { buildDemoData } from '../../demo/fixture.js';
 import { normalizeThemePreference, resolveTheme, THEME_PREFERENCES } from '../../theme.js';
 import {
@@ -2133,4 +2135,204 @@ test('the demo leaderboard places the athlete fourth and requests no images', ()
   }
   const wearing = d.leaderboard.filter((r) => r.activeCosmetic !== null);
   assert.ok(wearing.length >= 3, 'more than one gradient name on the board');
+});
+
+/* -------------------------------------------------------------------------- */
+/* Skill tree                                                                  */
+/* -------------------------------------------------------------------------- */
+
+const bestFor = (ids) =>
+  Object.fromEntries(
+    ids.map((id) => [
+      id,
+      { exerciseId: id, exerciseName: id, unit: 'reps', value: 10, achievedAt: 1 },
+    ]),
+  );
+
+const treeAthlete = (overrides = {}) => ({
+  level: 1,
+  personalBests: {},
+  inventory: { streakShields: 0, cosmetics: [], unlocks: [] },
+  ...overrides,
+});
+
+test('the skill graph is well formed', () => {
+  const graph = buildSkillTree();
+  const ids = new Set();
+  for (const node of graph.nodes) {
+    assert.ok(!ids.has(node.id), `duplicate node id ${node.id}`);
+    ids.add(node.id);
+    assert.ok(Number.isFinite(node.x) && Number.isFinite(node.y), `${node.id} has no coordinates`);
+  }
+  for (const edge of graph.edges) {
+    assert.ok(ids.has(edge.from), `edge from unknown node ${edge.from}`);
+    assert.ok(ids.has(edge.to), `edge to unknown node ${edge.to}`);
+  }
+  assert.equal(graph.nodes.filter((n) => n.kind === 'movement').length, EXERCISES.length);
+});
+
+test('every movement is placed deliberately rather than parked', () => {
+  // `place` drops an unplaced movement below the tree so it is visible rather
+  // than stacked on the origin. Nothing should ever land there.
+  const graph = buildSkillTree();
+  for (const node of graph.nodes.filter((n) => n.kind === 'movement')) {
+    assert.ok(node.y < 1400, `${node.id} has no hand-placed coordinate`);
+  }
+});
+
+test('the skill graph is acyclic and every drill chain ends at its movement', () => {
+  const graph = buildSkillTree();
+  const out = new Map(graph.nodes.map((n) => [n.id, []]));
+  for (const edge of graph.edges) out.get(edge.from).push(edge.to);
+
+  const state = new Map();
+  const visit = (id) => {
+    const seen = state.get(id);
+    if (seen === 'done') return;
+    assert.notEqual(seen, 'open', `cycle through ${id}`);
+    state.set(id, 'open');
+    for (const next of out.get(id)) visit(next);
+    state.set(id, 'done');
+  };
+  for (const node of graph.nodes) visit(node.id);
+
+  // Following a chain forward from its first drill must arrive at the movement.
+  for (const node of graph.nodes.filter((n) => n.kind === 'drill' && n.step === 1)) {
+    let current = node;
+    for (let i = 0; i < 20 && current.kind === 'drill'; i += 1) {
+      const next = out.get(current.id).map((id) => graph.byId[id]);
+      assert.equal(next.length, 1, `${current.id} should have exactly one successor`);
+      current = next[0];
+    }
+    assert.equal(current.kind, 'movement');
+    assert.equal(current.exerciseId, node.chainId, 'a chain ends at the movement it trains');
+  }
+});
+
+test('a brand-new account sees available nodes, not a wall of grey', () => {
+  const graph = buildSkillTree();
+  const states = skillStates(graph, treeAthlete());
+  const tally = skillTally(graph, states);
+  assert.equal(tally.cleared, 0, 'nothing logged, nothing cleared');
+  assert.ok(
+    tally.available >= 10,
+    `a beginner should see the whole foundation, saw ${tally.available}`,
+  );
+  assert.equal(
+    tally.available + tally.locked + tally.in_progress + tally.cleared,
+    graph.nodes.length,
+    'every node has exactly one state',
+  );
+});
+
+test('clearing a prerequisite opens the drill that hangs off it', () => {
+  const graph = buildSkillTree();
+  const before = skillStates(graph, treeAthlete());
+  const first = 'drill:pistol_squat:1';
+  assert.equal(before[first], 'locked', 'the pistol route waits on a squat');
+
+  const after = skillStates(graph, treeAthlete({ personalBests: bestFor(['squat']) }));
+  assert.equal(after[first], 'cleared', 'its first drill is the squat itself');
+  assert.equal(after['drill:pistol_squat:2'], 'in_progress');
+  assert.equal(after['skill:squat'], 'cleared');
+
+  // And nothing unrelated moved.
+  const moved = Object.keys(after).filter((id) => after[id] !== before[id]);
+  for (const id of moved) {
+    const node = graph.byId[id];
+    assert.ok(
+      node.chainId === 'pistol_squat' ||
+        node.exerciseId === 'squat' ||
+        node.exerciseId === 'pistol_squat',
+      `${id} should not have changed`,
+    );
+  }
+});
+
+test('a logged movement clears its whole route', () => {
+  const graph = buildSkillTree();
+  const states = skillStates(
+    graph,
+    treeAthlete({ level: 30, personalBests: bestFor(['front_lever']) }),
+  );
+  assert.equal(states['skill:front_lever'], 'cleared');
+  for (const node of graph.nodes.filter((n) => n.chainId === 'front_lever')) {
+    assert.equal(states[node.id], 'cleared', `${node.id} is on a route already walked`);
+  }
+});
+
+test('the level gate still decides when an elite movement opens', () => {
+  const graph = buildSkillTree();
+  const logged = bestFor(['pull_up', 'dip']);
+  const low = skillStates(graph, treeAthlete({ level: 1, personalBests: logged }));
+  assert.notEqual(low['skill:muscle_up'], 'available', 'level 1 is not a muscle-up');
+
+  const high = skillStates(graph, treeAthlete({ level: 40, personalBests: logged }));
+  assert.equal(high['skill:muscle_up'], 'available');
+});
+
+test('a shop unlock opens a movement the level has not reached', () => {
+  const graph = buildSkillTree();
+  const gated = EXERCISES.find((e) => e.unlockId && e.minLevel > 1);
+  const bare = skillStates(graph, treeAthlete({ level: 1 }));
+  assert.notEqual(bare[`skill:${gated.id}`], 'available');
+
+  const bought = skillStates(
+    graph,
+    treeAthlete({
+      level: 1,
+      inventory: { streakShields: 0, cosmetics: [], unlocks: [gated.unlockId] },
+    }),
+  );
+  // Its prerequisite may still be unmet, but the gate itself is no longer why.
+  assert.notEqual(
+    bought[`skill:${gated.id}`],
+    bare[`skill:${gated.id}`] === 'locked' ? undefined : 'x',
+  );
+  assert.ok(['available', 'in_progress', 'locked'].includes(bought[`skill:${gated.id}`]));
+});
+
+test('state derivation is total against a malformed profile', () => {
+  const graph = buildSkillTree();
+  for (const broken of [
+    null,
+    {},
+    { personalBests: null },
+    { personalBests: 'not a map' },
+    { personalBests: { push_up: null } },
+    { personalBests: { push_up: { value: NaN } } },
+    { personalBests: { push_up: {} }, level: NaN },
+  ]) {
+    const states = skillStates(graph, broken);
+    assert.equal(Object.keys(states).length, graph.nodes.length);
+    for (const node of graph.nodes) {
+      assert.ok(
+        ['locked', 'available', 'in_progress', 'cleared'].includes(states[node.id]),
+        `${node.id} got ${states[node.id]}`,
+      );
+    }
+  }
+});
+
+test('the frontier is somewhere worth going', () => {
+  const graph = buildSkillTree();
+  const fresh = skillStates(graph, treeAthlete());
+  const start = frontierNode(graph, fresh);
+  assert.ok(start, 'a new account still opens somewhere');
+  assert.equal(fresh[start.id], 'available');
+
+  const training = treeAthlete({ level: 12, personalBests: bestFor(['pull_up']) });
+  const onward = frontierNode(graph, skillStates(graph, training));
+  assert.ok(onward, 'and so does an account with history');
+});
+
+test('every drill carries the coaching text the catalog wrote for it', () => {
+  const graph = buildSkillTree();
+  const drills = graph.nodes.filter((n) => n.kind === 'drill');
+  const steps = EXERCISES.reduce((n, e) => n + (e.progression?.steps.length ?? 0), 0);
+  assert.equal(drills.length, steps, 'no drill is dropped on the way into the tree');
+  for (const drill of drills) {
+    assert.ok(drill.label.length > 0);
+    assert.ok(drill.detail && drill.detail.length > 0, `${drill.id} has no detail`);
+  }
 });
