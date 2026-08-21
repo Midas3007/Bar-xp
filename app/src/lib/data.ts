@@ -169,11 +169,12 @@ export async function ensureProfile(user: User, preferredName?: string): Promise
     const storedName = str(raw.displayName, '');
     const legalName = sanitizeDisplayName(storedName);
 
-    // Legality repair. A document written before the length was enforced fails
-    // `userFieldsAreValid` on every subsequent update, which locks the account
-    // out of logging anything at all. Correcting the name inside the patch is
-    // enough on its own: on an update the rules validate the merged document,
-    // so this single write brings the whole document back into compliance.
+    // Legality repair. A name written before the length was enforced fails the
+    // rules on any write that touches `displayName` — including the leaderboard
+    // mirror, which compares the two — so the account cannot publish anything.
+    // Correcting it inside the patch is enough on its own: the rules validate
+    // the fields a write actually changes, so repairing the name repairs the
+    // one field that was wrong.
     if (legalName !== storedName) patch.displayName = legalName;
 
     // Leak repair, once per account. `nameFixedAt` is the marker; a name the

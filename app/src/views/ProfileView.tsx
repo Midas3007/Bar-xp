@@ -58,6 +58,16 @@ import { THEME_PREFERENCES } from '../lib/theme';
 import { buildExport, bundleToCsv, downloadFile, exportFilename } from '../lib/export';
 import { arr, fmt, fmtDecimal, int, num } from '../lib/safe';
 
+/**
+ * Streaks are counted in days. They were weeks for one slice, and the `w`
+ * suffixes outlived the change — a best streak of eleven days read as eleven
+ * weeks, which is a very different claim.
+ */
+function inDays(value: unknown): string {
+  const days = Math.max(0, int(value, 0));
+  return `${fmt(days)} day${days === 1 ? '' : 's'}`;
+}
+
 export function ProfileView({ profile }: { profile: Profile }) {
   const personalBests = Object.values(profile.personalBests ?? {}).sort(
     (a, b) => num(b.achievedAt, 0) - num(a.achievedAt, 0),
@@ -254,7 +264,7 @@ function ProfileHeader({ profile }: { profile: Profile }) {
           <StatReadout label="Lifetime reps" value={fmt(profile.totalReps)} />
           <StatReadout
             label="Best streak"
-            value={`${fmt(profile.streak.best)}w`}
+            value={inDays(profile.streak.best)}
             accent="text-ember"
           />
           <StatReadout
@@ -303,10 +313,10 @@ function DisciplineCard({ profile }: { profile: Profile }) {
       <div className="mt-5 grid grid-cols-3 gap-4 border-t border-line pt-5">
         <StatReadout
           label="Current"
-          value={`${fmt(profile.streak.current)}w`}
+          value={inDays(profile.streak.current)}
           accent={identity.text}
         />
-        <StatReadout label="Best" value={`${fmt(profile.streak.best)}w`} />
+        <StatReadout label="Best" value={inDays(profile.streak.best)} />
         <StatReadout label="Identity" value={identity.label} accent={identity.text} />
       </div>
 

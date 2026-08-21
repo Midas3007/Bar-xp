@@ -466,7 +466,8 @@ export function WorkoutLoggerView({
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-content-muted">
-                      Streak bonus ({fmt(profile.streak.current)}w)
+                      Streak bonus ({fmt(profile.streak.current)} day
+                      {profile.streak.current === 1 ? '' : 's'})
                     </span>
                     <span className="font-mono text-ember">×{fmtDecimal(multiplier, 2)}</span>
                   </div>

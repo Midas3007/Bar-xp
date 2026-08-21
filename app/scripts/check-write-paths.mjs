@@ -70,12 +70,125 @@ const fresh = {
   recentDays: [],
 };
 
+/**
+ * The same account after a few months of training.
+ *
+ * The baseline used to be `fresh` — an empty profile — and that is precisely
+ * why this suite stayed green through an outage that rejected every write in
+ * the live app. Firestore's 1,000-expression budget is spent on the *rules*,
+ * not on the data, but a clause that short-circuits on an absent or one-key
+ * field costs nothing on an empty document and a hundred expressions on a real
+ * one. `measurements: null` alone was the difference between passing here and
+ * failing for every athlete who had ever picked up a tape measure.
+ *
+ * So the baseline is now a lived-in account: every optional field present,
+ * every measurement site filled in, collections populated.
+ */
+const lived = {
+  ...fresh,
+  onboarded: true,
+  photoURL: 'https://lh3.googleusercontent.com/a/ACg8ocKq1234567890abcdefghij=s96-c',
+  assessment: {
+    maxPullUps: 8,
+    maxPushUps: 30,
+    plankSeconds: 90,
+    bodyFat: 20,
+    completedAt: Date.now(),
+  },
+  level: 5,
+  totalXp: 2400,
+  coins: 107,
+  coinsPeak: 340,
+  stats: { strength: 24.5, endurance: 18.2, aesthetics: 15.9, discipline: 12.4 },
+  tier: 'Gold',
+  identity: 'Stirring',
+  bodyFat: 20,
+  measurements: {
+    values: {
+      bodyweight: 80,
+      chest: 105,
+      back: 110,
+      waist: 95.2,
+      biceps: 41,
+      thighs: 62,
+      calves: 39,
+    },
+    recordedAt: Date.now(),
+  },
+  streak: {
+    current: 4,
+    best: 11,
+    lastWorkoutDay: '2026-08-20',
+    shieldsUsed: 1,
+    weekKey: '2026-08-17',
+    daysThisWeek: 3,
+    model: 'daily',
+  },
+  inventory: { streakShields: 1, cosmetics: ['neon_name'], unlocks: ['unlock_muscle_up'] },
+  activeCosmetic: 'neon_name',
+  personalBests: Object.fromEntries(
+    [
+      'push_up',
+      'pull_up',
+      'dip',
+      'squat',
+      'plank',
+      'chin_up',
+      'lunge',
+      'burpee',
+      'row',
+      'leg_raise',
+    ].map((id) => [
+      id,
+      { exerciseId: id, exerciseName: id, unit: 'reps', value: 30, achievedAt: Date.now() },
+    ]),
+  ),
+  customExercises: [
+    { id: 'c1', name: 'Vest Push-up', unit: 'reps', xpPerUnit: 1.6, category: 'push' },
+  ],
+  routines: [{ id: 'r1', name: 'Day A', items: [], createdAt: Date.now(), updatedAt: Date.now() }],
+  goals: [1, 2, 3].map((i) => ({ id: `g${i}`, templateId: `t${i}`, target: 500, progress: 120 })),
+  workoutCount: 24,
+  totalReps: 4120,
+  muscleVolume: Object.fromEntries(
+    [
+      'chest',
+      'shoulders',
+      'triceps',
+      'biceps',
+      'forearms',
+      'lats',
+      'upper_back',
+      'abs',
+      'obliques',
+      'lower_back',
+      'glutes',
+      'quads',
+      'hamstrings',
+      'calves',
+    ].map((m) => [m, 1234.5]),
+  ),
+  season: { id: '2026-S3', xp: 900, sessions: 6, startedAt: Date.now() },
+  seasonHistory: [
+    {
+      id: '2026-S2',
+      xp: 1200,
+      sessions: 20,
+      rank: 3,
+      entrants: 11,
+      pending: false,
+      endedAt: Date.now(),
+    },
+  ],
+  recentDays: ['2026-08-20', '2026-08-19', '2026-08-17'],
+};
+
 const results = [];
 // Each path is checked from the same known baseline: a stateful sequence makes
 // one failure cascade into four and hides which write is actually at fault.
 async function reset(overrides = {}) {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
-    await setDoc(doc(ctx.firestore(), 'users', A), { ...fresh, onboarded: true, ...overrides });
+    await setDoc(doc(ctx.firestore(), 'users', A), { ...lived, ...overrides });
   });
 }
 async function step(label, fn, overrides) {
@@ -118,26 +231,40 @@ await step('completeAssessment update', () =>
     bodyFat: 18,
     identity: 'Fading',
     goals: [],
-    measurements: { values: { bodyweight: 82 }, recordedAt: Date.now() },
+    measurements: {
+      values: {
+        bodyweight: 82,
+        chest: 104,
+        back: 109,
+        waist: 96,
+        biceps: 40,
+        thighs: 61,
+        calves: 38,
+      },
+      recordedAt: Date.now(),
+    },
     updatedAt: Date.now(),
   }),
 );
+// The widest write the app makes: sixteen validated fields in one update, on
+// top of the lived-in baseline. If anything is ever going to hit the
+// expression budget, it is this.
 await step('logWorkout update', () =>
   updateDoc(doc(alice, 'users', A), {
-    totalXp: 400,
-    level: 2,
-    coins: 150,
-    coinsPeak: 150,
-    stats: { strength: 14, endurance: 11, aesthetics: 8, discipline: 6 },
-    tier: 'Bronze',
+    totalXp: 2470,
+    level: 5,
+    coins: 127,
+    coinsPeak: 340,
+    stats: { strength: 25, endurance: 19, aesthetics: 16, discipline: 13 },
+    tier: 'Gold',
     identity: 'Stirring',
     streak: {
-      current: 1,
-      best: 1,
-      lastWorkoutDay: '2026-08-20',
-      shieldsUsed: 0,
+      current: 5,
+      best: 11,
+      lastWorkoutDay: '2026-08-21',
+      shieldsUsed: 1,
       weekKey: '2026-08-17',
-      daysThisWeek: 1,
+      daysThisWeek: 4,
       model: 'daily',
     },
     personalBests: {
@@ -145,17 +272,17 @@ await step('logWorkout update', () =>
         exerciseId: 'push_up',
         exerciseName: 'Push-up',
         unit: 'reps',
-        value: 20,
+        value: 41,
         achievedAt: Date.now(),
       },
     },
-    goals: [],
-    workoutCount: 1,
-    totalReps: 60,
-    muscleVolume: { chest: 60 },
-    season: { id: '2026-S3', xp: 400, sessions: 1, startedAt: Date.now() },
-    seasonHistory: [],
-    recentDays: ['2026-08-20'],
+    goals: [{ id: 'g1', templateId: 't1', target: 500, progress: 260 }],
+    workoutCount: 25,
+    totalReps: 4174,
+    muscleVolume: { chest: 1300, triceps: 900 },
+    season: { id: '2026-S3', xp: 970, sessions: 7, startedAt: Date.now() },
+    seasonHistory: [{ id: '2026-S2', xp: 1200, sessions: 20, rank: 3, entrants: 11 }],
+    recentDays: ['2026-08-21', '2026-08-20'],
     updatedAt: Date.now(),
   }),
 );
@@ -186,7 +313,18 @@ await step('updateBodyFat update', () =>
 );
 await step('recordMeasurements update', () =>
   updateDoc(doc(alice, 'users', A), {
-    measurements: { values: { bodyweight: 83, waist: 80 }, recordedAt: Date.now() },
+    measurements: {
+      values: {
+        bodyweight: 83,
+        chest: 106,
+        back: 111,
+        waist: 94,
+        biceps: 42,
+        thighs: 63,
+        calves: 40,
+      },
+      recordedAt: Date.now(),
+    },
     updatedAt: Date.now(),
   }),
 );

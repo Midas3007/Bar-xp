@@ -224,13 +224,7 @@ export interface Goal {
 }
 
 export type MeasurementKey =
-  | 'bodyweight'
-  | 'chest'
-  | 'back'
-  | 'waist'
-  | 'biceps'
-  | 'thighs'
-  | 'calves';
+  'bodyweight' | 'chest' | 'back' | 'waist' | 'biceps' | 'thighs' | 'calves';
 
 /** Metric always — bodyweight in kg, every girth in cm. */
 export type MeasurementValues = Partial<Record<MeasurementKey, number>>;
