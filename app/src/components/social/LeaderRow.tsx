@@ -51,7 +51,7 @@ export function LeaderRow({
           {row.streak > 0 ? (
             <span className="flex items-center gap-1 text-[11px] text-ember/80">
               <Flame className="h-3 w-3" aria-hidden />
-              {fmt(row.streak)}w
+              {fmt(row.streak)}d
             </span>
           ) : null}
         </div>

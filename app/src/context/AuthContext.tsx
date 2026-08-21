@@ -34,7 +34,7 @@ import {
 import type { Profile } from '../lib/types';
 import { normalizeProfile, sanitizeDisplayName, UNNAMED_ATHLETE } from '../lib/game/profile';
 import { ensureProfile, eraseAccountData, persistRecalculation, decayPatch } from '../lib/data';
-import { setDemoActive } from '../lib/demo/state';
+import { isDemoActive, setDemoActive } from '../lib/demo/state';
 import { getDemoData } from '../lib/demo/fixture';
 import { rolloverSeason, seasonIdFor, seasonLabel } from '../lib/game/season';
 import { resolvePendingSeasonPlacements } from '../lib/social';
@@ -123,7 +123,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(isFirebaseConfigured);
   const [authError, setAuthError] = useState<string | null>(null);
   const [backgroundNotice, setBackgroundNotice] = useState<string | null>(null);
-  const [isGuest, setIsGuest] = useState(false);
+  // Restored from `sessionStorage`, so a reload keeps the visitor inside the
+  // demo instead of returning them to the sign-in wall.
+  const [isGuest, setIsGuest] = useState(isDemoActive);
   const [guestPrompt, setGuestPrompt] = useState<string | null>(null);
 
   /**
@@ -186,6 +188,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mountedRef.current) return;
 
       setUser(nextUser);
+
+      // A real account always wins over a restored demo — otherwise signing in
+      // from inside the demo would show the sample athlete's numbers.
+      if (nextUser) {
+        setDemoActive(false);
+        setIsGuest(false);
+      }
 
       if (!nextUser) {
         setProfile(null);

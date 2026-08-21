@@ -10,6 +10,7 @@ import { SeasonPanel } from '../components/social/SeasonPanel';
 import { fetchLeaderboard } from '../lib/data';
 import { EMPTY_GRAPH, fetchFriendGraph, sendFriendRequest, type FriendGraph } from '../lib/social';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import { fmt } from '../lib/safe';
 
 type Tab = 'global' | 'friends' | 'season' | 'challenges';
@@ -29,6 +30,7 @@ const TABS: Array<{ key: Tab; label: string; icon: typeof Trophy }> = [
  */
 export function LeaderboardView({ profile }: { profile: Profile }) {
   const toast = useToast();
+  const { isGuest, requestSignUp } = useAuth();
   const [tab, setTab] = useState<Tab>('global');
 
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
@@ -80,6 +82,10 @@ export function LeaderboardView({ profile }: { profile: Profile }) {
   const requestedSet = new Set(graph.outgoing.map((r) => r.to));
 
   const addFriend = async (uid: string) => {
+    if (isGuest) {
+      requestSignUp('add friends');
+      return;
+    }
     try {
       await sendFriendRequest(profile.uid, uid);
       toast.success('Request sent');

@@ -18,6 +18,8 @@ import { CHALLENGE_SCORES, COLLECTIONS, getDbOrThrow } from './firebase';
 import type { Challenge, ChallengeScore, FriendRequest, LeaderboardRow, Profile } from './types';
 import { arr, int, num, str } from './safe';
 import { fetchWorkouts } from './data';
+import { assertNotDemo, isDemoActive } from './demo/state';
+import { getDemoData } from './demo/fixture';
 import {
   normalizeFriendCard,
   pairKey,
@@ -101,6 +103,14 @@ export async function searchAthletes(term: string, max = 10): Promise<Leaderboar
   const q = searchKey(term);
   if (q.length < 2) return [];
 
+  // The demo searches the field it can already see. Reaching Firestore here
+  // would query somebody's real leaderboard with no session at all.
+  if (isDemoActive()) {
+    return getDemoData()
+      .leaderboard.filter((row) => searchKey(row.displayName).startsWith(q))
+      .slice(0, max);
+  }
+
   const db = getDbOrThrow();
   const snapshot = await getDocs(
     query(
@@ -115,6 +125,7 @@ export async function searchAthletes(term: string, max = 10): Promise<Leaderboar
 }
 
 export async function sendFriendRequest(fromUid: string, toUid: string): Promise<void> {
+  assertNotDemo();
   if (fromUid === toUid) return;
   const db = getDbOrThrow();
   await setDoc(doc(db, COLLECTIONS.friendRequests, requestId(fromUid, toUid)), {
@@ -132,6 +143,7 @@ export async function sendFriendRequest(fromUid: string, toUid: string): Promise
  * deletes that request.
  */
 export async function acceptFriendRequest(me: string, fromUid: string): Promise<void> {
+  assertNotDemo();
   const db = getDbOrThrow();
   const batch = writeBatch(db);
 
@@ -152,6 +164,7 @@ export async function acceptFriendRequest(me: string, fromUid: string): Promise<
  * `resource`, `resource.data.from` throws, and the whole batch is denied.
  */
 export async function clearMirrorRequest(me: string, otherUid: string): Promise<void> {
+  assertNotDemo();
   try {
     await deleteDoc(doc(getDbOrThrow(), COLLECTIONS.friendRequests, requestId(me, otherUid)));
   } catch {
@@ -160,14 +173,17 @@ export async function clearMirrorRequest(me: string, otherUid: string): Promise<
 }
 
 export async function declineFriendRequest(me: string, fromUid: string): Promise<void> {
+  assertNotDemo();
   await deleteDoc(doc(getDbOrThrow(), COLLECTIONS.friendRequests, requestId(fromUid, me)));
 }
 
 export async function cancelFriendRequest(me: string, toUid: string): Promise<void> {
+  assertNotDemo();
   await deleteDoc(doc(getDbOrThrow(), COLLECTIONS.friendRequests, requestId(me, toUid)));
 }
 
 export async function removeFriend(me: string, friendUid: string): Promise<void> {
+  assertNotDemo();
   await deleteDoc(doc(getDbOrThrow(), COLLECTIONS.friendships, pairKey(me, friendUid)));
 }
 
@@ -212,6 +228,11 @@ function requestFrom(id: string, raw: unknown): FriendRequest {
  * composite ones.
  */
 export async function fetchFriendGraph(uid: string): Promise<FriendGraph> {
+  // The sample athlete has no friends, and asking for them was reaching
+  // Firestore without a session — a console error on every visit to the
+  // Compete screen, and a permission denial against the live database.
+  if (isDemoActive()) return EMPTY_GRAPH;
+
   const db = getDbOrThrow();
 
   const [friendships, incomingSnap, outgoingSnap] = await Promise.all([
@@ -302,6 +323,7 @@ export async function createChallenge(
   friendUid: string,
   template: ChallengeTemplate,
 ): Promise<string> {
+  assertNotDemo();
   const db = getDbOrThrow();
   const window = challengeWindowDays(template.window);
   const ref = doc(collection(db, COLLECTIONS.challenges));
@@ -326,6 +348,7 @@ export async function createChallenge(
 }
 
 export async function respondToChallenge(id: string, accept: boolean): Promise<void> {
+  assertNotDemo();
   await updateDoc(doc(getDbOrThrow(), COLLECTIONS.challenges, id), {
     status: accept ? 'active' : 'declined',
     respondedAt: Date.now(),
@@ -333,10 +356,12 @@ export async function respondToChallenge(id: string, accept: boolean): Promise<v
 }
 
 export async function deleteChallenge(id: string): Promise<void> {
+  assertNotDemo();
   await deleteDoc(doc(getDbOrThrow(), COLLECTIONS.challenges, id));
 }
 
 export async function fetchChallenges(uid: string): Promise<Challenge[]> {
+  if (isDemoActive()) return [];
   const db = getDbOrThrow();
   const snapshot = await getDocs(
     query(collection(db, COLLECTIONS.challenges), where('members', 'array-contains', uid)),
@@ -347,6 +372,7 @@ export async function fetchChallenges(uid: string): Promise<Challenge[]> {
 }
 
 export async function fetchChallengeScores(id: string): Promise<Record<string, ChallengeScore>> {
+  if (isDemoActive()) return {};
   const db = getDbOrThrow();
   const snapshot = await getDocs(collection(db, COLLECTIONS.challenges, id, CHALLENGE_SCORES));
   const out: Record<string, ChallengeScore> = {};
@@ -366,6 +392,7 @@ export async function syncChallengeScore(
   profile: Profile,
   challenge: Challenge,
 ): Promise<ChallengeScore> {
+  assertNotDemo();
   const workouts = await fetchWorkouts(profile.uid, 200);
   const scored = scoreChallenge(
     challenge.metric,
@@ -398,6 +425,10 @@ export function challengeTemplateFor(challenge: Challenge): ChallengeTemplate | 
 /* -------------------------------------------------------------------------- */
 
 export async function fetchSeasonLadder(seasonId: string, max = 50): Promise<LeaderboardRow[]> {
+  // The fixture's board is the season board: the sample athlete's whole history
+  // sits inside the current season, so there is nothing else it could be.
+  if (isDemoActive()) return getDemoData().leaderboard.slice(0, max);
+
   const db = getDbOrThrow();
   const snapshot = await getDocs(
     query(
@@ -422,6 +453,8 @@ const STANDINGS_LIMIT = 200;
  * and told they came first.
  */
 export async function fetchSeasonStandings(seasonId: string): Promise<SeasonStanding[]> {
+  if (isDemoActive()) return [];
+
   const db = getDbOrThrow();
   const [live, finished] = await Promise.all([
     getDocs(

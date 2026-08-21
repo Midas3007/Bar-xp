@@ -16,6 +16,7 @@ import {
   type FriendGraph,
 } from '../../lib/social';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import { fmt } from '../../lib/safe';
 
 /**
@@ -36,6 +37,7 @@ export function FriendsPanel({
   onReload: () => void;
 }) {
   const toast = useToast();
+  const { isGuest, requestSignUp } = useAuth();
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -51,6 +53,13 @@ export function FriendsPanel({
   ladder.sort((a, b) => b.totalXp - a.totalXp);
 
   const act = async (key: string, run: () => Promise<void>, message?: string) => {
+    // Every friend action funnels through here, so this is the one place the
+    // demo has to be turned away — and it is turned away with the offer of an
+    // account rather than with a failed write.
+    if (isGuest) {
+      requestSignUp('add friends');
+      return;
+    }
     setBusy(key);
     try {
       await run();

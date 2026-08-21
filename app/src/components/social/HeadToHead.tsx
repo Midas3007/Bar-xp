@@ -117,13 +117,13 @@ export function HeadToHead({
               label="Streak"
               mine={profile.streak?.current}
               theirs={card.streak}
-              suffix="w"
+              suffix="d"
             />
             <Compare
               label="Best streak"
               mine={profile.streak?.best}
               theirs={card.bestStreak}
-              suffix="w"
+              suffix="d"
             />
           </div>
 

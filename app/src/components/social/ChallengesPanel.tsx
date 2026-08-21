@@ -20,6 +20,7 @@ import {
   type FriendGraph,
 } from '../../lib/social';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import { fmt, num } from '../../lib/safe';
 
 /**
@@ -31,6 +32,7 @@ import { fmt, num } from '../../lib/safe';
  */
 export function ChallengesPanel({ profile, graph }: { profile: Profile; graph: FriendGraph }) {
   const toast = useToast();
+  const { isGuest, requestSignUp } = useAuth();
   const [challenges, setChallenges] = useState<Challenge[] | null>(null);
   const [scores, setScores] = useState<Record<string, Record<string, ChallengeScore>>>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -84,6 +86,10 @@ export function ChallengesPanel({ profile, graph }: { profile: Profile; graph: F
   }, [challenges]);
 
   const act = async (key: string, run: () => Promise<void>, message?: string) => {
+    if (isGuest) {
+      requestSignUp('take on a challenge');
+      return;
+    }
     setBusy(key);
     try {
       await run();
@@ -98,6 +104,10 @@ export function ChallengesPanel({ profile, graph }: { profile: Profile; graph: F
   };
 
   const create = async () => {
+    if (isGuest) {
+      requestSignUp('set a challenge');
+      return;
+    }
     const template = templateById(templateId);
     if (!template || !friendUid) return;
     setCreating(true);
