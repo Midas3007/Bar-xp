@@ -258,7 +258,7 @@ export function settleStreak(
   let run = current.current;
   let shieldsLeft = shields;
   let consumed = 0;
-  let credited = 0;
+  const credited = 0;
   let broken = false;
 
   // The week the counter belongs to was already credited the moment it reached

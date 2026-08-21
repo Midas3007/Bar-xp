@@ -15,22 +15,30 @@ import { buildEntryFromReps } from './xp';
 
 /** Coerce a stored routine list into well-formed routines. Junk is dropped. */
 export function normalizeRoutines(raw: unknown): Routine[] {
-  return arr<Partial<Routine>>(raw)
-    .filter((r): r is Partial<Routine> => Boolean(r) && typeof r === 'object' && typeof r.id === 'string')
-    .slice(0, LIMITS.MAX_ROUTINES)
-    .map<Routine>((r) => ({
-      id: str(r.id, ''),
-      name: str(r.name, '').slice(0, LIMITS.MAX_NAME_LENGTH) || 'Routine',
-      items: arr<Partial<RoutineItem>>(r.items)
-        .filter((i) => Boolean(i) && typeof i === 'object' && typeof i.exerciseId === 'string')
-        .map<RoutineItem>((i) => ({ exerciseId: str(i.exerciseId, ''), reps: normalizeReps(i.reps) }))
-        .filter((i) => i.exerciseId.length > 0 && i.reps.length > 0)
-        .slice(0, LIMITS.MAX_ROUTINE_ITEMS),
-      createdAt: num(r.createdAt, 0),
-      updatedAt: num(r.updatedAt, 0),
-    }))
-    // A routine with nothing left in it cannot be started, so it is not kept.
-    .filter((r) => r.id.length > 0 && r.items.length > 0);
+  return (
+    arr<Partial<Routine>>(raw)
+      .filter(
+        (r): r is Partial<Routine> =>
+          Boolean(r) && typeof r === 'object' && typeof r.id === 'string',
+      )
+      .slice(0, LIMITS.MAX_ROUTINES)
+      .map<Routine>((r) => ({
+        id: str(r.id, ''),
+        name: str(r.name, '').slice(0, LIMITS.MAX_NAME_LENGTH) || 'Routine',
+        items: arr<Partial<RoutineItem>>(r.items)
+          .filter((i) => Boolean(i) && typeof i === 'object' && typeof i.exerciseId === 'string')
+          .map<RoutineItem>((i) => ({
+            exerciseId: str(i.exerciseId, ''),
+            reps: normalizeReps(i.reps),
+          }))
+          .filter((i) => i.exerciseId.length > 0 && i.reps.length > 0)
+          .slice(0, LIMITS.MAX_ROUTINE_ITEMS),
+        createdAt: num(r.createdAt, 0),
+        updatedAt: num(r.updatedAt, 0),
+      }))
+      // A routine with nothing left in it cannot be started, so it is not kept.
+      .filter((r) => r.id.length > 0 && r.items.length > 0)
+  );
 }
 
 /** Target units in a routine — used for the "≈ N reps" line on the card. */
@@ -89,7 +97,11 @@ export function upsertRoutine(existing: unknown, routine: Routine): Routine[] {
     const next = [...list];
     // The stored identity wins: replacing by name must not orphan the id a
     // logged workout already recorded in `presetId`.
-    next[index] = { ...routine, id: previous.id, createdAt: previous.createdAt || routine.createdAt };
+    next[index] = {
+      ...routine,
+      id: previous.id,
+      createdAt: previous.createdAt || routine.createdAt,
+    };
     return next;
   }
 

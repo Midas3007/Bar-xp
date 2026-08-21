@@ -81,10 +81,7 @@ export function saveDraft(uid: string, draft: Omit<SessionDraft, 'savedAt'>): vo
     return;
   }
   try {
-    window.localStorage.setItem(
-      keyFor(uid),
-      JSON.stringify({ ...draft, savedAt: Date.now() }),
-    );
+    window.localStorage.setItem(keyFor(uid), JSON.stringify({ ...draft, savedAt: Date.now() }));
   } catch {
     // Quota exceeded or private mode. A lost draft is bad; a crashed logger is worse.
   }

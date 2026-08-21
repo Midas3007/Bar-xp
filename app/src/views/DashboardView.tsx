@@ -1,18 +1,16 @@
 import { useEffect, useState } from 'react';
-import {
-  ArrowRight,
-  Coins,
-  Dumbbell,
-  Flame,
-  Info,
-  Target,
-  Trophy,
-  Zap,
-} from 'lucide-react';
+import { ArrowRight, Coins, Dumbbell, Flame, Info, Target, Trophy, Zap } from 'lucide-react';
 
 import type { Profile, Workout } from '../lib/types';
 import type { ViewKey } from '../components/layout/AppShell';
-import { Button, Card, CardHeader, EmptyState, ProgressBar, SkeletonBlock } from '../components/ui/Primitives';
+import {
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  ProgressBar,
+  SkeletonBlock,
+} from '../components/ui/Primitives';
 import {
   IdentityChip,
   LevelBar,
@@ -266,8 +264,8 @@ export function DashboardView({
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-content">
                         {arr(workout.entries).length} exercise
-                        {arr(workout.entries).length === 1 ? '' : 's'} ·{' '}
-                        {fmt(workout.totalVolume)} units
+                        {arr(workout.entries).length === 1 ? '' : 's'} · {fmt(workout.totalVolume)}{' '}
+                        units
                       </p>
                       <p className="mt-0.5 text-[11px] text-content-subtle">
                         {formatDay(workout.day)} ·{' '}
@@ -349,7 +347,7 @@ function NudgeCard({
   onClick: () => void;
 }) {
   return (
-    <Card className="group cursor-pointer p-5 transition hover:ring-line-strong" >
+    <Card className="group cursor-pointer p-5 transition hover:ring-line-strong">
       <button type="button" onClick={onClick} className="flex w-full items-start gap-4 text-left">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-hover text-forge ring-1 ring-line-strong">
           {icon}

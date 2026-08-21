@@ -9,25 +9,50 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  xpForLevel, totalXpForLevel, levelFromTotalXp, levelProgress,
-  TIERS, IDENTITIES, STAT_META, tierForStats, MAX_LEVEL,
+  xpForLevel,
+  totalXpForLevel,
+  levelFromTotalXp,
+  levelProgress,
+  TIERS,
+  IDENTITIES,
+  STAT_META,
+  tierForStats,
+  identityForStreak,
+  MAX_LEVEL,
 } from '../constants.js';
 import {
-  WEEKLY_TARGET, weekKey, weekKeyForDay, registerWorkout, settleStreak,
-  streakMultiplier, safeStreak, migrateLegacyStreak, daysRemainingThisWeek,
-  EMPTY_STREAK, migrateStreakModel,
+  WEEKLY_TARGET,
+  weekKey,
+  weekKeyForDay,
+  registerWorkout,
+  settleStreak,
+  streakMultiplier,
+  safeStreak,
+  migrateLegacyStreak,
+  daysRemainingThisWeek,
+  EMPTY_STREAK,
+  migrateStreakModel,
 } from '../streak.js';
 import {
-  volumeMultiplier, DIMINISHING_THRESHOLD, scoreSession, coinsForSession,
-  buildEntry, buildEntryFromReps, entryXp, volumeXp,
+  volumeMultiplier,
+  DIMINISHING_THRESHOLD,
+  scoreSession,
+  coinsForSession,
+  buildEntry,
+  buildEntryFromReps,
+  entryXp,
+  volumeXp,
 } from '../xp.js';
-import {
-  normalizeReps, entryReps, entryVolume, bestSet, formatSetLadder,
-} from '../sets.js';
+import { normalizeReps, entryReps, entryVolume, bestSet, formatSetLadder } from '../sets.js';
 import { ensureGoals, advanceGoals } from '../goals.js';
 import {
-  normalizeRoutines, upsertRoutine, removeRoutine, loadRoutine, routineVolume,
-  routineItemsFromEntries, buildRoutine,
+  normalizeRoutines,
+  upsertRoutine,
+  removeRoutine,
+  loadRoutine,
+  routineVolume,
+  routineItemsFromEntries,
+  buildRoutine,
 } from '../routines.js';
 import {
   baselineStats,
@@ -39,41 +64,82 @@ import {
   UNNAMED_ATHLETE,
 } from '../profile.js';
 import {
-  LIMITS, validateSetLadder, validateRoutine, validateSession, validateMeasurements,
+  LIMITS,
+  validateSetLadder,
+  validateRoutine,
+  validateSession,
+  validateMeasurements,
 } from '../validation.js';
 import { newlyEarned, isTierAchievement, achievementsFor } from '../achievements.js';
 import {
-  MEASUREMENT_BOUNDS, displayFromMetric, metricFromDisplay,
-  normalizeMeasurementValues, unitLabel,
+  MEASUREMENT_BOUNDS,
+  displayFromMetric,
+  metricFromDisplay,
+  normalizeMeasurementValues,
+  unitLabel,
 } from '../measurements.js';
 import {
-  GRADE_LABELS, GRADE_META, gradeLabel, measuredVTaper, overallAestheticScore,
-  overallGrade, rateAesthetics,
+  GRADE_LABELS,
+  GRADE_META,
+  gradeLabel,
+  measuredVTaper,
+  overallAestheticScore,
+  overallGrade,
+  rateAesthetics,
 } from '../aesthetics.js';
 import { SHOP_ITEMS, purchaseState } from '../shop.js';
+import { buildDemoData } from '../../demo/fixture.js';
+import { normalizeThemePreference, resolveTheme, THEME_PREFERENCES } from '../../theme.js';
 import {
-  normalizeThemePreference, resolveTheme, THEME_PREFERENCES,
-} from '../../theme.js';
-import {
-  mergeMuscleVolume, sessionMuscleVolume, subtractMuscleVolume,
-  MUSCLE_META, MUSCLE_GRADE_META, muscleHex, rateMuscles,
+  mergeMuscleVolume,
+  sessionMuscleVolume,
+  subtractMuscleVolume,
+  MUSCLE_META,
+  MUSCLE_GRADE_META,
+  muscleHex,
+  rateMuscles,
 } from '../muscles.js';
 import {
-  CORRECTION_WINDOW_MS, applyReversal, canCorrect, reversalOf, withinCorrectionWindow,
+  CORRECTION_WINDOW_MS,
+  applyReversal,
+  canCorrect,
+  reversalOf,
+  withinCorrectionWindow,
 } from '../correction.js';
 import {
-  FRIEND_CARD_FIELDS, friendCardFrom, otherMember, pairKey, pushRecentDay, requestId, searchKey,
+  FRIEND_CARD_FIELDS,
+  friendCardFrom,
+  otherMember,
+  pairKey,
+  pushRecentDay,
+  requestId,
+  searchKey,
 } from '../friends.js';
 import {
-  EMPTY_SEASON, MAX_SEASON_HISTORY, accrueSeason, daysLeftInSeason, mergeSeasonStandings,
-  placementIn, rolloverSeason, seasonIdFor, seasonWindowById, seasonWindowFor,
+  EMPTY_SEASON,
+  MAX_SEASON_HISTORY,
+  accrueSeason,
+  daysLeftInSeason,
+  mergeSeasonStandings,
+  placementIn,
+  rolloverSeason,
+  seasonIdFor,
+  seasonWindowById,
+  seasonWindowFor,
 } from '../season.js';
 import {
-  CHALLENGE_TEMPLATES, challengeState, challengeWindowDays, resolveChallenge, scoreChallenge,
+  CHALLENGE_TEMPLATES,
+  challengeState,
+  challengeWindowDays,
+  resolveChallenge,
+  scoreChallenge,
 } from '../challenges.js';
 import {
-  buildShareCardSvg, escapeXml, shareCardFilename,
-  SHARE_CARD_WIDTH, SHARE_CARD_HEIGHT,
+  buildShareCardSvg,
+  escapeXml,
+  shareCardFilename,
+  SHARE_CARD_WIDTH,
+  SHARE_CARD_HEIGHT,
 } from '../../share/shareCard.js';
 
 /* -------------------------------------------------------------------------- */
@@ -100,8 +166,14 @@ test('MIGRATION: no existing account can lose a level under the new curve', () =
 
 test('MIGRATION: every tier threshold that existed before is unchanged', () => {
   const before = {
-    Uninitiated: 0, Bronze: 12, Silver: 26, Gold: 45,
-    Platinum: 68, Diamond: 95, Mythic: 130, Legend: 175,
+    Uninitiated: 0,
+    Bronze: 12,
+    Silver: 26,
+    Gold: 45,
+    Platinum: 68,
+    Diamond: 95,
+    Mythic: 130,
+    Legend: 175,
   };
   for (const [name, min] of Object.entries(before)) {
     const tier = TIERS.find((t) => t.name === name);
@@ -124,7 +196,9 @@ test('the tier ladder now extends past Legend', () => {
 
 test('level 100 is a five-year goal, not a decorative one', () => {
   // A realistic athlete: session XP grows with level, sustained weekly streak.
-  let xp = 0, sessions = 0, level = 1;
+  let xp = 0,
+    sessions = 0,
+    level = 1;
   while (level < MAX_LEVEL && sessions < 100000) {
     xp += (200 + Math.min(level, 60) * 14) * 1.25;
     sessions += 1;
@@ -139,14 +213,18 @@ test('levelFromTotalXp and totalXpForLevel agree at every boundary', () => {
   for (let level = 1; level <= MAX_LEVEL; level += 1) {
     const at = totalXpForLevel(level);
     assert.equal(levelFromTotalXp(at), level, `at exactly the level ${level} boundary`);
-    if (level > 1) assert.equal(levelFromTotalXp(at - 1), level - 1, `one XP short of level ${level}`);
+    if (level > 1)
+      assert.equal(levelFromTotalXp(at - 1), level - 1, `one XP short of level ${level}`);
   }
 });
 
 test('levelProgress never produces a value a bar cannot render', () => {
   for (const input of [undefined, null, NaN, Infinity, -1, 'abc', 0, 5_000_000]) {
     const p = levelProgress(input);
-    assert.ok(Number.isFinite(p.percent) && p.percent >= 0 && p.percent <= 100, `percent for ${input}`);
+    assert.ok(
+      Number.isFinite(p.percent) && p.percent >= 0 && p.percent <= 100,
+      `percent for ${input}`,
+    );
     assert.ok(Number.isFinite(p.xpIntoLevel) && p.xpIntoLevel >= 0, `xpIntoLevel for ${input}`);
     assert.ok(p.level >= 1 && p.level <= MAX_LEVEL, `level for ${input}`);
   }
@@ -160,9 +238,15 @@ test('the curve is strictly increasing', () => {
 /* Weekly streaks — the bug this slice exists to fix                           */
 /* -------------------------------------------------------------------------- */
 
-const MON = '2026-08-03', TUE = '2026-08-04', WED = '2026-08-05',
-      THU = '2026-08-06', FRI = '2026-08-07', SAT = '2026-08-08',
-      NEXT_MON = '2026-08-10', NEXT_WED = '2026-08-12', NEXT_FRI = '2026-08-14';
+const MON = '2026-08-03',
+  TUE = '2026-08-04',
+  WED = '2026-08-05',
+  THU = '2026-08-06',
+  FRI = '2026-08-07',
+  SAT = '2026-08-08',
+  NEXT_MON = '2026-08-10',
+  NEXT_WED = '2026-08-12',
+  NEXT_FRI = '2026-08-14';
 
 const train = (days, start = EMPTY_STREAK) =>
   days.reduce((s, d) => registerWorkout(s, d, 0), start);
@@ -273,8 +357,12 @@ test('MIGRATION: a weekly streak converts to the days it was actually earned wit
   // is the honest floor: nobody is handed a run they did not train for, and
   // nobody loses one they did.
   const weekly = {
-    current: 3, best: 5, lastWorkoutDay: WED, shieldsUsed: 1,
-    weekKey: MON, daysThisWeek: 2,
+    current: 3,
+    best: 5,
+    lastWorkoutDay: WED,
+    shieldsUsed: 1,
+    weekKey: MON,
+    daysThisWeek: 2,
   };
   const migrated = migrateStreakModel(safeStreak(weekly), WED);
   assert.equal(migrated.current, 3 * WEEKLY_TARGET);
@@ -285,8 +373,12 @@ test('MIGRATION: a weekly streak converts to the days it was actually earned wit
 
 test('MIGRATION: a converted streak is never converted twice', () => {
   const weekly = {
-    current: 3, best: 5, lastWorkoutDay: WED, shieldsUsed: 0,
-    weekKey: MON, daysThisWeek: 2,
+    current: 3,
+    best: 5,
+    lastWorkoutDay: WED,
+    shieldsUsed: 0,
+    weekKey: MON,
+    daysThisWeek: 2,
   };
   const once = migrateStreakModel(safeStreak(weekly), WED);
   const twice = migrateStreakModel(safeStreak(once), WED);
@@ -294,7 +386,15 @@ test('MIGRATION: a converted streak is never converted twice', () => {
 });
 
 test('safeStreak survives anything a stale document can hold', () => {
-  for (const junk of [undefined, null, {}, { current: NaN }, { current: -5, best: 'x' }, 42, 'nope']) {
+  for (const junk of [
+    undefined,
+    null,
+    {},
+    { current: NaN },
+    { current: -5, best: 'x' },
+    42,
+    'nope',
+  ]) {
     const s = safeStreak(junk);
     assert.ok(Number.isFinite(s.current) && s.current >= 0);
     assert.ok(Number.isFinite(s.best) && s.best >= 0);
@@ -307,14 +407,21 @@ test('safeStreak survives anything a stale document can hold', () => {
 /* -------------------------------------------------------------------------- */
 
 const PUSH_UP = {
-  id: 'push_up', name: 'Push-up', unit: 'reps', xpPerUnit: 1,
+  id: 'push_up',
+  name: 'Push-up',
+  unit: 'reps',
+  xpPerUnit: 1,
   statWeights: { strength: 0.45, endurance: 0.3, aesthetics: 0.2, discipline: 0.05 },
 };
 const entry = (sets, amount) => {
   const volume = sets * amount;
   return {
-    exerciseId: 'push_up', exerciseName: 'Push-up', unit: 'reps',
-    sets, amount, volume,
+    exerciseId: 'push_up',
+    exerciseName: 'Push-up',
+    unit: 'reps',
+    sets,
+    amount,
+    volume,
     xp: Math.round(volume * PUSH_UP.xpPerUnit * volumeMultiplier(volume)),
   };
 };
@@ -345,8 +452,10 @@ test('different movements are judged independently', () => {
 });
 
 test('session scoring is finite whatever the entries hold', () => {
-  const junk = [{ exerciseId: 'push_up', unit: 'reps', volume: NaN, xp: undefined },
-                { exerciseId: 'ghost', unit: 'reps', volume: Infinity, xp: 'x' }];
+  const junk = [
+    { exerciseId: 'push_up', unit: 'reps', volume: NaN, xp: undefined },
+    { exerciseId: 'ghost', unit: 'reps', volume: Infinity, xp: 'x' },
+  ];
   const s = scoreSession(junk, resolve, NaN);
   assert.ok(Number.isFinite(s.xp) && s.xp >= 0);
   assert.ok(Number.isFinite(s.coins) && s.coins >= 0);
@@ -384,7 +493,10 @@ test('a beginner still starts at the bottom', () => {
 });
 
 test('assessment stats are finite for hostile input', () => {
-  for (const bad of [{}, { maxPullUps: NaN, maxPushUps: 'x', plankSeconds: -5, bodyFat: Infinity }]) {
+  for (const bad of [
+    {},
+    { maxPullUps: NaN, maxPushUps: 'x', plankSeconds: -5, bodyFat: Infinity },
+  ]) {
     const s = baselineStats(bad);
     for (const v of Object.values(s)) assert.ok(Number.isFinite(v) && v >= 0);
   }
@@ -395,7 +507,14 @@ test('assessment stats are finite for hostile input', () => {
 /* -------------------------------------------------------------------------- */
 
 const HOSTILE_NAMES = [
-  undefined, null, 42, {}, [], '', '   ', '\n\t ',
+  undefined,
+  null,
+  42,
+  {},
+  [],
+  '',
+  '   ',
+  '\n\t ',
   'A'.repeat(200),
   '🏋️'.repeat(60),
   '  Ada   Lovelace  ',
@@ -443,10 +562,25 @@ test('REGRESSION: a long Google name cannot break profile creation', () => {
 /* -------------------------------------------------------------------------- */
 
 test('MIGRATION: an old-format entry and a ladder of the same volume score identically', () => {
-  const legacy = { exerciseId: 'push_up', exerciseName: 'Push-up', unit: 'reps',
-                   sets: 3, amount: 10, volume: 30, xp: 30 };
-  const ladder = { exerciseId: 'push_up', exerciseName: 'Push-up', unit: 'reps',
-                   sets: 3, amount: 12, volume: 30, reps: [12, 10, 8], xp: 30 };
+  const legacy = {
+    exerciseId: 'push_up',
+    exerciseName: 'Push-up',
+    unit: 'reps',
+    sets: 3,
+    amount: 10,
+    volume: 30,
+    xp: 30,
+  };
+  const ladder = {
+    exerciseId: 'push_up',
+    exerciseName: 'Push-up',
+    unit: 'reps',
+    sets: 3,
+    amount: 12,
+    volume: 30,
+    reps: [12, 10, 8],
+    xp: 30,
+  };
   const a = scoreSession([legacy], resolve, 0);
   const b = scoreSession([ladder], resolve, 0);
   assert.equal(b.xp, a.xp);
@@ -514,7 +648,12 @@ test('formatSetLadder renders both shapes and truncates a long ladder', () => {
 test('validateSetLadder enforces the same bounds as the uniform path', () => {
   assert.ok(validateSetLadder(PUSH_UP, [12, 10, 8]).ok);
   assert.ok(!validateSetLadder(PUSH_UP, []).ok);
-  assert.ok(!validateSetLadder(PUSH_UP, Array.from({ length: 21 }, () => 5)).ok);
+  assert.ok(
+    !validateSetLadder(
+      PUSH_UP,
+      Array.from({ length: 21 }, () => 5),
+    ).ok,
+  );
   assert.ok(!validateSetLadder(PUSH_UP, [12, 0, 8]).ok);
   assert.ok(!validateSetLadder(PUSH_UP, [500]).ok);
   const HOLD = { ...PUSH_UP, id: 'plank', unit: 'seconds' };
@@ -531,11 +670,15 @@ test('validateSession measures a ladder by its true total', () => {
 /* Routines                                                                   */
 /* -------------------------------------------------------------------------- */
 
-const routine = (over = {}) => buildRoutine({
-  id: 'r1', name: 'Push Day',
-  items: [{ exerciseId: 'push_up', reps: [12, 10, 8] }],
-  createdAt: 100, updatedAt: 100, ...over,
-});
+const routine = (over = {}) =>
+  buildRoutine({
+    id: 'r1',
+    name: 'Push Day',
+    items: [{ exerciseId: 'push_up', reps: [12, 10, 8] }],
+    createdAt: 100,
+    updatedAt: 100,
+    ...over,
+  });
 
 test('upsertRoutine replaces by id and preserves the original identity', () => {
   const list = [routine()];
@@ -558,7 +701,8 @@ test('upsertRoutine appends otherwise and refuses to pass the cap', () => {
   assert.equal(upsertRoutine(list, routine({ id: 'r2', name: 'Pull Day' })).length, 2);
 
   const full = Array.from({ length: LIMITS.MAX_ROUTINES }, (_, i) =>
-    routine({ id: `r${i}`, name: `Day ${i}` }));
+    routine({ id: `r${i}`, name: `Day ${i}` }),
+  );
   const over = upsertRoutine(full, routine({ id: 'new', name: 'One More' }));
   assert.equal(over.length, LIMITS.MAX_ROUTINES);
 });
@@ -575,7 +719,11 @@ test('normalizeRoutines survives junk and drops empty routines', () => {
   assert.deepEqual(normalizeRoutines(42), []);
   assert.deepEqual(normalizeRoutines([null]), []);
   assert.deepEqual(normalizeRoutines([{ id: 'r', items: 'nope' }]), []);
-  assert.equal(normalizeRoutines([{ id: 'r', name: 'X', items: [{ exerciseId: 'push_up', reps: [10] }] }]).length, 1);
+  assert.equal(
+    normalizeRoutines([{ id: 'r', name: 'X', items: [{ exerciseId: 'push_up', reps: [10] }] }])
+      .length,
+    1,
+  );
 });
 
 test('routineVolume totals the target work', () => {
@@ -584,13 +732,15 @@ test('routineVolume totals the target work', () => {
 
 test('loadRoutine builds ladder entries, and reports locked and missing movements', () => {
   const r = buildRoutine({
-    id: 'r1', name: 'Mixed',
+    id: 'r1',
+    name: 'Mixed',
     items: [
       { exerciseId: 'push_up', reps: [12, 10, 8] },
       { exerciseId: 'muscle_up', reps: [3] },
       { exerciseId: 'ghost', reps: [5] },
     ],
-    createdAt: 0, updatedAt: 0,
+    createdAt: 0,
+    updatedAt: 0,
   });
   const MUSCLE_UP = { ...PUSH_UP, id: 'muscle_up', name: 'Muscle-up' };
   const out = loadRoutine(
@@ -605,9 +755,15 @@ test('loadRoutine builds ladder entries, and reports locked and missing movement
 });
 
 test('loadRoutine never returns more entries than a session can hold', () => {
-  const items = Array.from({ length: LIMITS.MAX_ROUTINE_ITEMS }, () => ({ exerciseId: 'push_up', reps: [10] }));
-  const out = loadRoutine(buildRoutine({ id: 'r', name: 'Long', items, createdAt: 0, updatedAt: 0 }),
-    () => PUSH_UP, () => true);
+  const items = Array.from({ length: LIMITS.MAX_ROUTINE_ITEMS }, () => ({
+    exerciseId: 'push_up',
+    reps: [10],
+  }));
+  const out = loadRoutine(
+    buildRoutine({ id: 'r', name: 'Long', items, createdAt: 0, updatedAt: 0 }),
+    () => PUSH_UP,
+    () => true,
+  );
   assert.ok(out.entries.length <= LIMITS.MAX_ENTRIES);
 });
 
@@ -683,7 +839,10 @@ test('newlyEarned surfaces the rank badge, which isTierAchievement identifies', 
   const before = athlete({ tier: 'Bronze' });
   const after = athlete({ tier: 'Silver' });
   const earned = newlyEarned(before, after);
-  assert.ok(earned.some((a) => isTierAchievement(a.id)), 'the promotion produces a tier badge');
+  assert.ok(
+    earned.some((a) => isTierAchievement(a.id)),
+    'the promotion produces a tier badge',
+  );
   assert.ok(!isTierAchievement('sessions_10'));
   assert.ok(!isTierAchievement(undefined));
 });
@@ -795,10 +954,7 @@ test('the unit conversion round-trips exactly', () => {
     for (const kind of KINDS) {
       for (const system of SYSTEMS) {
         const back = metricFromDisplay(displayFromMetric(v, kind, system), kind, system);
-        assert.ok(
-          Math.abs(back - v) < 1e-9,
-          `${v} ${kind} in ${system} came back as ${back}`,
-        );
+        assert.ok(Math.abs(back - v) < 1e-9, `${v} ${kind} in ${system} came back as ${back}`);
       }
     }
   }
@@ -886,9 +1042,20 @@ test('measurements move the V-taper trait and only that trait', () => {
     workoutCount: 40,
     totalReps: 6000,
     muscleVolume: {
-      chest: 900, shoulders: 700, triceps: 600, biceps: 550, lats: 800,
-      upper_back: 700, abs: 500, obliques: 300, quads: 900, glutes: 700,
-      hamstrings: 500, calves: 400, forearms: 300, lower_back: 300,
+      chest: 900,
+      shoulders: 700,
+      triceps: 600,
+      biceps: 550,
+      lats: 800,
+      upper_back: 700,
+      abs: 500,
+      obliques: 300,
+      quads: 900,
+      glutes: 700,
+      hamstrings: 500,
+      calves: 400,
+      forearms: 300,
+      lower_back: 300,
     },
   };
   const measured = {
@@ -1210,7 +1377,11 @@ test('season history dedupes by id, sorts newest first and caps at 24', () => {
     endedAt: i,
   }));
   const withDuplicate = [...many, { ...many[0], xp: 999 }];
-  const out = rolloverSeason({ id: '2050-S1', xp: 5, sessions: 1, startedAt: 1 }, withDuplicate, '2050-S2');
+  const out = rolloverSeason(
+    { id: '2050-S1', xp: 5, sessions: 1, startedAt: 1 },
+    withDuplicate,
+    '2050-S2',
+  );
   assert.equal(out.history.length, MAX_SEASON_HISTORY);
   assert.equal(new Set(out.history.map((r) => r.id)).size, out.history.length);
   for (let i = 1; i < out.history.length; i += 1) {
@@ -1241,10 +1412,19 @@ test('accrueSeason adds XP and counts the session', () => {
 
 test('standings union keeps the higher XP for a duplicate uid', () => {
   const merged = mergeSeasonStandings(
-    [{ uid: 'a', displayName: 'A', xp: 100 }, { uid: 'b', displayName: 'B', xp: 400 }],
-    [{ uid: 'a', displayName: 'A', xp: 250 }, { uid: 'c', displayName: 'C', xp: 50 }],
+    [
+      { uid: 'a', displayName: 'A', xp: 100 },
+      { uid: 'b', displayName: 'B', xp: 400 },
+    ],
+    [
+      { uid: 'a', displayName: 'A', xp: 250 },
+      { uid: 'c', displayName: 'C', xp: 50 },
+    ],
   );
-  assert.deepEqual(merged.map((s) => s.uid), ['b', 'a', 'c']);
+  assert.deepEqual(
+    merged.map((s) => s.uid),
+    ['b', 'a', 'c'],
+  );
   assert.equal(merged.find((s) => s.uid === 'a').xp, 250);
 });
 
@@ -1333,13 +1513,37 @@ test('exercise volume filters to the named movement', () => {
   const workouts = [
     chWorkout('2026-08-18', {
       entries: [
-        { exerciseId: 'pull_up', exerciseName: 'Pull-up', unit: 'reps', sets: 3, amount: 8, volume: 24, xp: 24 },
-        { exerciseId: 'push_up', exerciseName: 'Push-up', unit: 'reps', sets: 3, amount: 20, volume: 60, xp: 60 },
+        {
+          exerciseId: 'pull_up',
+          exerciseName: 'Pull-up',
+          unit: 'reps',
+          sets: 3,
+          amount: 8,
+          volume: 24,
+          xp: 24,
+        },
+        {
+          exerciseId: 'push_up',
+          exerciseName: 'Push-up',
+          unit: 'reps',
+          sets: 3,
+          amount: 20,
+          volume: 60,
+          xp: 60,
+        },
       ],
     }),
     chWorkout('2026-09-05', {
       entries: [
-        { exerciseId: 'pull_up', exerciseName: 'Pull-up', unit: 'reps', sets: 5, amount: 10, volume: 50, xp: 50 },
+        {
+          exerciseId: 'pull_up',
+          exerciseName: 'Pull-up',
+          unit: 'reps',
+          sets: 5,
+          amount: 10,
+          volume: 50,
+          xp: 50,
+        },
       ],
     }),
   ];
@@ -1395,7 +1599,10 @@ const challengeOf = (overrides = {}) => ({
 });
 
 test('a challenge is unresolved until it ends', () => {
-  const scores = { a: { uid: 'a', value: 5, sessions: 5, updatedAt: 0 }, b: { uid: 'b', value: 2, sessions: 2, updatedAt: 0 } };
+  const scores = {
+    a: { uid: 'a', value: 5, sessions: 5, updatedAt: 0 },
+    b: { uid: 'b', value: 2, sessions: 2, updatedAt: 0 },
+  };
   assert.equal(challengeState(challengeOf(), 500), 'active');
   assert.deepEqual(resolveChallenge(challengeOf(), scores, 500), {
     ended: false,
@@ -1405,7 +1612,10 @@ test('a challenge is unresolved until it ends', () => {
 });
 
 test('the higher score wins once it has ended', () => {
-  const scores = { a: { uid: 'a', value: 5, sessions: 5, updatedAt: 0 }, b: { uid: 'b', value: 2, sessions: 2, updatedAt: 0 } };
+  const scores = {
+    a: { uid: 'a', value: 5, sessions: 5, updatedAt: 0 },
+    b: { uid: 'b', value: 2, sessions: 2, updatedAt: 0 },
+  };
   assert.equal(challengeState(challengeOf(), 2000), 'ended');
   assert.deepEqual(resolveChallenge(challengeOf(), scores, 2000), {
     ended: true,
@@ -1415,7 +1625,10 @@ test('the higher score wins once it has ended', () => {
 });
 
 test('a tie is a tie, and is not broken on a secondary metric', () => {
-  const scores = { a: { uid: 'a', value: 4, sessions: 9, updatedAt: 0 }, b: { uid: 'b', value: 4, sessions: 1, updatedAt: 0 } };
+  const scores = {
+    a: { uid: 'a', value: 4, sessions: 9, updatedAt: 0 },
+    b: { uid: 'b', value: 4, sessions: 1, updatedAt: 0 },
+  };
   const out = resolveChallenge(challengeOf(), scores, 2000);
   assert.equal(out.tie, true);
   assert.equal(out.winner, null);
@@ -1493,8 +1706,18 @@ test('the friend card carries exactly FRIEND_CARD_FIELDS and nothing private', (
 
   assert.deepEqual(Object.keys(card).sort(), [...FRIEND_CARD_FIELDS].sort());
   for (const forbidden of [
-    'email', 'bodyFat', 'assessment', 'personalBests', 'customExercises', 'goals',
-    'muscleVolume', 'coins', 'inventory', 'measurements', 'routines', 'uid',
+    'email',
+    'bodyFat',
+    'assessment',
+    'personalBests',
+    'customExercises',
+    'goals',
+    'muscleVolume',
+    'coins',
+    'inventory',
+    'measurements',
+    'routines',
+    'uid',
   ]) {
     assert.ok(!(forbidden in card), `${forbidden} must never reach a friend card`);
   }
@@ -1602,10 +1825,24 @@ test('tier names and thresholds are untouched by the token migration', () => {
   // presentation only.
   assert.deepEqual(
     TIERS.map((t) => t.name),
-    ['Uninitiated', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond',
-     'Mythic', 'Legend', 'Ascendant', 'Immortal', 'Apex'],
+    [
+      'Uninitiated',
+      'Bronze',
+      'Silver',
+      'Gold',
+      'Platinum',
+      'Diamond',
+      'Mythic',
+      'Legend',
+      'Ascendant',
+      'Immortal',
+      'Apex',
+    ],
   );
-  assert.deepEqual(TIERS.map((t) => t.min), [0, 12, 26, 45, 68, 95, 130, 175, 240, 330, 450]);
+  assert.deepEqual(
+    TIERS.map((t) => t.min),
+    [0, 12, 26, 45, 68, 95, 130, 175, 240, 330, 450],
+  );
 });
 
 test('theme preference normalisation is total', () => {
@@ -1715,8 +1952,14 @@ test('a streak goal written before baselines existed still works', () => {
   // Legacy goals carry no baseline; treating it as 0 keeps the old behaviour
   // rather than silently changing what an in-flight goal requires.
   const legacy = {
-    id: 'legacy', type: 'streak', title: 'Hold a 3-day streak', target: 3,
-    progress: 0, rewardXp: 50, rewardCoins: 20, createdAt: Date.now(),
+    id: 'legacy',
+    type: 'streak',
+    title: 'Hold a 3-day streak',
+    target: 3,
+    progress: 0,
+    rewardXp: 50,
+    rewardCoins: 20,
+    createdAt: Date.now(),
   };
   const out = advanceGoals([legacy], 1, { ...GOAL_INPUT, streak: 5 });
   assert.ok(out.completed.some((g) => g.id === 'legacy'));
@@ -1728,7 +1971,9 @@ test('achievements derive from the profile and never need storing', () => {
   assert.equal(earned.length, 0, 'a fresh profile has earned nothing');
 
   const busy = profileOf({ workoutCount: 10, totalReps: 1200, level: 12 });
-  const ids = achievementsFor(busy).filter((a) => a.earned).map((a) => a.id);
+  const ids = achievementsFor(busy)
+    .filter((a) => a.earned)
+    .map((a) => a.id);
   assert.ok(ids.includes('first_session'));
   assert.ok(ids.includes('sessions_10'));
   assert.ok(ids.includes('reps_1000'));
@@ -1795,4 +2040,97 @@ test('the shop reports affordability, ownership and stack caps', () => {
   assert.equal(purchaseState(shield, owned), 'maxed', 'a full stack cannot be topped up');
 
   assert.equal(purchaseState(cosmetic, null), 'unaffordable', 'no profile, no purchase');
+});
+
+/* -------------------------------------------------------------------------- */
+/* The demo athlete                                                            */
+/* -------------------------------------------------------------------------- */
+
+const DEMO_AT = new Date('2026-08-20T18:00:00').getTime();
+
+test('the demo athlete is internally consistent', () => {
+  // The point of simulating through the real engine rather than writing JSON:
+  // every figure on screen has to add up, because a reviewer will check.
+  const d = buildDemoData(DEMO_AT);
+  const p = d.profile;
+
+  assert.equal(p.level, levelFromTotalXp(p.totalXp), 'level is derived from XP');
+  assert.equal(p.tier, tierForStats(p.stats).name, 'tier is derived from stats');
+  assert.equal(p.identity, identityForStreak(p.streak.current).label);
+  assert.equal(p.workoutCount, d.workouts.length, 'the session count matches the ledger');
+  assert.equal(p.grossXp, p.totalXp, 'nothing was voided');
+
+  const ledgerXp = d.workouts.reduce((acc, w) => acc + w.xpEarned, 0);
+  assert.ok(Math.abs(ledgerXp - p.totalXp) < 1, `XP totals: ${ledgerXp} vs ${p.totalXp}`);
+
+  const ledgerReps = d.workouts.reduce((acc, w) => acc + w.totalReps, 0);
+  assert.equal(ledgerReps, p.totalReps, 'reps total matches the ledger');
+});
+
+test('the demo athlete lands somewhere believable', () => {
+  // A band, not exact figures: the simulation owns the numbers, and pinning
+  // them would turn every engine tweak into a failing demo test.
+  const p = buildDemoData(DEMO_AT).profile;
+  const avg = (p.stats.strength + p.stats.endurance + p.stats.aesthetics + p.stats.discipline) / 4;
+
+  assert.ok(p.workoutCount >= 55 && p.workoutCount <= 80, `sessions: ${p.workoutCount}`);
+  assert.ok(p.totalXp >= 20000 && p.totalXp <= 50000, `xp: ${p.totalXp}`);
+  assert.ok(p.level >= 15 && p.level <= 26, `level: ${p.level}`);
+  assert.ok(avg >= 50 && avg <= 130, `avg stat: ${avg}`);
+  assert.ok(p.streak.current >= 3, `streak: ${p.streak.current}`);
+  assert.ok(Object.keys(p.personalBests).length >= 8, 'a full-looking PR list');
+  assert.ok(p.onboarded, 'the demo must never land on the onboarding screen');
+});
+
+test('the demo shows the streak shield actually doing its job', () => {
+  // Week 5 is an illness week bridged by the one shield the athlete holds;
+  // week 11 is a short week with none left, so the run breaks and rebuilds.
+  const p = buildDemoData(DEMO_AT).profile;
+  assert.equal(p.streak.shieldsUsed, 1, 'exactly one shield was spent');
+  assert.ok(p.streak.best > p.streak.current, 'the run broke at least once and rebuilt');
+});
+
+test('every demo session is a legal session', () => {
+  // The demo doubles as a worked example, so it must satisfy the same bounds a
+  // real client is held to.
+  const d = buildDemoData(DEMO_AT);
+  for (const w of d.workouts) {
+    assert.ok(w.entries.length >= 1 && w.entries.length <= LIMITS.MAX_ENTRIES, 'entry count');
+    assert.ok(w.totalVolume <= LIMITS.MAX_SESSION_VOLUME, `volume ${w.totalVolume}`);
+    for (const e of w.entries) {
+      assert.ok(e.sets >= 1 && e.sets <= LIMITS.MAX_SETS, `sets ${e.sets}`);
+      const cap = e.unit === 'seconds' ? LIMITS.MAX_SECONDS : LIMITS.MAX_REPS;
+      assert.ok(e.amount >= 1 && e.amount <= cap, `${e.exerciseName} amount ${e.amount}`);
+      assert.ok(Number.isFinite(e.xp) && e.xp >= 0, 'finite entry XP');
+    }
+  }
+});
+
+test('the demo is deterministic and ordered the way the app reads it', () => {
+  const a = buildDemoData(DEMO_AT);
+  const b = buildDemoData(DEMO_AT);
+  assert.deepEqual(a.profile, b.profile, 'same clock, same athlete');
+
+  // `fetchWorkouts` returns newest first; `fetchStatsHistory` oldest first.
+  for (let i = 1; i < a.workouts.length; i += 1) {
+    assert.ok(a.workouts[i - 1].createdAt >= a.workouts[i].createdAt, 'workouts newest first');
+  }
+  for (let i = 1; i < a.statsHistory.length; i += 1) {
+    assert.ok(
+      a.statsHistory[i - 1].createdAt <= a.statsHistory[i].createdAt,
+      'snapshots oldest first',
+    );
+  }
+});
+
+test('the demo leaderboard places the athlete fourth and requests no images', () => {
+  const d = buildDemoData(DEMO_AT);
+  const rank = d.leaderboard.findIndex((r) => r.uid === d.profile.uid) + 1;
+  assert.equal(rank, 4, 'mid-table reads as real; top of the board reads as bragging');
+  assert.equal(d.leaderboard.length, 12);
+  for (const row of d.leaderboard) {
+    assert.equal(row.photoURL, '', 'a demo must make no outbound image request');
+  }
+  const wearing = d.leaderboard.filter((r) => r.activeCosmetic !== null);
+  assert.ok(wearing.length >= 3, 'more than one gradient name on the board');
 });

@@ -237,7 +237,11 @@ function Group({
 }: GroupProps) {
   return (
     <Card>
-      <CardHeader title={title} subtitle={subtitle} icon={<Swords className="h-4 w-4" aria-hidden />} />
+      <CardHeader
+        title={title}
+        subtitle={subtitle}
+        icon={<Swords className="h-4 w-4" aria-hidden />}
+      />
       {challenges.length === 0 ? (
         <EmptyState title={empty} message="" />
       ) : (
@@ -305,12 +309,7 @@ function ChallengeCard({
         <div className="mt-3 flex items-center gap-4">
           <Score label="You" value={mine} unit={unit} winning={mine > theirs} />
           <span className="text-[11px] text-content-subtle">vs</span>
-          <Score
-            label={nameFor(opponent)}
-            value={theirs}
-            unit={unit}
-            winning={theirs > mine}
-          />
+          <Score label={nameFor(opponent)} value={theirs} unit={unit} winning={theirs > mine} />
         </div>
       ) : null}
 
@@ -325,7 +324,13 @@ function ChallengeCard({
             <Button
               size="sm"
               disabled={busy !== null}
-              onClick={() => void act(challenge.id, () => respondToChallenge(challenge.id, true), 'Challenge accepted')}
+              onClick={() =>
+                void act(
+                  challenge.id,
+                  () => respondToChallenge(challenge.id, true),
+                  'Challenge accepted',
+                )
+              }
             >
               Accept
             </Button>
@@ -333,7 +338,13 @@ function ChallengeCard({
               size="sm"
               variant="ghost"
               disabled={busy !== null}
-              onClick={() => void act(challenge.id, () => respondToChallenge(challenge.id, false), 'Challenge declined')}
+              onClick={() =>
+                void act(
+                  challenge.id,
+                  () => respondToChallenge(challenge.id, false),
+                  'Challenge declined',
+                )
+              }
             >
               Decline
             </Button>
@@ -343,7 +354,9 @@ function ChallengeCard({
           size="sm"
           variant="ghost"
           disabled={busy !== null}
-          onClick={() => void act(challenge.id, () => deleteChallenge(challenge.id), 'Challenge removed')}
+          onClick={() =>
+            void act(challenge.id, () => deleteChallenge(challenge.id), 'Challenge removed')
+          }
           aria-label="Remove challenge"
         >
           <Trash2 className="h-3.5 w-3.5" aria-hidden />
@@ -371,7 +384,9 @@ function StateChip({
   if (state === 'active') return <Chip>Running</Chip>;
   if (outcome.tie) return <Chip>Tied</Chip>;
   if (!outcome.winner) return <Chip>No scores</Chip>;
-  return <Chip>{outcome.winner === profile.uid ? 'You won' : `${nameFor(outcome.winner)} won`}</Chip>;
+  return (
+    <Chip>{outcome.winner === profile.uid ? 'You won' : `${nameFor(outcome.winner)} won`}</Chip>
+  );
 }
 
 function Score({
@@ -388,9 +403,7 @@ function Score({
   return (
     <div className="min-w-0 flex-1">
       <p className="truncate text-[11px] text-content-muted">{label}</p>
-      <p
-        className={`font-mono text-lg font-bold ${winning ? 'text-vital' : 'text-content'}`}
-      >
+      <p className={`font-mono text-lg font-bold ${winning ? 'text-vital' : 'text-content'}`}>
         {fmt(value)}
         <span className="ml-1 text-[11px] font-normal text-content-subtle">{unit}</span>
       </p>

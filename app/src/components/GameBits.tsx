@@ -49,13 +49,7 @@ export function NeonName({
 /* Tier badge                                                                  */
 /* -------------------------------------------------------------------------- */
 
-export function TierBadge({
-  tierName,
-  size = 'md',
-}: {
-  tierName: unknown;
-  size?: 'sm' | 'md';
-}) {
+export function TierBadge({ tierName, size = 'md' }: { tierName: unknown; size?: 'sm' | 'md' }) {
   const tier = tierByName(tierName);
   const padding = size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-3 py-1 text-xs';
   return (
@@ -267,8 +261,8 @@ export function TierProgress({ stats }: { stats: Stats }) {
       <div className="flex items-center gap-3">
         <Trophy className="h-4 w-4 text-ember" aria-hidden />
         <p className="text-xs text-content-muted">
-          <span className="font-semibold text-ember">Legend</span> — the highest rank. Nothing
-          left above you.
+          <span className="font-semibold text-ember">Legend</span> — the highest rank. Nothing left
+          above you.
         </p>
       </div>
     );

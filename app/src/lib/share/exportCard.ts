@@ -72,10 +72,13 @@ export async function exportShareCard(
   width: number,
   height: number,
 ): Promise<ShareOutcome> {
+  // eslint-disable-next-line no-useless-assignment -- TypeScript needs the
+  // initialiser: the catch below returns, so it cannot prove definite
+  // assignment across the try/finally, and `toPng` can legitimately yield null.
+  let png: Blob | null = null;
   const source = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(source);
 
-  let png: Blob | null = null;
   try {
     const image = await loadImage(url);
     const canvas = document.createElement('canvas');

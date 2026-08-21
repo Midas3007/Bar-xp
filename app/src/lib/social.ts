@@ -15,13 +15,7 @@ import {
 } from 'firebase/firestore';
 
 import { CHALLENGE_SCORES, COLLECTIONS, getDbOrThrow } from './firebase';
-import type {
-  Challenge,
-  ChallengeScore,
-  FriendRequest,
-  LeaderboardRow,
-  Profile,
-} from './types';
+import type { Challenge, ChallengeScore, FriendRequest, LeaderboardRow, Profile } from './types';
 import { arr, int, num, str } from './safe';
 import { fetchWorkouts } from './data';
 import {
@@ -221,7 +215,9 @@ export async function fetchFriendGraph(uid: string): Promise<FriendGraph> {
   const db = getDbOrThrow();
 
   const [friendships, incomingSnap, outgoingSnap] = await Promise.all([
-    getDocs(query(collection(db, COLLECTIONS.friendships), where('members', 'array-contains', uid))),
+    getDocs(
+      query(collection(db, COLLECTIONS.friendships), where('members', 'array-contains', uid)),
+    ),
     getDocs(query(collection(db, COLLECTIONS.friendRequests), where('to', '==', uid))),
     getDocs(query(collection(db, COLLECTIONS.friendRequests), where('from', '==', uid))),
   ]);
@@ -246,9 +242,7 @@ export async function fetchFriendGraph(uid: string): Promise<FriendGraph> {
   if (everyone.length > 0) {
     const rowChunks = await Promise.all(
       chunk(everyone, IN_CHUNK).map((ids) =>
-        getDocs(
-          query(collection(db, COLLECTIONS.publicProfiles), where(documentId(), 'in', ids)),
-        ),
+        getDocs(query(collection(db, COLLECTIONS.publicProfiles), where(documentId(), 'in', ids))),
       ),
     );
     for (const snap of rowChunks) {
@@ -501,6 +495,8 @@ export async function resolvePendingSeasonPlacements(
       : r,
   );
 
-  const changed = patched.some((r, i) => r.pending !== history[i].pending || r.rank !== history[i].rank);
+  const changed = patched.some(
+    (r, i) => r.pending !== history[i].pending || r.rank !== history[i].rank,
+  );
   return changed ? patched : null;
 }

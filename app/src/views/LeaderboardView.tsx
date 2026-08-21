@@ -93,7 +93,9 @@ export function LeaderboardView({ profile }: { profile: Profile }) {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
-        <h1 className="font-display text-2xl font-bold tracking-tight text-content-strong">Compete</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-content-strong">
+          Compete
+        </h1>
         <p className="mt-1.5 text-sm text-content-muted">
           Lifetime rank, your friends, this season, and whatever you have bet on.
           {tab === 'global' && myRank >= 0 ? ` You are #${fmt(myRank + 1)} overall.` : ''}
@@ -181,9 +183,7 @@ export function LeaderboardView({ profile }: { profile: Profile }) {
         <FriendsPanel profile={profile} graph={graph} meRow={meRow} onReload={reloadGraph} />
       ) : null}
 
-      {tab === 'season' ? (
-        <SeasonPanel profile={profile} graph={graph} meRow={meRow} />
-      ) : null}
+      {tab === 'season' ? <SeasonPanel profile={profile} graph={graph} meRow={meRow} /> : null}
 
       {tab === 'challenges' ? <ChallengesPanel profile={profile} graph={graph} /> : null}
 

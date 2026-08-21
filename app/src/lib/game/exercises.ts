@@ -1,10 +1,4 @@
-import type {
-  CustomExercise,
-  Exercise,
-  ExerciseCategory,
-  ExerciseGrade,
-  Profile,
-} from '../types';
+import type { CustomExercise, Exercise, ExerciseCategory, ExerciseGrade, Profile } from '../types';
 import { arr, num, str } from '../safe';
 
 /**
@@ -42,7 +36,11 @@ export const EXERCISES: Exercise[] = [
       'Elbows track back at roughly 45°, not flared straight out to the sides.',
       'Lower until the chest is a fist off the floor, then push all the way to lockout.',
     ],
-    mistakes: ['Hips sagging or piking up', 'Half reps that never reach the bottom', 'Head craning forward to touch first'],
+    mistakes: [
+      'Hips sagging or piking up',
+      'Half reps that never reach the bottom',
+      'Head craning forward to touch first',
+    ],
   },
   {
     id: 'incline_push_up',
@@ -60,7 +58,10 @@ export const EXERCISES: Exercise[] = [
       'The higher the hands, the easier it is — lower the surface as you get stronger.',
       'Same straight line from heel to head as a floor push-up.',
     ],
-    mistakes: ['Letting the hips lead the way down', 'Choosing a surface so high there is no challenge'],
+    mistakes: [
+      'Letting the hips lead the way down',
+      'Choosing a surface so high there is no challenge',
+    ],
   },
   {
     id: 'pike_push_up',
@@ -78,7 +79,10 @@ export const EXERCISES: Exercise[] = [
       'Lower the top of the head toward the floor, just in front of the hands.',
       'Elbows point forward-ish, not straight out to the sides.',
     ],
-    mistakes: ['Hips drifting back so it becomes a normal push-up', 'Only bending at the waist instead of the elbows'],
+    mistakes: [
+      'Hips drifting back so it becomes a normal push-up',
+      'Only bending at the waist instead of the elbows',
+    ],
   },
   {
     id: 'dip',
@@ -97,7 +101,11 @@ export const EXERCISES: Exercise[] = [
       'Descend until the shoulders are level with or just below the elbows.',
       'If a full dip is not there yet, use a bench dip or push through a band.',
     ],
-    mistakes: ['Shrugging so the shoulders swallow the neck', 'Bouncing out of the bottom', 'Going far deeper than shoulder mobility allows'],
+    mistakes: [
+      'Shrugging so the shoulders swallow the neck',
+      'Bouncing out of the bottom',
+      'Going far deeper than shoulder mobility allows',
+    ],
   },
   {
     id: 'diamond_push_up',
@@ -138,10 +146,26 @@ export const EXERCISES: Exercise[] = [
     progression: {
       intro: 'A near-unilateral press. You want a solid set of 15 clean push-ups before starting.',
       steps: [
-        { title: 'Build the base', detail: 'Work up to 3 sets of 15 strict push-ups.', exerciseId: 'push_up' },
-        { title: 'Widen your stance', detail: 'Do push-ups with hands 1.5× shoulder width to get used to the wider position.', exerciseId: 'push_up' },
-        { title: 'Shift your weight', detail: 'From the wide position, lower slightly toward one hand. Increase the lean over weeks.' },
-        { title: 'Straighten the far arm', detail: 'Once you can take most of the load on one side, let the other arm lock out fully.' },
+        {
+          title: 'Build the base',
+          detail: 'Work up to 3 sets of 15 strict push-ups.',
+          exerciseId: 'push_up',
+        },
+        {
+          title: 'Widen your stance',
+          detail: 'Do push-ups with hands 1.5× shoulder width to get used to the wider position.',
+          exerciseId: 'push_up',
+        },
+        {
+          title: 'Shift your weight',
+          detail:
+            'From the wide position, lower slightly toward one hand. Increase the lean over weeks.',
+        },
+        {
+          title: 'Straighten the far arm',
+          detail:
+            'Once you can take most of the load on one side, let the other arm lock out fully.',
+        },
       ],
     },
   },
@@ -163,15 +187,38 @@ export const EXERCISES: Exercise[] = [
       'Lower until the head lightly touches the floor, then press to lockout.',
       'Keep the ribs down — do not arch the lower back to get up.',
     ],
-    mistakes: ['Collapsing into a headstand rather than pressing', 'Elbows flaring straight out', 'Kicking off the wall for momentum'],
+    mistakes: [
+      'Collapsing into a headstand rather than pressing',
+      'Elbows flaring straight out',
+      'Kicking off the wall for momentum',
+    ],
     progression: {
-      intro: 'Vertical pressing needs shoulder strength plus the confidence to be inverted. Expect several months.',
+      intro:
+        'Vertical pressing needs shoulder strength plus the confidence to be inverted. Expect several months.',
       steps: [
-        { title: 'Own the pike push-up', detail: 'Build to 3 sets of 12 with the hips stacked high.', exerciseId: 'pike_push_up' },
-        { title: 'Elevate your feet', detail: 'Put your feet on a chair or box in the pike position. Raise the box over time.' },
-        { title: 'Wall handstand hold', detail: 'Kick up and hold 30–60 seconds to get comfortable inverted and build shoulder endurance.' },
-        { title: 'Negatives', detail: 'From a wall handstand, lower to the floor as slowly as you can. Aim for 5 seconds down.' },
-        { title: 'Full reps', detail: 'Press back up from the bottom. One clean rep is a real milestone.' },
+        {
+          title: 'Own the pike push-up',
+          detail: 'Build to 3 sets of 12 with the hips stacked high.',
+          exerciseId: 'pike_push_up',
+        },
+        {
+          title: 'Elevate your feet',
+          detail: 'Put your feet on a chair or box in the pike position. Raise the box over time.',
+        },
+        {
+          title: 'Wall handstand hold',
+          detail:
+            'Kick up and hold 30–60 seconds to get comfortable inverted and build shoulder endurance.',
+        },
+        {
+          title: 'Negatives',
+          detail:
+            'From a wall handstand, lower to the floor as slowly as you can. Aim for 5 seconds down.',
+        },
+        {
+          title: 'Full reps',
+          detail: 'Press back up from the bottom. One clean rep is a real milestone.',
+        },
       ],
     },
   },
@@ -193,13 +240,28 @@ export const EXERCISES: Exercise[] = [
       'Fight hard to keep both hips facing the floor.',
       'Free hand behind the back or along the thigh.',
     ],
-    mistakes: ['Twisting the hips open to cheat', 'Feet so wide it becomes a side press', 'Partial range at the bottom'],
+    mistakes: [
+      'Twisting the hips open to cheat',
+      'Feet so wide it becomes a side press',
+      'Partial range at the bottom',
+    ],
     progression: {
-      intro: 'This is a full-body tension skill as much as a pressing one. Archer push-ups come first.',
+      intro:
+        'This is a full-body tension skill as much as a pressing one. Archer push-ups come first.',
       steps: [
-        { title: 'Master archers', detail: 'Build to 3 sets of 8 archer push-ups per side.', exerciseId: 'archer_push_up' },
-        { title: 'Elevated one-arm', detail: 'One hand on a waist-high surface. Lower the surface over months.' },
-        { title: 'Negatives on the floor', detail: 'Lower on one arm as slowly as possible, then push back with two.' },
+        {
+          title: 'Master archers',
+          detail: 'Build to 3 sets of 8 archer push-ups per side.',
+          exerciseId: 'archer_push_up',
+        },
+        {
+          title: 'Elevated one-arm',
+          detail: 'One hand on a waist-high surface. Lower the surface over months.',
+        },
+        {
+          title: 'Negatives on the floor',
+          detail: 'Lower on one arm as slowly as possible, then push back with two.',
+        },
         { title: 'Full rep', detail: 'Press up from the bottom keeping both hips level.' },
       ],
     },
@@ -223,7 +285,11 @@ export const EXERCISES: Exercise[] = [
       'Pull the chest to the bar, driving the elbows back past the ribs.',
       'The more horizontal your body, the harder it gets.',
     ],
-    mistakes: ['Hips sagging toward the floor', 'Stopping short of the bar', 'Shrugging instead of rowing'],
+    mistakes: [
+      'Hips sagging toward the floor',
+      'Stopping short of the bar',
+      'Shrugging instead of rowing',
+    ],
   },
   {
     id: 'chin_up',
@@ -242,7 +308,11 @@ export const EXERCISES: Exercise[] = [
       'Pull until the chin clears the bar, then lower under control.',
       'No pull-ups yet? Jump to the top and lower slowly — negatives build them fast.',
     ],
-    mistakes: ['Kipping with the legs', 'Stopping halfway up', 'Dropping like a stone instead of controlling the descent'],
+    mistakes: [
+      'Kipping with the legs',
+      'Stopping halfway up',
+      'Dropping like a stone instead of controlling the descent',
+    ],
   },
   {
     id: 'pull_up',
@@ -261,7 +331,11 @@ export const EXERCISES: Exercise[] = [
       'Drive the elbows down toward the ribs and clear the bar with your chin.',
       'Lower all the way to straight arms every rep.',
     ],
-    mistakes: ['Swinging or kipping for momentum', 'Never reaching a full dead hang', 'Chin craning over the bar while the chest stays low'],
+    mistakes: [
+      'Swinging or kipping for momentum',
+      'Never reaching a full dead hang',
+      'Chin craning over the bar while the chest stays low',
+    ],
   },
   {
     id: 'wide_pull_up',
@@ -297,13 +371,28 @@ export const EXERCISES: Exercise[] = [
       'The far arm stays straight, sliding along the bar as support.',
       'Chin comes up beside the working hand, not in the middle.',
     ],
-    mistakes: ['Bending the far arm so it becomes a wide pull-up', 'Twisting the torso instead of pulling to the side'],
+    mistakes: [
+      'Bending the far arm so it becomes a wide pull-up',
+      'Twisting the torso instead of pulling to the side',
+    ],
     progression: {
       intro: 'The main stepping stone toward one-arm pulling. Needs a solid pull-up base first.',
       steps: [
-        { title: 'Build volume', detail: 'Reach 3 sets of 8 clean pull-ups.', exerciseId: 'pull_up' },
-        { title: 'Go wide', detail: 'Work wide-grip pull-ups for a few weeks.', exerciseId: 'wide_pull_up' },
-        { title: 'Uneven pulls', detail: 'Hold a towel over the bar with one hand, lower than the other. Pull toward the high hand.' },
+        {
+          title: 'Build volume',
+          detail: 'Reach 3 sets of 8 clean pull-ups.',
+          exerciseId: 'pull_up',
+        },
+        {
+          title: 'Go wide',
+          detail: 'Work wide-grip pull-ups for a few weeks.',
+          exerciseId: 'wide_pull_up',
+        },
+        {
+          title: 'Uneven pulls',
+          detail:
+            'Hold a towel over the bar with one hand, lower than the other. Pull toward the high hand.',
+        },
         { title: 'Full archer', detail: 'Straighten the far arm entirely along the bar.' },
       ],
     },
@@ -326,16 +415,38 @@ export const EXERCISES: Exercise[] = [
       'Lean the chest forward and over the bar as you reach the top of the pull.',
       'Finish by pressing out of the dip position to straight arms.',
     ],
-    mistakes: ['Pulling only to chin height and stalling', 'Trying to muscle through without leaning over the bar', 'Enormous leg kip that hides a missing strength base'],
+    mistakes: [
+      'Pulling only to chin height and stalling',
+      'Trying to muscle through without leaning over the bar',
+      'Enormous leg kip that hides a missing strength base',
+    ],
     progression: {
-      intro: 'A muscle-up is a high pull-up, a transition, and a dip stitched together. Build all three separately.',
+      intro:
+        'A muscle-up is a high pull-up, a transition, and a dip stitched together. Build all three separately.',
       steps: [
-        { title: 'Strong pull-ups', detail: 'Reach 8–10 clean pull-ups from a dead hang.', exerciseId: 'pull_up' },
+        {
+          title: 'Strong pull-ups',
+          detail: 'Reach 8–10 clean pull-ups from a dead hang.',
+          exerciseId: 'pull_up',
+        },
         { title: 'Strong dips', detail: 'Reach 10–12 full-depth dips.', exerciseId: 'dip' },
-        { title: 'Chest-high pulls', detail: 'Pull explosively until the bar reaches your sternum or lower ribs.', exerciseId: 'pull_up' },
-        { title: 'False grip hangs', detail: 'Hang with the wrists over the bar for 20–30 seconds to build the position.' },
-        { title: 'Transition drill', detail: 'From a low bar with feet down, practise rolling the chest over the bar.' },
-        { title: 'Put it together', detail: 'One clean muscle-up. Slight leg swing is fine at first.' },
+        {
+          title: 'Chest-high pulls',
+          detail: 'Pull explosively until the bar reaches your sternum or lower ribs.',
+          exerciseId: 'pull_up',
+        },
+        {
+          title: 'False grip hangs',
+          detail: 'Hang with the wrists over the bar for 20–30 seconds to build the position.',
+        },
+        {
+          title: 'Transition drill',
+          detail: 'From a low bar with feet down, practise rolling the chest over the bar.',
+        },
+        {
+          title: 'Put it together',
+          detail: 'One clean muscle-up. Slight leg swing is fine at first.',
+        },
       ],
     },
   },
@@ -376,7 +487,10 @@ export const EXERCISES: Exercise[] = [
       'Drop the back knee toward the floor, torso upright.',
       'Push through the front heel to return.',
     ],
-    mistakes: ['Front knee shooting far past the toes', 'Leaning the torso forward over the front leg'],
+    mistakes: [
+      'Front knee shooting far past the toes',
+      'Leaning the torso forward over the front leg',
+    ],
   },
   {
     id: 'pistol_squat',
@@ -395,13 +509,28 @@ export const EXERCISES: Exercise[] = [
       'Keep the working heel flat — ankle mobility is usually the limit.',
       'Stand without letting the free foot touch down.',
     ],
-    mistakes: ['Heel lifting at the bottom', 'Crashing down instead of controlling', 'Free foot touching for balance'],
+    mistakes: [
+      'Heel lifting at the bottom',
+      'Crashing down instead of controlling',
+      'Free foot touching for balance',
+    ],
     progression: {
-      intro: 'Mostly a mobility and balance problem, not a strength one. Elevate to make it easier.',
+      intro:
+        'Mostly a mobility and balance problem, not a strength one. Elevate to make it easier.',
       steps: [
-        { title: 'Squat depth first', detail: 'Comfortable, heels-down deep squats for 20 reps.', exerciseId: 'squat' },
-        { title: 'Box pistols', detail: 'Sit down onto a chair on one leg, then stand. Lower the seat over time.' },
-        { title: 'Assisted pistols', detail: 'Hold a doorframe or strap and use as little help as you can.' },
+        {
+          title: 'Squat depth first',
+          detail: 'Comfortable, heels-down deep squats for 20 reps.',
+          exerciseId: 'squat',
+        },
+        {
+          title: 'Box pistols',
+          detail: 'Sit down onto a chair on one leg, then stand. Lower the seat over time.',
+        },
+        {
+          title: 'Assisted pistols',
+          detail: 'Hold a doorframe or strap and use as little help as you can.',
+        },
         { title: 'Full pistol', detail: 'No support, heel flat, free leg never touching down.' },
       ],
     },
@@ -425,7 +554,11 @@ export const EXERCISES: Exercise[] = [
       'Squeeze glutes and quads — a plank should be hard everywhere, not just the abs.',
       'Breathe normally instead of holding your breath.',
     ],
-    mistakes: ['Hips sagging into the lower back', 'Hips hiked high to make it easy', 'Holding for time with terrible position'],
+    mistakes: [
+      'Hips sagging into the lower back',
+      'Hips hiked high to make it easy',
+      'Holding for time with terrible position',
+    ],
   },
   {
     id: 'hollow_hold',
@@ -480,7 +613,10 @@ export const EXERCISES: Exercise[] = [
       'Curl the knees up toward the chest, rolling the pelvis under.',
       'Lower with control — no swinging into the next rep.',
     ],
-    mistakes: ['Using a body swing to throw the knees up', 'Only lifting the thighs without curling the pelvis'],
+    mistakes: [
+      'Using a body swing to throw the knees up',
+      'Only lifting the thighs without curling the pelvis',
+    ],
   },
   {
     id: 'toes_to_bar',
@@ -502,10 +638,23 @@ export const EXERCISES: Exercise[] = [
     progression: {
       intro: 'Hanging knee raises with the knees progressively straighter.',
       steps: [
-        { title: 'Knee raises', detail: 'Build to 3 sets of 15 strict hanging knee raises.', exerciseId: 'hanging_knee_raise' },
-        { title: 'Half-straight raises', detail: 'Raise with the knees only slightly bent, aiming for hip height.' },
-        { title: 'Straight-leg raises', detail: 'Straight legs to horizontal, held for a beat at the top.' },
-        { title: 'All the way up', detail: 'Continue past horizontal until the toes touch the bar.' },
+        {
+          title: 'Knee raises',
+          detail: 'Build to 3 sets of 15 strict hanging knee raises.',
+          exerciseId: 'hanging_knee_raise',
+        },
+        {
+          title: 'Half-straight raises',
+          detail: 'Raise with the knees only slightly bent, aiming for hip height.',
+        },
+        {
+          title: 'Straight-leg raises',
+          detail: 'Straight legs to horizontal, held for a beat at the top.',
+        },
+        {
+          title: 'All the way up',
+          detail: 'Continue past horizontal until the toes touch the bar.',
+        },
       ],
     },
   },
@@ -526,14 +675,27 @@ export const EXERCISES: Exercise[] = [
       'Use parallettes, dip bars, or the floor — the floor is hardest.',
       'Point the toes and squeeze everything.',
     ],
-    mistakes: ['Shoulders shrugged up to the ears', 'Knees bent and called an L-sit', 'Leaning far back to fake the angle'],
+    mistakes: [
+      'Shoulders shrugged up to the ears',
+      'Knees bent and called an L-sit',
+      'Leaning far back to fake the angle',
+    ],
     progression: {
       intro: 'Straight-arm strength plus compression. Elevating the hands makes it far easier.',
       steps: [
-        { title: 'Support hold', detail: 'Hold yourself up on straight arms, shoulders down, for 30 seconds.' },
-        { title: 'Tuck L-sit', detail: 'Same hold with the knees tucked tight to the chest. Build to 30 seconds.' },
+        {
+          title: 'Support hold',
+          detail: 'Hold yourself up on straight arms, shoulders down, for 30 seconds.',
+        },
+        {
+          title: 'Tuck L-sit',
+          detail: 'Same hold with the knees tucked tight to the chest. Build to 30 seconds.',
+        },
         { title: 'One leg out', detail: 'Extend a single leg, alternating sides.' },
-        { title: 'Full L-sit', detail: 'Both legs straight and horizontal. Ten seconds is a strong result.' },
+        {
+          title: 'Full L-sit',
+          detail: 'Both legs straight and horizontal. Ten seconds is a strong result.',
+        },
       ],
     },
   },
@@ -557,14 +719,33 @@ export const EXERCISES: Exercise[] = [
       'Lean forward until the shoulders are well past the hands.',
       'The further forward you lean, the harder it gets.',
     ],
-    mistakes: ['Letting the shoulder blades pinch together', 'Bending the arms', 'Sagging the lower back'],
+    mistakes: [
+      'Letting the shoulder blades pinch together',
+      'Bending the arms',
+      'Sagging the lower back',
+    ],
     progression: {
-      intro: 'The entry point to all planche work, and the drill that builds the straight-arm strength for it.',
+      intro:
+        'The entry point to all planche work, and the drill that builds the straight-arm strength for it.',
       steps: [
-        { title: 'Wrist prep', detail: 'Straight-arm work is hard on the wrists. Warm them up thoroughly every session.' },
-        { title: 'Plank to lean', detail: 'From a push-up plank, shift the shoulders slightly forward of the wrists. Hold 20 seconds.', exerciseId: 'plank' },
-        { title: 'Increase the lean', detail: 'Add a centimetre of forward lean every week or two. Never rush this.' },
-        { title: 'Protract hard', detail: 'Actively push the floor away so the upper back stays rounded throughout.' },
+        {
+          title: 'Wrist prep',
+          detail: 'Straight-arm work is hard on the wrists. Warm them up thoroughly every session.',
+        },
+        {
+          title: 'Plank to lean',
+          detail:
+            'From a push-up plank, shift the shoulders slightly forward of the wrists. Hold 20 seconds.',
+          exerciseId: 'plank',
+        },
+        {
+          title: 'Increase the lean',
+          detail: 'Add a centimetre of forward lean every week or two. Never rush this.',
+        },
+        {
+          title: 'Protract hard',
+          detail: 'Actively push the floor away so the upper back stays rounded throughout.',
+        },
       ],
     },
   },
@@ -586,16 +767,39 @@ export const EXERCISES: Exercise[] = [
       'Raise the body to horizontal, hollow through the middle.',
       'Squeeze the glutes so the hips do not sag below the shoulders.',
     ],
-    mistakes: ['Bent arms turning it into a hanging hold', 'Hips sagging well below the line', 'Holding the breath and losing the hollow'],
+    mistakes: [
+      'Bent arms turning it into a hanging hold',
+      'Hips sagging well below the line',
+      'Holding the breath and losing the hollow',
+    ],
     progression: {
-      intro: 'Work through tuck positions. Each step opens the body angle and multiplies the difficulty.',
+      intro:
+        'Work through tuck positions. Each step opens the body angle and multiplies the difficulty.',
       steps: [
-        { title: 'Solid pull-ups', detail: 'Reach 8–10 pull-ups so the back can handle the load.', exerciseId: 'pull_up' },
-        { title: 'Hollow body', detail: 'A 45-second hollow hold. The lever is a hollow body turned sideways.', exerciseId: 'hollow_hold' },
-        { title: 'Tuck lever', detail: 'Hang, tuck the knees tight, raise until the back is horizontal. Build to 20 seconds.' },
+        {
+          title: 'Solid pull-ups',
+          detail: 'Reach 8–10 pull-ups so the back can handle the load.',
+          exerciseId: 'pull_up',
+        },
+        {
+          title: 'Hollow body',
+          detail: 'A 45-second hollow hold. The lever is a hollow body turned sideways.',
+          exerciseId: 'hollow_hold',
+        },
+        {
+          title: 'Tuck lever',
+          detail:
+            'Hang, tuck the knees tight, raise until the back is horizontal. Build to 20 seconds.',
+        },
         { title: 'Advanced tuck', detail: 'Open the knees to roughly 90°, keeping the back flat.' },
-        { title: 'Single leg', detail: 'Extend one leg fully, keeping the other tucked. Alternate.' },
-        { title: 'Full lever', detail: 'Both legs straight and horizontal. Five seconds is an excellent hold.' },
+        {
+          title: 'Single leg',
+          detail: 'Extend one leg fully, keeping the other tucked. Alternate.',
+        },
+        {
+          title: 'Full lever',
+          detail: 'Both legs straight and horizontal. Five seconds is an excellent hold.',
+        },
       ],
     },
   },
@@ -617,15 +821,37 @@ export const EXERCISES: Exercise[] = [
       'Body in one line from head to toe, glutes squeezed hard.',
       'Point the toes and hold the entire body under tension.',
     ],
-    mistakes: ['Piked hips instead of a flat line', 'Any bend in the elbows', 'Chasing the full hold before the tuck versions are solid'],
+    mistakes: [
+      'Piked hips instead of a flat line',
+      'Any bend in the elbows',
+      'Chasing the full hold before the tuck versions are solid',
+    ],
     progression: {
-      intro: 'One of the hardest bodyweight holds there is. Realistically two to four years of consistent straight-arm work.',
+      intro:
+        'One of the hardest bodyweight holds there is. Realistically two to four years of consistent straight-arm work.',
       steps: [
-        { title: 'Planche lean', detail: 'A 30-second deep lean with the shoulders well past the wrists.', exerciseId: 'planche_lean' },
-        { title: 'Tuck planche', detail: 'Knees tucked to the chest, feet off the floor, hips at shoulder height. Build to 20 seconds.' },
-        { title: 'Advanced tuck', detail: 'Open the hips so the back is flat, knees still bent. Build to 15 seconds.' },
-        { title: 'Straddle planche', detail: 'Legs straight and spread wide — much easier than a full planche.' },
-        { title: 'Full planche', detail: 'Legs together and straight. Even two seconds is world-class.' },
+        {
+          title: 'Planche lean',
+          detail: 'A 30-second deep lean with the shoulders well past the wrists.',
+          exerciseId: 'planche_lean',
+        },
+        {
+          title: 'Tuck planche',
+          detail:
+            'Knees tucked to the chest, feet off the floor, hips at shoulder height. Build to 20 seconds.',
+        },
+        {
+          title: 'Advanced tuck',
+          detail: 'Open the hips so the back is flat, knees still bent. Build to 15 seconds.',
+        },
+        {
+          title: 'Straddle planche',
+          detail: 'Legs straight and spread wide — much easier than a full planche.',
+        },
+        {
+          title: 'Full planche',
+          detail: 'Legs together and straight. Even two seconds is world-class.',
+        },
       ],
     },
   },
@@ -647,14 +873,27 @@ export const EXERCISES: Exercise[] = [
       'Press the bottom arm straight and keep it locked.',
       'Stack the body in one line and squeeze the obliques hard.',
     ],
-    mistakes: ['Treating it as pure core strength when it is mostly shoulders', 'Bottom arm bending', 'Hips dropping out of line'],
+    mistakes: [
+      'Treating it as pure core strength when it is mostly shoulders',
+      'Bottom arm bending',
+      'Hips dropping out of line',
+    ],
     progression: {
       intro: 'Far more shoulder strength than core. Build the push-pull opposition first.',
       steps: [
-        { title: 'Vertical support', detail: 'Grip the pole and hold yourself vertically, feet off, for 20 seconds.' },
-        { title: 'Tuck flag', detail: 'Knees tucked tight, hips lifted sideways off the ground. Build to 15 seconds.' },
+        {
+          title: 'Vertical support',
+          detail: 'Grip the pole and hold yourself vertically, feet off, for 20 seconds.',
+        },
+        {
+          title: 'Tuck flag',
+          detail: 'Knees tucked tight, hips lifted sideways off the ground. Build to 15 seconds.',
+        },
         { title: 'Straddle flag', detail: 'Legs straight and spread wide to shorten the lever.' },
-        { title: 'Full flag', detail: 'Legs together and horizontal. Even three seconds is impressive.' },
+        {
+          title: 'Full flag',
+          detail: 'Legs together and horizontal. Even three seconds is impressive.',
+        },
       ],
     },
   },
@@ -676,7 +915,11 @@ export const EXERCISES: Exercise[] = [
       'Jump the feet back under the hips.',
       'Explode into a jump with the hands overhead.',
     ],
-    mistakes: ['Skipping the chest-to-floor portion', 'No jump at the top', 'Letting the lower back collapse when tired'],
+    mistakes: [
+      'Skipping the chest-to-floor portion',
+      'No jump at the top',
+      'Letting the lower back collapse when tired',
+    ],
   },
   {
     id: 'mountain_climber',
@@ -716,7 +959,10 @@ export const EXERCISES: Exercise[] = [
   },
 ];
 
-export const CATEGORY_META: Record<ExerciseCategory, { label: string; color: string; ring: string }> = {
+export const CATEGORY_META: Record<
+  ExerciseCategory,
+  { label: string; color: string; ring: string }
+> = {
   push: { label: 'Push', color: 'text-ember', ring: 'ring-ember/30 bg-ember/10' },
   pull: { label: 'Pull', color: 'text-forge', ring: 'ring-forge/30 bg-forge/10' },
   legs: { label: 'Legs', color: 'text-vital', ring: 'ring-vital/30 bg-vital/10' },
@@ -844,7 +1090,8 @@ export const PRESETS: Preset[] = [
   {
     id: 'beginner_push',
     name: 'Beginner Push',
-    description: 'The first pressing block. Builds the elbow and shoulder strength everything else stands on.',
+    description:
+      'The first pressing block. Builds the elbow and shoulder strength everything else stands on.',
     recommendedLevel: 1,
     focus: 'push',
     setup: 'bodyweight',
@@ -872,7 +1119,8 @@ export const PRESETS: Preset[] = [
   {
     id: 'foundation_full',
     name: 'Full Body Foundation',
-    description: 'A balanced push/pull/legs circuit. The best default when you are unsure what to train.',
+    description:
+      'A balanced push/pull/legs circuit. The best default when you are unsure what to train.',
     recommendedLevel: 1,
     focus: 'conditioning',
     setup: 'park',
@@ -887,7 +1135,8 @@ export const PRESETS: Preset[] = [
   {
     id: 'bar_basics',
     name: 'Bar Basics',
-    description: 'Everything that hangs from a bar. The core session for building real pulling strength.',
+    description:
+      'Everything that hangs from a bar. The core session for building real pulling strength.',
     recommendedLevel: 1,
     focus: 'pull',
     setup: 'bar',
@@ -972,7 +1221,8 @@ export const PRESETS: Preset[] = [
   {
     id: 'lat_width',
     name: 'Back Width',
-    description: 'Everything that builds the V-taper. The highest-leverage session for how your upper body reads.',
+    description:
+      'Everything that builds the V-taper. The highest-leverage session for how your upper body reads.',
     recommendedLevel: 1,
     focus: 'pull',
     setup: 'bar',
@@ -1014,7 +1264,8 @@ export const PRESETS: Preset[] = [
   {
     id: 'arms_focus',
     name: 'Arm Day',
-    description: 'Chin-ups for biceps, diamonds and dips for triceps. Triceps are two thirds of arm size.',
+    description:
+      'Chin-ups for biceps, diamonds and dips for triceps. Triceps are two thirds of arm size.',
     recommendedLevel: 1,
     focus: 'pull',
     setup: 'power_tower',
@@ -1028,7 +1279,8 @@ export const PRESETS: Preset[] = [
   {
     id: 'legs_focus',
     name: 'Legs & Glutes',
-    description: 'The session most calisthenics athletes skip. Costs no equipment and fixes your proportions.',
+    description:
+      'The session most calisthenics athletes skip. Costs no equipment and fixes your proportions.',
     recommendedLevel: 1,
     focus: 'legs',
     setup: 'bodyweight',
@@ -1057,7 +1309,8 @@ export const PRESETS: Preset[] = [
   {
     id: 'posture_fix',
     name: 'Posture Repair',
-    description: 'Pulling-heavy work to undo rounded shoulders. Standing tall changes your silhouette more than any single muscle.',
+    description:
+      'Pulling-heavy work to undo rounded shoulders. Standing tall changes your silhouette more than any single muscle.',
     recommendedLevel: 1,
     focus: 'pull',
     setup: 'park',

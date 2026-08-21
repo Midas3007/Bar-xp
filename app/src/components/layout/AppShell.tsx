@@ -21,13 +21,7 @@ import { Modal } from '../ui/Modal';
 import { levelProgress } from '../../lib/game/constants';
 import { formatClock, useRestTimer } from '../../context/RestTimerContext';
 
-export type ViewKey =
-  | 'dashboard'
-  | 'workout'
-  | 'progress'
-  | 'leaderboard'
-  | 'shop'
-  | 'profile';
+export type ViewKey = 'dashboard' | 'workout' | 'progress' | 'leaderboard' | 'shop' | 'profile';
 
 interface NavItem {
   key: ViewKey;
@@ -50,14 +44,17 @@ export function AppShell({
   profile,
   view,
   onNavigate,
+  banner,
   children,
 }: {
   profile: Profile;
   view: ViewKey;
   onNavigate: (view: ViewKey) => void;
+  /** Rendered above everything — the demo's read-only notice uses it. */
+  banner?: ReactNode;
   children: ReactNode;
 }) {
-  const { signOut } = useAuth();
+  const { signOut, isGuest, exitDemo } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [online, setOnline] = useState(() => navigator.onLine !== false);
 
@@ -91,6 +88,8 @@ export function AppShell({
         aria-hidden
       />
 
+      {banner}
+
       {online ? null : (
         <div className="relative z-40 flex items-center justify-center gap-2 bg-warn-vivid/15 px-4 py-2 text-center text-[11px] font-medium text-warn ring-1 ring-inset ring-warn/25">
           <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -112,7 +111,11 @@ export function AppShell({
               />
             ))}
           </nav>
-          <SidebarFooter profile={profile} onSignOut={() => void signOut()} />
+          <SidebarFooter
+            profile={profile}
+            onSignOut={() => (isGuest ? exitDemo() : void signOut())}
+            signOutLabel={isGuest ? 'Leave demo' : undefined}
+          />
         </aside>
 
         {/* --- Main column --- */}
@@ -180,7 +183,11 @@ export function AppShell({
             />
           ))}
         </nav>
-        <SidebarFooter profile={profile} onSignOut={() => void signOut()} />
+        <SidebarFooter
+          profile={profile}
+          onSignOut={() => (isGuest ? exitDemo() : void signOut())}
+          signOutLabel={isGuest ? 'Leave demo' : undefined}
+        />
       </Modal>
 
       {/* --- Mobile bottom bar --- */}
@@ -216,9 +223,7 @@ export function AppShell({
                   />
                 ) : null}
                 <Icon className="h-[18px] w-[18px]" aria-hidden />
-                <span className="w-full truncate text-center">
-                  {item.shortLabel ?? item.label}
-                </span>
+                <span className="w-full truncate text-center">{item.shortLabel ?? item.label}</span>
               </button>
             );
           })}
@@ -244,10 +249,7 @@ function RestTimerBar() {
       }`}
       role="status"
     >
-      <Timer
-        className={`h-4 w-4 shrink-0 ${done ? 'text-vital' : 'text-forge'}`}
-        aria-hidden
-      />
+      <Timer className={`h-4 w-4 shrink-0 ${done ? 'text-vital' : 'text-forge'}`} aria-hidden />
       <span
         className={`font-mono text-sm font-bold tabular-nums ${
           done ? 'text-vital' : 'text-content-strong'
@@ -261,7 +263,11 @@ function RestTimerBar() {
         className="rounded-full bg-surface-hover p-1.5 text-content-muted transition hover:text-content-strong"
         aria-label={done ? 'Dismiss the rest alert' : 'Pause the rest timer'}
       >
-        {done ? <X className="h-3.5 w-3.5" aria-hidden /> : <Pause className="h-3.5 w-3.5" aria-hidden />}
+        {done ? (
+          <X className="h-3.5 w-3.5" aria-hidden />
+        ) : (
+          <Pause className="h-3.5 w-3.5" aria-hidden />
+        )}
       </button>
     </div>
   );
@@ -315,7 +321,15 @@ function NavButton({
   );
 }
 
-function SidebarFooter({ profile, onSignOut }: { profile: Profile; onSignOut: () => void }) {
+function SidebarFooter({
+  profile,
+  onSignOut,
+  signOutLabel = 'Sign out',
+}: {
+  profile: Profile;
+  onSignOut: () => void;
+  signOutLabel?: string;
+}) {
   return (
     <div className="border-t border-line p-3">
       <div className="flex items-center gap-3 rounded-xl px-2 py-2">
@@ -328,14 +342,16 @@ function SidebarFooter({ profile, onSignOut }: { profile: Profile; onSignOut: ()
               ownedCosmetics={profile.inventory.cosmetics}
             />
           </p>
-          <p className="truncate text-[11px] text-content-subtle">{profile.email || 'Signed in'}</p>
+          <p className="truncate text-[11px] text-content-subtle">
+            {profile.email || (signOutLabel === 'Sign out' ? 'Signed in' : 'Sample athlete')}
+          </p>
         </div>
         <button
           type="button"
           onClick={onSignOut}
           className="rounded-lg p-2 text-content-muted transition hover:bg-surface-hover hover:text-danger"
-          aria-label="Sign out"
-          title="Sign out"
+          aria-label={signOutLabel}
+          title={signOutLabel}
         >
           <LogOut className="h-4 w-4" aria-hidden />
         </button>

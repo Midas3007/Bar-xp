@@ -24,7 +24,15 @@ import {
 
 import type { Exercise, Profile, StatKey, StatsSnapshot, Workout } from '../lib/types';
 import type { ViewKey } from '../components/layout/AppShell';
-import { Button, Card, CardHeader, Chip, EmptyState, SkeletonBlock, Spinner } from '../components/ui/Primitives';
+import {
+  Button,
+  Card,
+  CardHeader,
+  Chip,
+  EmptyState,
+  SkeletonBlock,
+  Spinner,
+} from '../components/ui/Primitives';
 import { MeasurementCharts } from '../components/MeasurementCharts';
 import { STAT_META } from '../lib/game/constants';
 import { useTheme } from '../context/ThemeContext';
@@ -288,8 +296,16 @@ export function ProgressView({
                 <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 4, left: -12 }}>
                   <defs>
                     <linearGradient id="xpGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={statHex('endurance', resolved)} stopOpacity={0.45} />
-                      <stop offset="100%" stopColor={statHex('endurance', resolved)} stopOpacity={0.02} />
+                      <stop
+                        offset="0%"
+                        stopColor={statHex('endurance', resolved)}
+                        stopOpacity={0.45}
+                      />
+                      <stop
+                        offset="100%"
+                        stopColor={statHex('endurance', resolved)}
+                        stopOpacity={0.02}
+                      />
                     </linearGradient>
                   </defs>
                   <CartesianGrid stroke={grid} vertical={false} />
@@ -391,10 +407,7 @@ export function ProgressView({
                 />
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={volumePoints}
-                    margin={{ top: 8, right: 8, bottom: 4, left: -12 }}
-                  >
+                  <BarChart data={volumePoints} margin={{ top: 8, right: 8, bottom: 4, left: -12 }}>
                     <CartesianGrid stroke={grid} vertical={false} />
                     <XAxis
                       dataKey="label"
@@ -412,7 +425,10 @@ export function ProgressView({
                       width={44}
                       tickFormatter={(v) => compactNumber(v)}
                     />
-                    <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                    <Tooltip
+                      content={<ChartTooltip />}
+                      cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                    />
                     <Bar
                       dataKey="reps"
                       name="Total reps"
@@ -462,7 +478,9 @@ export function ProgressView({
 function Header() {
   return (
     <div>
-      <h1 className="font-display text-2xl font-bold tracking-tight text-content-strong">Progress</h1>
+      <h1 className="font-display text-2xl font-bold tracking-tight text-content-strong">
+        Progress
+      </h1>
       <p className="mt-1.5 text-sm text-content-muted">
         Every assessment and session writes a snapshot. This is the long view.
       </p>
@@ -571,8 +589,8 @@ function WorkoutHistory({
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-2 truncate text-sm font-medium text-content">
                       <span className="truncate">
-                        {formatShortDay(workout.day, workout.createdAt)} ·{' '}
-                        {workout.entries.length} movement
+                        {formatShortDay(workout.day, workout.createdAt)} · {workout.entries.length}{' '}
+                        movement
                         {workout.entries.length === 1 ? '' : 's'}
                       </span>
                       {corrected ? <Chip>Corrected</Chip> : null}
@@ -731,7 +749,10 @@ export function ChartTooltip({
             />
             <span className="text-content-muted">{String(entry.name ?? '')}</span>
             <span className="ml-auto font-mono font-semibold text-content-strong">
-              {fmtDecimal(entry.value, entry.value !== undefined && num(entry.value, 0) % 1 === 0 ? 0 : 1)}
+              {fmtDecimal(
+                entry.value,
+                entry.value !== undefined && num(entry.value, 0) % 1 === 0 ? 0 : 1,
+              )}
               {suffix}
             </span>
           </li>

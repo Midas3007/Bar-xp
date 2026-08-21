@@ -54,7 +54,11 @@ export function PhysiqueLab({ profile }: { profile: Profile }) {
   const traits = useMemo(() => rateAesthetics(profile), [profile]);
   const overall = useMemo(() => overallAestheticScore(traits), [traits]);
   const overallBand = useMemo(
-    () => overallGrade(overall, traits.some((t) => t.grade !== 'unknown')),
+    () =>
+      overallGrade(
+        overall,
+        traits.some((t) => t.grade !== 'unknown'),
+      ),
     [overall, traits],
   );
   const priorities = useMemo(() => priorityTraits(traits, 3), [traits]);
@@ -112,7 +116,9 @@ export function PhysiqueLab({ profile }: { profile: Profile }) {
                   {fmtDecimal(overall, 0)}
                   <span className="ml-1 text-base font-medium text-content-subtle">/100</span>
                 </p>
-                <p className={`mt-1 font-display text-sm font-semibold ${GRADE_META[overallBand].color}`}>
+                <p
+                  className={`mt-1 font-display text-sm font-semibold ${GRADE_META[overallBand].color}`}
+                >
                   {gradeLabel(overallBand, labelSet)}
                 </p>
               </div>
@@ -181,8 +187,12 @@ export function PhysiqueLab({ profile }: { profile: Profile }) {
                       animated={false}
                       label={trait.label}
                     />
-                    <p className="mt-1.5 text-[11px] leading-relaxed text-content-subtle">{trait.what}</p>
-                    <p className="mt-1 text-[11px] leading-relaxed text-content-muted">{trait.tip}</p>
+                    <p className="mt-1.5 text-[11px] leading-relaxed text-content-subtle">
+                      {trait.what}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-content-muted">
+                      {trait.tip}
+                    </p>
                   </li>
                 );
               })}
@@ -199,7 +209,9 @@ export function PhysiqueLab({ profile }: { profile: Profile }) {
               {LEVERS.map((lever) => (
                 <li key={lever.title}>
                   <p className="text-sm font-semibold text-content">{lever.title}</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-content-muted">{lever.detail}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-content-muted">
+                    {lever.detail}
+                  </p>
                 </li>
               ))}
             </ul>

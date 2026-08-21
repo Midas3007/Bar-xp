@@ -53,6 +53,8 @@ import { friendCardFrom, pushRecentDay, searchKey } from './game/friends';
 import { accrueSeason, rolloverSeason, seasonIdFor } from './game/season';
 import { buildRoutine, removeRoutine, upsertRoutine } from './game/routines';
 import { LIMITS } from './game/validation';
+import { assertNotDemo, isDemoActive } from './demo/state';
+import { getDemoData } from './demo/fixture';
 
 /* -------------------------------------------------------------------------- */
 /* Profile lifecycle                                                           */
@@ -310,6 +312,7 @@ export async function completeAssessment(
   input: AssessmentInput,
   measurements: MeasurementValues = {},
 ): Promise<AssessmentResult> {
+  assertNotDemo();
   const db = getDbOrThrow();
   const stats = baselineStats(input);
   const tier = tierForStats(stats).name;
@@ -432,6 +435,7 @@ export async function logWorkout(
   resolve: (id: string) => Exercise | undefined,
   presetId: string | null = null,
 ): Promise<LogWorkoutResult> {
+  assertNotDemo();
   const db = getDbOrThrow();
   const now = Date.now();
   const today = dayKey();
@@ -444,7 +448,11 @@ export async function logWorkout(
   // Shields are passed in so an elapsed week is settled here, on the logging
   // path, rather than waiting for the hourly background pass — which is how a
   // shield bought to protect a streak used to expire before it could spend.
-  const streakAfter = registerWorkout(streakBefore, today, int(profile.inventory?.streakShields, 0));
+  const streakAfter = registerWorkout(
+    streakBefore,
+    today,
+    int(profile.inventory?.streakShields, 0),
+  );
 
   const goalOutcome = advanceGoals(profile.goals, profile.level, {
     entries,
@@ -546,7 +554,6 @@ export async function logWorkout(
     recentDays,
     updatedAt: now,
   });
-
 
   // The profile as the batch will leave it. Achievements are derived, so the
   // only way to know what this session unlocked is to score both sides — and
@@ -710,6 +717,7 @@ export async function voidWorkout(
   workout: Workout,
   resolve: (id: string) => Exercise | undefined,
 ): Promise<VoidWorkoutResult> {
+  assertNotDemo();
   const db = getDbOrThrow();
   const now = Date.now();
 
@@ -825,6 +833,7 @@ async function erasePage(uid: string, collectionName: string): Promise<number> {
  * sessions belonging to a profile that no longer exists.
  */
 export async function eraseAccountData(uid: string): Promise<void> {
+  assertNotDemo();
   for (const name of [COLLECTIONS.workouts, COLLECTIONS.statsHistory]) {
     // Paged rather than recursive so a huge history cannot blow the stack.
     for (;;) {
@@ -843,6 +852,7 @@ export async function eraseAccountData(uid: string): Promise<void> {
 
 /** Record a new body fat reading; aesthetics gets a floor from leanness. */
 export async function updateBodyFat(profile: Profile, bodyFat: number): Promise<void> {
+  assertNotDemo();
   const db = getDbOrThrow();
   const value = clamp(num(bodyFat, 20), LIMITS.MIN_BODY_FAT, LIMITS.MAX_BODY_FAT);
   const now = Date.now();
@@ -889,6 +899,7 @@ export async function recordMeasurements(
   profile: Profile,
   input: MeasurementValues,
 ): Promise<void> {
+  assertNotDemo();
   const db = getDbOrThrow();
   const entered = normalizeMeasurementValues(input);
   if (Object.keys(entered).length === 0) return;
@@ -926,12 +937,11 @@ export async function recordMeasurements(
 /* Shop                                                                        */
 /* -------------------------------------------------------------------------- */
 
-export type PurchaseOutcome =
-  | { ok: true; item: ShopItem }
-  | { ok: false; error: string };
+export type PurchaseOutcome = { ok: true; item: ShopItem } | { ok: false; error: string };
 
 /** Spend Bar Coins on a shop item, applying it to the inventory. */
 export async function purchaseItem(profile: Profile, itemId: string): Promise<PurchaseOutcome> {
+  assertNotDemo();
   const item = findShopItem(itemId);
   if (!item) return { ok: false, error: 'That item does not exist.' };
 
@@ -998,6 +1008,7 @@ export async function setActiveCosmetic(
   profile: Profile,
   cosmeticId: string | null,
 ): Promise<void> {
+  assertNotDemo();
   if (cosmeticId && !arr<string>(profile.inventory.cosmetics).includes(cosmeticId)) return;
   await updateDoc(userDocRef(profile.uid), {
     activeCosmetic: cosmeticId,
@@ -1014,6 +1025,7 @@ export async function addCustomExercise(
   profile: Profile,
   exercise: Omit<CustomExercise, 'id'>,
 ): Promise<void> {
+  assertNotDemo();
   const existing = arr<CustomExercise>(profile.customExercises);
   if (existing.length >= LIMITS.MAX_CUSTOM_EXERCISES) return;
 
@@ -1032,6 +1044,7 @@ export async function addCustomExercise(
 }
 
 export async function removeCustomExercise(profile: Profile, id: string): Promise<void> {
+  assertNotDemo();
   await updateDoc(userDocRef(profile.uid), {
     customExercises: arr<CustomExercise>(profile.customExercises).filter((e) => e.id !== id),
     updatedAt: Date.now(),
@@ -1048,6 +1061,7 @@ export async function saveRoutine(
   profile: Profile,
   input: { id?: string; name: string; items: RoutineItem[] },
 ): Promise<void> {
+  assertNotDemo();
   const existing = arr<Routine>(profile.routines);
   const now = Date.now();
   const matched =
@@ -1071,6 +1085,7 @@ export async function saveRoutine(
 }
 
 export async function deleteRoutine(profile: Profile, id: string): Promise<void> {
+  assertNotDemo();
   await updateDoc(userDocRef(profile.uid), {
     routines: removeRoutine(profile.routines, id),
     updatedAt: Date.now(),
@@ -1079,6 +1094,7 @@ export async function deleteRoutine(profile: Profile, id: string): Promise<void>
 
 /** Rename the athlete. Kept short so leaderboard rows stay tidy. */
 export async function updateDisplayName(profile: Profile, name: string): Promise<void> {
+  assertNotDemo();
   const requested = str(name, '').trim();
   if (requested.length < 2) return;
   const trimmed = sanitizeDisplayName(requested);
@@ -1096,6 +1112,7 @@ export async function updatePreferences(
   profile: Profile,
   patch: { unitSystem?: UnitSystem; gymBroMode?: boolean },
 ): Promise<void> {
+  assertNotDemo();
   const next: Record<string, unknown> = { updatedAt: Date.now() };
   if (patch.unitSystem === 'metric' || patch.unitSystem === 'imperial') {
     next.unitSystem = patch.unitSystem;
@@ -1109,6 +1126,7 @@ export async function updatePreferences(
 /* -------------------------------------------------------------------------- */
 
 export async function fetchStatsHistory(uid: string, max = 120): Promise<StatsSnapshot[]> {
+  if (isDemoActive()) return getDemoData().statsHistory.slice(-max);
   const db = getDbOrThrow();
   const q = query(
     collection(db, COLLECTIONS.statsHistory),
@@ -1124,6 +1142,7 @@ export async function fetchStatsHistory(uid: string, max = 120): Promise<StatsSn
 }
 
 export async function fetchWorkouts(uid: string, max = 60): Promise<Workout[]> {
+  if (isDemoActive()) return getDemoData().workouts.slice(0, max);
   const db = getDbOrThrow();
   const q = query(
     collection(db, COLLECTIONS.workouts),
@@ -1136,6 +1155,7 @@ export async function fetchWorkouts(uid: string, max = 60): Promise<Workout[]> {
 }
 
 export async function fetchLeaderboard(max = 50): Promise<LeaderboardRow[]> {
+  if (isDemoActive()) return getDemoData().leaderboard.slice(0, max);
   const db = getDbOrThrow();
   // Reads the public projection, never the user documents — those are private.
   const q = query(
@@ -1187,9 +1207,7 @@ function normalizeSnapshot(id: string, raw: unknown): StatsSnapshot {
     totalReps: Math.max(0, int(data.totalReps, 0)),
     streak: Math.max(0, int(data.streak, 0)),
     source:
-      data.source === 'assessment' ||
-      data.source === 'measurement' ||
-      data.source === 'correction'
+      data.source === 'assessment' || data.source === 'measurement' || data.source === 'correction'
         ? data.source
         : 'workout',
     // Null rather than `{}` when the key is absent, so "no measurements were

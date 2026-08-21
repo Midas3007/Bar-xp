@@ -152,10 +152,7 @@ export function purchaseState(item: ShopItem, profile: Profile | null): Purchase
 }
 
 /** Tailwind classes for a user's active name cosmetic, or '' for the default. */
-export function cosmeticNameClass(
-  activeCosmetic: unknown,
-  ownedCosmetics: unknown,
-): string {
+export function cosmeticNameClass(activeCosmetic: unknown, ownedCosmetics: unknown): string {
   const active = typeof activeCosmetic === 'string' ? activeCosmetic : null;
   if (!active) return '';
   // A cosmetic only renders if it is genuinely owned — this also guards the

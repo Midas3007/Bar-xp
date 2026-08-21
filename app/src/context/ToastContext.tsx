@@ -65,11 +65,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (toast: Omit<Toast, 'id'>) => {
       const id = nextId.current;
       nextId.current += 1;
-      setToasts((current) => [
-        ...current.slice(-(MAX_VISIBLE_TOASTS - 1)),
-        { ...toast, id },
-      ]);
-      timers.current.set(id, window.setTimeout(() => dismiss(id), TOAST_MS));
+      setToasts((current) => [...current.slice(-(MAX_VISIBLE_TOASTS - 1)), { ...toast, id }]);
+      timers.current.set(
+        id,
+        window.setTimeout(() => dismiss(id), TOAST_MS),
+      );
     },
     [dismiss],
   );
@@ -115,7 +115,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-content-strong">{toast.title}</p>
                 {toast.detail ? (
-                  <p className="mt-0.5 text-xs leading-relaxed text-content-muted">{toast.detail}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-content-muted">
+                    {toast.detail}
+                  </p>
                 ) : null}
               </div>
               <button

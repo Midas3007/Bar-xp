@@ -113,7 +113,10 @@ export interface FriendCard {
  * default. Nothing about the body, the assessment, personal bests, goals,
  * custom movements, coins or inventory belongs here.
  */
-export function friendCardFrom(profile: Profile, now: number = Date.now()): Record<string, unknown> {
+export function friendCardFrom(
+  profile: Profile,
+  now: number = Date.now(),
+): Record<string, unknown> {
   return {
     displayName: str(profile.displayName, 'Athlete'),
     photoURL: str(profile.photoURL, ''),

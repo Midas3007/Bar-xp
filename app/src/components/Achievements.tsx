@@ -1,14 +1,4 @@
-import {
-  Crown,
-  Dumbbell,
-  Flame,
-  Medal,
-  Shield,
-  Sparkles,
-  Target,
-  Trophy,
-  Zap,
-} from 'lucide-react';
+import { Crown, Dumbbell, Flame, Medal, Shield, Sparkles, Target, Trophy, Zap } from 'lucide-react';
 
 import type { Profile } from '../lib/types';
 import { Card, CardHeader } from './ui/Primitives';

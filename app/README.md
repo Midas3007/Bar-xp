@@ -1,11 +1,37 @@
 # Bar XP — Calisthenics RPG
 
+[![CI](https://github.com/Midas3007/Bar-xp/actions/workflows/ci.yml/badge.svg)](https://github.com/Midas3007/Bar-xp/actions/workflows/ci.yml)
+
+**[Try it without signing up →](https://workout-117fc.web.app)** — the sign-in
+screen has a **Look around first** button that drops you into a sample athlete
+with eighteen weeks of training behind him: filled charts, a Diamond rank, a
+muscle map, personal bests and a leaderboard he sits fourth on. Everything is
+read-only and no account is needed.
+
 A fitness tracker that treats training like a character sheet. Log calisthenics
 work to earn XP, level up, bank **Bar Coins**, and grow four core stats —
 **Strength, Endurance, Aesthetics, Discipline** — that decide your rank.
 
 React 18 · TypeScript · Vite · Tailwind CSS · Firebase (Auth + Firestore) ·
 Recharts · Lucide React.
+
+### The demo athlete
+
+The demo is a **local fixture, not an anonymous Firebase session**, and that was
+a deliberate call. An anonymous account would write a real user document and a
+real leaderboard row for every visitor — onto the board the actual users share,
+with no cleanup — and it would start _empty_, which is precisely the impression
+a demo exists to avoid.
+
+Instead, `src/lib/demo/fixture.ts` simulates eighteen weeks of training **through
+the real game engine**: `scoreSession`, `registerWorkout`, `settleStreak`,
+`advanceGoals`, `mergeMuscleVolume`. So `totalXp` really is the sum of the
+sessions, `level` really is `levelFromTotalXp` of it, and the streak really is
+what that schedule produces — including a week bridged by a Streak Shield and a
+later week where the run breaks and rebuilds. There is no seam to find. It is
+deterministic given a clock, needs no network and no Firebase config at all, and
+the test suite asserts it stays internally consistent and inside a believable
+band.
 
 ---
 
@@ -20,12 +46,12 @@ npm run dev
 Without a `.env` the app boots to a setup screen listing the missing keys
 rather than crashing, so `npm run dev` is useful on a fresh clone.
 
-| Script            | Does                                        |
-| ----------------- | ------------------------------------------- |
-| `npm run dev`     | Dev server on :5173                         |
-| `npm run build`   | Typecheck, then production build to `dist/` |
-| `npm run preview` | Serve the built bundle                      |
-| `npm run typecheck` | `tsc --noEmit`                            |
+| Script              | Does                                        |
+| ------------------- | ------------------------------------------- |
+| `npm run dev`       | Dev server on :5173                         |
+| `npm run build`     | Typecheck, then production build to `dist/` |
+| `npm run preview`   | Serve the built bundle                      |
+| `npm run typecheck` | `tsc --noEmit`                              |
 
 ---
 
@@ -55,11 +81,11 @@ Progress view loads empty and the console prints an index-creation link.
 
 Movements are graded rather than uniformly level-gated:
 
-| Grade | Access | Examples |
-| --- | --- | --- |
-| **Foundation** | Open from level 1 | Push-up, Pull-up, Dip, Squat, Plank, Chin-up, Row |
-| **Intermediate** | Light level gate (5–8) | Archer push-up, L-sit, Pistol squat, Toes to bar |
-| **Elite** | Level 12–20, or a shop unlock | Muscle-up, Front lever, Planche, Human flag, HSPU |
+| Grade            | Access                        | Examples                                          |
+| ---------------- | ----------------------------- | ------------------------------------------------- |
+| **Foundation**   | Open from level 1             | Push-up, Pull-up, Dip, Squat, Plank, Chin-up, Row |
+| **Intermediate** | Light level gate (5–8)        | Archer push-up, L-sit, Pistol squat, Toes to bar  |
+| **Elite**        | Level 12–20, or a shop unlock | Muscle-up, Front lever, Planche, Human flag, HSPU |
 
 Gating the basics only blocks training, so everything a beginner can reasonably
 attempt is available immediately. Every gated movement carries a **progression**
@@ -90,7 +116,7 @@ drives:
   specific next action for each. Collapsed by default, revealed by a local
   toggle. Body-fat guidance stops at healthy ranges rather than rewarding
   ever-lower numbers. **Gym Bro Mode** — on by default, toggled from the profile
-  — reads the *overall* verdict as Chud / Normie / Chad / GIGACHAD instead of
+  — reads the _overall_ verdict as Chud / Normie / Chad / GIGACHAD instead of
   Lagging / Building / Good / Standout. It reaches the headline and nothing
   else: eight joke labels turn a breakdown meant to be read into noise, and
   "Chud" against one lagging muscle group reads as an insult rather than a
@@ -144,7 +170,7 @@ A session's XP is the sum of its entries, with two adjustments:
   grinding a single movement is never the optimal play.
 - **Streak multiplier** — `+3%` per streak day, capped at `+45%`.
 
-Level is **always derived** from *net* lifetime XP (`levelFromTotalXp`) rather
+Level is **always derived** from _net_ lifetime XP (`levelFromTotalXp`) rather
 than trusted from the document, so the two can never drift apart. The curve is
 `100 · level^1.32 + 20 · level`, capped at level 100.
 
@@ -152,12 +178,12 @@ than trusted from the document, so the two can never drift apart. The curve is
 
 Rank comes from the **average of the four core stats**:
 
-| Tier | Avg stat | | Tier | Avg stat |
-| --- | --- | --- | --- | --- |
-| Uninitiated | 0 | | Platinum | 68 |
-| Bronze | 12 | | Diamond | 95 |
-| Silver | 26 | | Mythic | 130 |
-| Gold | 45 | | Legend | 175 |
+| Tier        | Avg stat |     | Tier     | Avg stat |
+| ----------- | -------- | --- | -------- | -------- |
+| Uninitiated | 0        |     | Platinum | 68       |
+| Bronze      | 12       |     | Diamond  | 95       |
+| Silver      | 26       |     | Mythic   | 130      |
+| Gold        | 45       |     | Legend   | 175      |
 
 ### Identities & streaks
 
@@ -200,7 +226,7 @@ the day boundary). Each pass:
 1. Applies **streak decay**. Training today or yesterday is safe. Each fully
    missed day can be bridged by consuming one **Streak Shield**, spent
    automatically. If the gap outruns the shields the streak resets — and the
-   shields are *not* spent on a gap they cannot bridge, so they carry over.
+   shields are _not_ spent on a gap they cannot bridge, so they carry over.
 2. Recomputes **tier** and **identity**, persisting any drift.
 
 ### Economy
@@ -216,7 +242,7 @@ Bar Coins come from sessions (`15 + xp/12`) and completed goals. They buy:
 ### Sets and routines
 
 A workout entry can describe what actually happened set by set. An entry carries
-an optional `reps` ladder — `[12, 10, 8]` — stored *only* when the sets genuinely
+an optional `reps` ladder — `[12, 10, 8]` — stored _only_ when the sets genuinely
 differ, so a uniform session writes exactly the document it wrote before the
 field existed. `volume` stays the single figure the scorer reads, and for a
 varied ladder it is deliberately less than `sets × amount`. Historical entries
@@ -224,7 +250,7 @@ have no ladder and are scored from their stored volume untouched; `entryVolume`
 never falls back to re-deriving it, because `workouts` documents are immutable
 and whatever an old session was worth it is still worth.
 
-`amount` is the *hardest* set, which is what a personal best measures.
+`amount` is the _hardest_ set, which is what a personal best measures.
 
 Routines are the editable counterpart to the read-only built-in presets: an
 ordered list of movements with target reps per set, saved from whatever is in
@@ -280,7 +306,7 @@ together or not at all.
 
 Time-boxed contests between two friends over the current week or month:
 sessions, volume, XP, or the volume of one movement. `sessions` counts distinct
-*days*, so splitting one workout into five logs wins nothing.
+_days_, so splitting one workout into five logs wins nothing.
 
 **No result is ever stored.** Each athlete writes their own score to
 `challenges/{id}/scores/{uid}`, and both clients derive the same winner from the
@@ -344,7 +370,7 @@ user-writable and therefore untrusted like any other input.
 
 Firestore's IndexedDB cache is enabled, which buys offline reads, offline
 queries and offline writes that replay on reconnect. The consequence that has to
-be handled: `WriteBatch.commit()` does not settle until the *server*
+be handled: `WriteBatch.commit()` does not settle until the _server_
 acknowledges, so offline it never settles. Writes are applied to the local cache
 synchronously either way, so `commitBatch` reports success once the write is
 durable on the device and tells the caller whether the server has seen it yet —
@@ -386,7 +412,7 @@ up to 1.5 discipline behind rather than risk removing more than was granted.
 ### Export and erasure
 
 The Profile view exports the full history as JSON (profile, sessions, stat
-snapshots) or CSV (one row per *entry*, every cell quoted, so a movement named
+snapshots) or CSV (one row per _entry_, every cell quoted, so a movement named
 `Front lever, tucked` stays in one cell). Delete-account erases the profile,
 every session, every snapshot, the leaderboard row and the sign-in itself,
 behind a typed `DELETE` confirmation. Deletes are owner-only and destroy history
@@ -514,7 +540,7 @@ Firestore documents can carry `undefined`, `null`, strings, or fields written by
 an older schema. A single `NaN` reaching JSX renders the literal text "NaN" and
 can break a chart's axis domain. Three layers guard against it:
 
-1. **`lib/safe.ts`** — `num`, `int`, `pct`, `fmt` and friends are *total*: they
+1. **`lib/safe.ts`** — `num`, `int`, `pct`, `fmt` and friends are _total_: they
    always return a finite number, whatever they are handed.
 2. **`normalizeProfile`** — every profile read passes through it, producing a
    fully populated object with finite values. Level and tier are re-derived
@@ -546,7 +572,7 @@ carefully, because it is only partly true**, and an accurate limitation is worth
 more than an overstated guarantee:
 
 - The **aggregate** bounds — total session volume, session XP, session coins,
-  body fat, XP monotonicity, the per-write XP and coin deltas — *are* enforced
+  body fat, XP monotonicity, the per-write XP and coin deltas — _are_ enforced
   in `firestore.rules`.
 - The **per-set** bounds — reps per set, seconds per hold, sets per exercise —
   are enforced **client-side only**. Firestore rules cannot iterate a list, so
@@ -558,17 +584,17 @@ So a hand-rolled client can write an entry claiming 900 reps in one set — but 
 cannot make that session worth more XP than a legitimate one, and it cannot move
 the profile by more than one session's worth.
 
-| Bound | Limit |
-| --- | --- |
-| Reps in one set | 1–499 (500+ rejected) |
-| Seconds in one hold | 1–3599 (3600+ rejected) |
-| Sets per exercise | 1–20 |
-| Exercises per session | 12 |
-| Total session volume | 5,000 units |
-| Custom exercise XP/unit | 0.1–8 |
-| Body fat | 3–60% |
-| Bodyweight | 20–400 kg |
-| Any girth measurement | 10–250 cm |
+| Bound                   | Limit                   |
+| ----------------------- | ----------------------- |
+| Reps in one set         | 1–499 (500+ rejected)   |
+| Seconds in one hold     | 1–3599 (3600+ rejected) |
+| Sets per exercise       | 1–20                    |
+| Exercises per session   | 12                      |
+| Total session volume    | 5,000 units             |
+| Custom exercise XP/unit | 0.1–8                   |
+| Body fat                | 3–60%                   |
+| Bodyweight              | 20–400 kg               |
+| Any girth measurement   | 10–250 cm               |
 
 The rules additionally enforce that `totalXp` is **monotonic** — it can never be
 reduced — that `xpVoided` is monotonic and can never exceed it, and that
@@ -576,17 +602,17 @@ reduced — that `xpVoided` is monotonic and can never exceed it, and that
 
 ### Data model
 
-| Collection | Access |
-| --- | --- |
-| `users/{uid}` | **Owner-only, read and write.** Holds email, body-fat readings, the assessment, personal bests and per-muscle volume. |
-| `public_profiles/{uid}` | Readable by any signed-in user. Exactly the nine fields the leaderboard renders, enforced with `hasOnly`. Mirrored from the user document on every write that changes one. |
-| `workouts/{id}` | Private to the owner. Create-only and **never updated**; deletable only by the owner, for account erasure. |
-| `stats_history/{id}` | Private to the owner. Append-only audit trail, and where body measurements are recorded. Owner-deletable for erasure. |
-| `friend_requests/{from}__{to}` | Readable by its two parties. No mutable state — its existence *is* "pending". Created only by the sender; deleted by either. |
-| `friendships/{a}__{b}` | Readable by its two members. Id is the sorted pair, so a pair has one address. Created only by the recipient of a matching request. |
-| `friend_cards/{uid}` | The richer projection — core stats, volume, streak, training days. Readable by an accepted friend; writable only by its owner. |
-| `challenges/{id}` | Readable by its two members. Only the *invited* member may set `status`, and only once. |
-| `challenges/{id}/scores/{uid}` | One document per athlete, named after them. The rule stopping you writing your opponent's number is the document id. |
+| Collection                     | Access                                                                                                                                                                     |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users/{uid}`                  | **Owner-only, read and write.** Holds email, body-fat readings, the assessment, personal bests and per-muscle volume.                                                      |
+| `public_profiles/{uid}`        | Readable by any signed-in user. Exactly the nine fields the leaderboard renders, enforced with `hasOnly`. Mirrored from the user document on every write that changes one. |
+| `workouts/{id}`                | Private to the owner. Create-only and **never updated**; deletable only by the owner, for account erasure.                                                                 |
+| `stats_history/{id}`           | Private to the owner. Append-only audit trail, and where body measurements are recorded. Owner-deletable for erasure.                                                      |
+| `friend_requests/{from}__{to}` | Readable by its two parties. No mutable state — its existence _is_ "pending". Created only by the sender; deleted by either.                                               |
+| `friendships/{a}__{b}`         | Readable by its two members. Id is the sorted pair, so a pair has one address. Created only by the recipient of a matching request.                                        |
+| `friend_cards/{uid}`           | The richer projection — core stats, volume, streak, training days. Readable by an accepted friend; writable only by its owner.                                             |
+| `challenges/{id}`              | Readable by its two members. Only the _invited_ member may set `status`, and only once.                                                                                    |
+| `challenges/{id}/scores/{uid}` | One document per athlete, named after them. The rule stopping you writing your opponent's number is the document id.                                                       |
 
 The split matters: an earlier version let any signed-in user read whole user
 documents, on the reasoning that the client only rendered safe fields. That was
@@ -610,8 +636,8 @@ smuggled into `public_profiles`.
 **The suite has been shown to fail.** Eight of these assertions once passed for
 the wrong reason: the emulator was never reset between tests, so an early one
 left `totalXp` high and every later negative fixture — which defaults to zero —
-was rejected by the monotonicity clause *before the field under test was ever
-evaluated*. `statsAreValid`, the coin bound, the level cap and the body-fat
+was rejected by the monotonicity clause _before the field under test was ever
+evaluated_. `statsAreValid`, the coin bound, the level cap and the body-fat
 bound could all be deleted with the suite still green. Each negative test now
 resets to a known document first, and every guard was verified by removing its
 rule and confirming that specific test goes red.
@@ -621,14 +647,14 @@ npm run test:paths
 ```
 
 Replays every write path in `data.ts` against the live rules. The rules suite
-proves each *rule* works; this proves the *application* can still write, which
+proves each _rule_ works; this proves the _application_ can still write, which
 is a different question and the one that breaks when a rule is tightened. It
 caught two real regressions during this work — see the note on Firestore's
 1,000-expression request budget in `firestore.rules`.
 
 A logged session writes the workout, the profile and the snapshot in **one
 batch**, so it can never half-commit. The public leaderboard row is written
-*after* that batch rather than inside it: the rules cross-read the private
+_after_ that batch rather than inside it: the rules cross-read the private
 document to prove the row is not forged, and a rule's `get()` inside a batch
 sees pre-batch state. A stale row is cosmetic and self-corrects; a forgeable
 leaderboard would not be.
@@ -637,4 +663,4 @@ leaderboard would not be.
 
 ## License
 
-MIT — see [LICENSE](../LICENSE).
+MIT — see [LICENSE](LICENSE).

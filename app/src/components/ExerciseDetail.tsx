@@ -139,10 +139,7 @@ export function ExerciseDetail({
             <ul className="space-y-2">
               {exercise.mistakes.map((mistake, i) => (
                 <li key={i} className="flex gap-2.5 text-sm leading-relaxed text-content-muted">
-                  <TriangleAlert
-                    className="mt-0.5 h-4 w-4 shrink-0 text-warn/70"
-                    aria-hidden
-                  />
+                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn/70" aria-hidden />
                   {mistake}
                 </li>
               ))}
@@ -166,7 +163,9 @@ export function ExerciseDetail({
                       aria-hidden
                     />
                     <p className="text-sm font-semibold text-content">{step.title}</p>
-                    <p className="mt-0.5 text-xs leading-relaxed text-content-muted">{step.detail}</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-content-muted">
+                      {step.detail}
+                    </p>
                     {linked ? (
                       <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg bg-surface-hover px-2 py-1 text-[11px] text-forge">
                         <CheckCircle2 className="h-3 w-3" aria-hidden />

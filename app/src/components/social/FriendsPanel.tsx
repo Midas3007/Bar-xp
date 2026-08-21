@@ -2,15 +2,7 @@ import { useState } from 'react';
 import { Search, UserPlus, Users, X } from 'lucide-react';
 
 import type { LeaderboardRow, Profile } from '../../lib/types';
-import {
-  Button,
-  Card,
-  CardHeader,
-  EmptyState,
-  Field,
-  Input,
-  Spinner,
-} from '../ui/Primitives';
+import { Button, Card, CardHeader, EmptyState, Field, Input, Spinner } from '../ui/Primitives';
 import { LeaderRow, RowAvatar } from './LeaderRow';
 import { HeadToHead } from './HeadToHead';
 import {
@@ -108,7 +100,9 @@ export function FriendsPanel({
                       {graph.people[request.from]?.displayName ?? 'An athlete'}
                     </span>
                   </p>
-                  <p className="mt-0.5 text-[11px] text-content-subtle">Wants to compare training.</p>
+                  <p className="mt-0.5 text-[11px] text-content-subtle">
+                    Wants to compare training.
+                  </p>
                 </div>
                 <div className="flex shrink-0 gap-2">
                   <Button
@@ -206,7 +200,9 @@ export function FriendsPanel({
                   isMe={isMe}
                   scoreValue={row.totalXp}
                   scoreLabel="XP"
-                  onClick={isMe ? undefined : () => setSelected(selected === row.uid ? null : row.uid)}
+                  onClick={
+                    isMe ? undefined : () => setSelected(selected === row.uid ? null : row.uid)
+                  }
                   action={
                     isMe ? null : (
                       <button
@@ -250,7 +246,10 @@ export function FriendsPanel({
         </h3>
         <div className="flex items-end gap-2">
           <div className="flex-1">
-            <Field label="Search by name" hint="At least two characters. Matches the start of a name.">
+            <Field
+              label="Search by name"
+              hint="At least two characters. Matches the start of a name."
+            >
               <Input
                 value={term}
                 onChange={(e) => setTerm(e.target.value)}

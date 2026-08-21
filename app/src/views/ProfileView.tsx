@@ -105,9 +105,7 @@ export function ProfileView({ profile }: { profile: Profile }) {
                     className="flex items-center justify-between gap-4 px-5 py-3.5"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-content">
-                        {pb.exerciseName}
-                      </p>
+                      <p className="truncate text-sm font-medium text-content">{pb.exerciseName}</p>
                       <p className="mt-0.5 text-[11px] text-content-subtle">
                         {formatDate(pb.achievedAt)}
                       </p>
@@ -194,7 +192,11 @@ function ProfileHeader({ profile }: { profile: Profile }) {
                   aria-label="Display name"
                 />
                 <Button size="sm" onClick={() => void save()} disabled={busy}>
-                  {busy ? <Spinner className="h-3.5 w-3.5" /> : <Check className="h-4 w-4" aria-hidden />}
+                  {busy ? (
+                    <Spinner className="h-3.5 w-3.5" />
+                  ) : (
+                    <Check className="h-4 w-4" aria-hidden />
+                  )}
                 </Button>
                 <Button
                   size="sm"
@@ -308,7 +310,9 @@ function DisciplineCard({ profile }: { profile: Profile }) {
         <StatReadout label="Identity" value={identity.label} accent={identity.text} />
       </div>
 
-      <p className="mt-4 text-[11px] italic leading-relaxed text-content-subtle">{identity.blurb}</p>
+      <p className="mt-4 text-[11px] italic leading-relaxed text-content-subtle">
+        {identity.blurb}
+      </p>
     </Card>
   );
 }
@@ -319,13 +323,22 @@ function DisciplineCard({ profile }: { profile: Profile }) {
 
 function BodyFatCard({ profile }: { profile: Profile }) {
   const toast = useToast();
+  const { isGuest, requestSignUp } = useAuth();
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const save = async () => {
+    if (isGuest) {
+      requestSignUp('record a body-fat reading');
+      return;
+    }
     const bodyFat = num(value, NaN);
-    if (!Number.isFinite(bodyFat) || bodyFat < LIMITS.MIN_BODY_FAT || bodyFat > LIMITS.MAX_BODY_FAT) {
+    if (
+      !Number.isFinite(bodyFat) ||
+      bodyFat < LIMITS.MIN_BODY_FAT ||
+      bodyFat > LIMITS.MAX_BODY_FAT
+    ) {
       setError(`Enter a value between ${LIMITS.MIN_BODY_FAT}% and ${LIMITS.MAX_BODY_FAT}%.`);
       return;
     }
@@ -596,7 +609,6 @@ function formatDate(timestamp: unknown): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-
 /* -------------------------------------------------------------------------- */
 /* Your data                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -668,11 +680,21 @@ function DataCard({ profile }: { profile: Profile }) {
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button variant="secondary" size="sm" disabled={busy !== null} onClick={() => void runExport('json')}>
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={busy !== null}
+          onClick={() => void runExport('json')}
+        >
           {busy === 'json' ? <Spinner className="h-3.5 w-3.5" /> : null}
           Export JSON
         </Button>
-        <Button variant="secondary" size="sm" disabled={busy !== null} onClick={() => void runExport('csv')}>
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={busy !== null}
+          onClick={() => void runExport('csv')}
+        >
           {busy === 'csv' ? <Spinner className="h-3.5 w-3.5" /> : null}
           Export CSV
         </Button>
@@ -718,7 +740,9 @@ function DataCard({ profile }: { profile: Profile }) {
               <Button
                 variant="danger"
                 size="sm"
-                disabled={busy !== null || confirmText !== 'DELETE' || (needsPassword && password === '')}
+                disabled={
+                  busy !== null || confirmText !== 'DELETE' || (needsPassword && password === '')
+                }
                 onClick={() => void erase()}
               >
                 {busy === 'delete' ? <Spinner className="h-3.5 w-3.5" /> : null}
@@ -748,7 +772,6 @@ function DataCard({ profile }: { profile: Profile }) {
     </Card>
   );
 }
-
 
 /**
  * Light / System / Dark.
