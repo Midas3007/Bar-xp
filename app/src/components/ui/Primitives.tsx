@@ -70,7 +70,8 @@ const VARIANTS: Record<ButtonVariant, string> = {
     'bg-gradient-to-r from-forge-vivid to-forge text-on-accent font-semibold hover:from-forge-vivid hover:to-forge shadow-glow-forge disabled:from-surface-strong disabled:to-surface-strong disabled:text-content-muted disabled:shadow-none',
   secondary:
     'bg-surface-inset text-content ring-1 ring-line-strong hover:bg-surface-strong hover:text-content-strong disabled:text-content-subtle',
-  ghost: 'text-content-muted hover:bg-surface-hover hover:text-content-strong disabled:text-content-subtle',
+  ghost:
+    'text-content-muted hover:bg-surface-hover hover:text-content-strong disabled:text-content-subtle',
   danger:
     'bg-danger/10 text-danger ring-1 ring-danger/30 hover:bg-danger/20 disabled:text-content-subtle',
 };
@@ -231,13 +232,7 @@ export function Toggle({
 /* Badges & chips                                                              */
 /* -------------------------------------------------------------------------- */
 
-export function Chip({
-  children,
-  className = '',
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function Chip({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${className}`}

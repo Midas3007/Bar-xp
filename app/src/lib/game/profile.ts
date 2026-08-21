@@ -1,6 +1,12 @@
 import type { Assessment, CustomExercise, Goal, Inventory, Profile, Stats } from '../types';
 import { arr, clamp, int, num, round, str } from '../safe';
-import { EMPTY_STATS, identityForStreak, levelFromTotalXp, safeStats, tierForStats } from './constants';
+import {
+  EMPTY_STATS,
+  identityForStreak,
+  levelFromTotalXp,
+  safeStats,
+  tierForStats,
+} from './constants';
 import { EMPTY_STREAK, safeStreak } from './streak';
 import { ensureGoals } from './goals';
 import { LIMITS } from './validation';
@@ -32,6 +38,7 @@ export const MAX_DISPLAY_NAME = LIMITS.MAX_NAME_LENGTH;
 export function sanitizeDisplayName(raw: unknown): string {
   const collapsed = str(raw, '')
     // Control characters render as nothing and wreck the leaderboard layout.
+    // eslint-disable-next-line no-control-regex -- stripping unprintables is the point
     .replace(/[\u0000-\u001f\u007f]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();

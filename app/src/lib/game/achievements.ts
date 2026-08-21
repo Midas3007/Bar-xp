@@ -11,14 +11,7 @@ import { TIERS } from './constants';
  */
 
 export type AchievementIcon =
-  | 'flame'
-  | 'trophy'
-  | 'dumbbell'
-  | 'zap'
-  | 'crown'
-  | 'shield'
-  | 'target'
-  | 'sparkles';
+  'flame' | 'trophy' | 'dumbbell' | 'zap' | 'crown' | 'shield' | 'target' | 'sparkles';
 
 export interface Achievement {
   id: string;

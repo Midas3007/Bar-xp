@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Dumbbell, Flame, MailCheck, Shield, TrendingUp, TriangleAlert } from 'lucide-react';
+import { Dumbbell, Eye, Flame, MailCheck, Shield, TrendingUp, TriangleAlert } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
 import { Button, Field, Input, Spinner } from '../components/ui/Primitives';
@@ -9,6 +9,7 @@ type Mode = 'signin' | 'signup';
 export function AuthView() {
   const {
     signInWithGoogle,
+    enterDemo,
     signInWithEmail,
     signUpWithEmail,
     resetPassword,
@@ -232,6 +233,24 @@ export function AuthView() {
               Continue with Google
             </Button>
 
+            <div className="mt-5 border-t border-line pt-5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="lg"
+                className="w-full"
+                onClick={enterDemo}
+                disabled={busy}
+              >
+                <Eye className="h-4 w-4" aria-hidden />
+                Look around first
+              </Button>
+              <p className="mt-2 text-center text-[11px] leading-relaxed text-content-subtle">
+                Opens a sample athlete with eighteen weeks of training. Read-only, no account, no
+                email.
+              </p>
+            </div>
+
             <p className="mt-5 text-center text-[11px] leading-relaxed text-content-subtle">
               Your workout data is stored against your account only. Ranks and XP appear on the
               public leaderboard.
@@ -271,7 +290,9 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
-        active ? 'bg-surface-inset text-content-strong shadow-sm' : 'text-content-muted hover:text-content'
+        active
+          ? 'bg-surface-inset text-content-strong shadow-sm'
+          : 'text-content-muted hover:text-content'
       }`}
     >
       {children}

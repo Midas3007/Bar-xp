@@ -4,7 +4,7 @@ import type { ViewKey } from '../components/layout/AppShell';
 /**
  * URL routing over the History API.
  *
- * Deliberately not `react-router`. The app has six flat, parameterless
+ * Deliberately not `react-router`. The app has seven flat, parameterless
  * destinations, no nested layouts, no loaders and no route params — this is
  * forty lines against a 20 kB dependency in a bundle already carrying Firebase
  * and Recharts. Revisit if the app ever gains nested or parameterised routes.
@@ -15,6 +15,7 @@ export const ROUTES: Record<ViewKey, string> = {
   dashboard: '/dashboard',
   workout: '/train',
   progress: '/progress',
+  skills: '/skills',
   leaderboard: '/leaderboard',
   shop: '/shop',
   profile: '/profile',

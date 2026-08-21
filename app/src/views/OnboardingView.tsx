@@ -10,11 +10,7 @@ import { validateAssessment, validateMeasurements } from '../lib/game/validation
 import { completeAssessment } from '../lib/data';
 import { useToast } from '../context/ToastContext';
 import { num } from '../lib/safe';
-import {
-  MEASUREMENT_SITES,
-  metricFromDisplay,
-  unitLabel,
-} from '../lib/game/measurements';
+import { MEASUREMENT_SITES, metricFromDisplay, unitLabel } from '../lib/game/measurements';
 
 /**
  * First-run assessment.
@@ -49,8 +45,7 @@ export function OnboardingView({ profile }: { profile: Profile }) {
     [pullUps, pushUps, plank, bodyFat],
   );
 
-  const filled =
-    pullUps !== '' && pushUps !== '' && plank !== '' && bodyFat !== '';
+  const filled = pullUps !== '' && pushUps !== '' && plank !== '' && bodyFat !== '';
 
   // Live preview — only computed once every field has a valid value.
   const preview = useMemo(() => {

@@ -102,7 +102,11 @@ export function Modal({
 
   return (
     <div className={container}>
-      <div className="absolute inset-0 bg-surface-scrim backdrop-blur-sm" onClick={onClose} aria-hidden />
+      <div
+        className="absolute inset-0 bg-surface-scrim backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden
+      />
       <div
         ref={panelRef}
         role="dialog"

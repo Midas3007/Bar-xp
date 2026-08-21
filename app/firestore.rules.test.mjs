@@ -17,7 +17,18 @@ import {
   assertFails,
   assertSucceeds,
 } from '@firebase/rules-unit-testing';
-import { doc, deleteDoc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, writeBatch } from 'firebase/firestore';
+import {
+  doc,
+  deleteDoc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  writeBatch,
+} from 'firebase/firestore';
 
 const PROJECT_ID = 'barxp-rules-test';
 const ALICE = 'alice';
@@ -157,7 +168,15 @@ function workoutDoc(uid, overrides = {}) {
     day: '2026-08-17',
     createdAt: Date.now(),
     entries: [
-      { exerciseId: 'push_up', exerciseName: 'Push-up', unit: 'reps', sets: 3, amount: 10, volume: 30, xp: 30 },
+      {
+        exerciseId: 'push_up',
+        exerciseName: 'Push-up',
+        unit: 'reps',
+        sets: 3,
+        amount: 10,
+        volume: 30,
+        xp: 30,
+      },
     ],
     xpEarned: 30,
     coinsEarned: 17,
@@ -248,14 +267,20 @@ await test('XP can increase', async () => {
 await test('rejects a non-numeric stat', async () => {
   await resetAlice();
   await assertFails(
-    setDoc(doc(alice, 'users', ALICE), userDoc({ stats: { strength: 'lots', endurance: 1, aesthetics: 1, discipline: 1 } })),
+    setDoc(
+      doc(alice, 'users', ALICE),
+      userDoc({ stats: { strength: 'lots', endurance: 1, aesthetics: 1, discipline: 1 } }),
+    ),
   );
 });
 
 await test('rejects a missing stat key', async () => {
   await resetAlice();
   await assertFails(
-    setDoc(doc(alice, 'users', ALICE), userDoc({ stats: { strength: 1, endurance: 1, aesthetics: 1 } })),
+    setDoc(
+      doc(alice, 'users', ALICE),
+      userDoc({ stats: { strength: 1, endurance: 1, aesthetics: 1 } }),
+    ),
   );
 });
 
@@ -277,21 +302,30 @@ await test('rejects body fat outside the accepted range', async () => {
 await test('rejects more streak shields than the shop allows', async () => {
   await resetAlice();
   await assertFails(
-    setDoc(doc(alice, 'users', ALICE), userDoc({ inventory: { streakShields: 99, cosmetics: [], unlocks: [] } })),
+    setDoc(
+      doc(alice, 'users', ALICE),
+      userDoc({ inventory: { streakShields: 99, cosmetics: [], unlocks: [] } }),
+    ),
   );
 });
 
 await test('rejects a malformed lastWorkoutDay', async () => {
   await resetAlice();
   await assertFails(
-    setDoc(doc(alice, 'users', ALICE), userDoc({ streak: { current: 1, best: 1, lastWorkoutDay: 'yesterday', shieldsUsed: 0 } })),
+    setDoc(
+      doc(alice, 'users', ALICE),
+      userDoc({ streak: { current: 1, best: 1, lastWorkoutDay: 'yesterday', shieldsUsed: 0 } }),
+    ),
   );
 });
 
 await test('accepts a well-formed lastWorkoutDay', async () => {
   await resetAlice();
   await assertSucceeds(
-    setDoc(doc(alice, 'users', ALICE), userDoc({ streak: { current: 1, best: 1, lastWorkoutDay: '2026-08-17', shieldsUsed: 0 } })),
+    setDoc(
+      doc(alice, 'users', ALICE),
+      userDoc({ streak: { current: 1, best: 1, lastWorkoutDay: '2026-08-17', shieldsUsed: 0 } }),
+    ),
   );
 });
 
@@ -309,16 +343,12 @@ await test('accepts a display name at the 40-character limit', async () => {
 
 await test('rejects a display name one character over the limit', async () => {
   await resetAlice();
-  await assertFails(
-    setDoc(doc(alice, 'users', ALICE), userDoc({ displayName: 'x'.repeat(41) })),
-  );
+  await assertFails(setDoc(doc(alice, 'users', ALICE), userDoc({ displayName: 'x'.repeat(41) })));
 });
 
 await test('the nameFixedAt repair marker is accepted on the user document', async () => {
   await resetAlice();
-  await assertSucceeds(
-    setDoc(doc(alice, 'users', ALICE), userDoc({ nameFixedAt: Date.now() })),
-  );
+  await assertSucceeds(setDoc(doc(alice, 'users', ALICE), userDoc({ nameFixedAt: Date.now() })));
 });
 
 await test('accepts a routine list', async () => {
@@ -525,6 +555,157 @@ await test('gross XP still cannot be reduced by a correction', async () => {
   await assertFails(updateDoc(doc(alice, 'users', ALICE), { totalXp: 3000, xpVoided: 1200 }));
 });
 
+section('users — the expression budget');
+
+/**
+ * Firestore stops evaluating a request after 1,000 expressions and denies it.
+ * That is not a theoretical limit: a full sweep of this document's thirty-odd
+ * fields costs slightly more than that, and for a while every write in the live
+ * app was being rejected with "maximum of 1000 expressions" — including one
+ * that only set `photoURL` to the empty string. The symptom is indistinguishable
+ * from a rule saying no, which is what made it hard to see.
+ *
+ * These two assertions pin the two shapes the app actually writes. If a later
+ * slice adds fields to either of them, or adds clauses to the rules, this is
+ * what goes red — here, rather than in production.
+ */
+
+/** Every field `newProfile` writes, at the sizes the game allows. */
+function maxedProfile(overrides = {}) {
+  const personalBests = {};
+  for (let i = 0; i < 200; i += 1) {
+    personalBests[`ex${i}`] = {
+      exerciseId: `ex${i}`,
+      unit: 'reps',
+      value: 30,
+      achievedAt: Date.now(),
+    };
+  }
+  const muscleVolume = {};
+  for (let i = 0; i < 20; i += 1) muscleVolume[`muscle${i}`] = 4200;
+  const list = (n, make) => Array.from({ length: n }, (_, i) => make(i));
+
+  return userDoc({
+    email: 'alice@example.com',
+    photoURL: 'https://lh3.googleusercontent.com/a/ACg8ocKq1234567890=s96-c',
+    nameFixedAt: Date.now(),
+    assessment: {
+      maxPullUps: 8,
+      maxPushUps: 30,
+      plankSeconds: 90,
+      bodyFat: 20,
+      completedAt: Date.now(),
+    },
+    xpVoided: 0,
+    coinsPeak: 100,
+    measurements: {
+      values: {
+        bodyweight: 80,
+        chest: 105,
+        back: 110,
+        waist: 95,
+        biceps: 41,
+        thighs: 62,
+        calves: 39,
+      },
+      recordedAt: Date.now(),
+    },
+    unitSystem: 'metric',
+    gymBroMode: true,
+    personalBests,
+    muscleVolume,
+    goals: list(10, (i) => ({ id: `g${i}`, target: 500, progress: 1 })),
+    customExercises: list(20, (i) => ({
+      id: `c${i}`,
+      name: 'Vest Push-up',
+      unit: 'reps',
+      xpPerUnit: 1.6,
+    })),
+    routines: list(12, (i) => ({ id: `r${i}`, name: 'Day A', items: [] })),
+    season: { id: '2026-S3', xp: 900, sessions: 6, startedAt: Date.now() },
+    seasonHistory: list(24, (i) => ({
+      id: `2026-S${i}`,
+      xp: 10,
+      sessions: 1,
+      rank: 1,
+      entrants: 2,
+    })),
+    recentDays: list(20, (i) => `2026-08-${String(i + 1).padStart(2, '0')}`),
+    ...overrides,
+  });
+}
+
+await test('a full profile can be created', async () => {
+  // Creation is the one write where every key counts as new, so it is the one
+  // most easily pushed over the budget — and if it goes over, nobody can sign up.
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await deleteDoc(doc(ctx.firestore(), 'users', CAROL));
+  });
+  const carol = testEnv.authenticatedContext(CAROL).firestore();
+  await assertSucceeds(
+    setDoc(doc(carol, 'users', CAROL), maxedProfile({ totalXp: 0, coins: 100 })),
+  );
+});
+
+await test('the largest write the app makes fits inside the budget', async () => {
+  // Field for field, `logWorkout` in src/lib/data.ts. Sixteen validated fields
+  // in one update, against a profile carrying the most of everything the game
+  // permits.
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(
+      doc(ctx.firestore(), 'users', ALICE),
+      maxedProfile({ totalXp: 24000, coins: 400 }),
+    );
+  });
+  await assertSucceeds(
+    updateDoc(doc(alice, 'users', ALICE), {
+      totalXp: 24070,
+      level: 8,
+      coins: 420,
+      coinsPeak: 500,
+      stats: { strength: 25, endurance: 19, aesthetics: 16, discipline: 13 },
+      tier: 'Gold',
+      identity: 'Stirring',
+      streak: { current: 1, best: 3, lastWorkoutDay: '2026-08-21', shieldsUsed: 0 },
+      personalBests: {
+        push_up: { exerciseId: 'push_up', unit: 'reps', value: 41, achievedAt: Date.now() },
+      },
+      goals: [{ id: 'g1', target: 500, progress: 200 }],
+      workoutCount: 10,
+      totalReps: 1474,
+      muscleVolume: { chest: 5000, triceps: 4000 },
+      season: { id: '2026-S3', xp: 970, sessions: 7, startedAt: Date.now() },
+      seasonHistory: [{ id: '2026-S2', xp: 1200, sessions: 20, rank: 3, entrants: 11 }],
+      recentDays: ['2026-08-21', '2026-08-20'],
+      updatedAt: Date.now(),
+    }),
+  );
+});
+
+await test('a field the write does not touch is not re-validated', async () => {
+  // The deliberate tradeoff that buys the budget back. A stored value that the
+  // rules would reject today does not block an unrelated write — it is checked
+  // again the moment something writes to that field. Only reachable by planting
+  // the value with the rules off, or from a document written before the clause
+  // existed, which is the case this is really about.
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users', ALICE), userDoc({ unitSystem: 'furlongs' }));
+  });
+  await assertSucceeds(updateDoc(doc(alice, 'users', ALICE), { updatedAt: Date.now() }));
+});
+
+await test('a field the write does touch is still validated', async () => {
+  await assertFails(updateDoc(doc(alice, 'users', ALICE), { unitSystem: 'stones' }));
+  await assertSucceeds(updateDoc(doc(alice, 'users', ALICE), { unitSystem: 'imperial' }));
+});
+
+await test('removing a required field is denied', async () => {
+  await resetAlice();
+  const withoutStats = userDoc();
+  delete withoutStats.stats;
+  await assertFails(setDoc(doc(alice, 'users', ALICE), withoutStats));
+});
+
 section('public_profiles — the leaderboard projection');
 
 await test('owner can write their own public row', async () => {
@@ -585,20 +766,26 @@ await test('other signed-in users CAN read it (leaderboard)', async () => {
 });
 
 await test('the leaderboard query works', async () => {
-  await assertSucceeds(getDocs(query(collection(bob, 'public_profiles'), orderBy('totalXp', 'desc'))));
+  await assertSucceeds(
+    getDocs(query(collection(bob, 'public_profiles'), orderBy('totalXp', 'desc'))),
+  );
 });
 
 await test('anonymous users cannot read the leaderboard', async () => {
   await assertFails(getDoc(doc(anon, 'public_profiles', ALICE)));
 });
 
-await test('you cannot write someone else\'s public row', async () => {
-  await assertFails(setDoc(doc(bob, 'public_profiles', ALICE), publicDoc({ displayName: 'Pwned' })));
+await test("you cannot write someone else's public row", async () => {
+  await assertFails(
+    setDoc(doc(bob, 'public_profiles', ALICE), publicDoc({ displayName: 'Pwned' })),
+  );
 });
 
 await test('private fields cannot be smuggled into the public row', async () => {
   // The `hasOnly` allow-list is what makes this fail.
-  await assertFails(setDoc(doc(alice, 'public_profiles', ALICE), publicDoc({ email: 'alice@example.com' })));
+  await assertFails(
+    setDoc(doc(alice, 'public_profiles', ALICE), publicDoc({ email: 'alice@example.com' })),
+  );
 });
 
 await test('body fat cannot be smuggled into the public row', async () => {
@@ -612,7 +799,9 @@ await test('measurements cannot be smuggled into the public row', async () => {
 });
 
 await test('rejects an over-long display name in the public row', async () => {
-  await assertFails(setDoc(doc(alice, 'public_profiles', ALICE), publicDoc({ displayName: 'x'.repeat(120) })));
+  await assertFails(
+    setDoc(doc(alice, 'public_profiles', ALICE), publicDoc({ displayName: 'x'.repeat(120) })),
+  );
 });
 
 section('workouts — private and immutable');
@@ -623,12 +812,18 @@ await test('owner can create a workout', async () => {
 
 await test('accepts a workout entry carrying a per-set ladder', async () => {
   const entries = [
-    { exerciseId: 'push_up', exerciseName: 'Push-up', unit: 'reps',
-      sets: 3, amount: 12, volume: 30, reps: [12, 10, 8], xp: 30 },
+    {
+      exerciseId: 'push_up',
+      exerciseName: 'Push-up',
+      unit: 'reps',
+      sets: 3,
+      amount: 12,
+      volume: 30,
+      reps: [12, 10, 8],
+      xp: 30,
+    },
   ];
-  await assertSucceeds(
-    setDoc(doc(alice, 'workouts', 'w_ladder'), workoutDoc(ALICE, { entries })),
-  );
+  await assertSucceeds(setDoc(doc(alice, 'workouts', 'w_ladder'), workoutDoc(ALICE, { entries })));
 });
 
 await test('owner can read their own workout', async () => {
@@ -642,7 +837,6 @@ await test('another user cannot read your workouts', async () => {
 await test('workouts cannot be edited once written', async () => {
   await assertFails(updateDoc(doc(alice, 'workouts', 'w1'), { xpEarned: 999999 }));
 });
-
 
 await test('cannot create a workout owned by someone else', async () => {
   await assertFails(setDoc(doc(bob, 'workouts', 'w2'), workoutDoc(ALICE)));
@@ -704,12 +898,20 @@ await test('an unknown workout kind is rejected', async () => {
 section('workouts — anti-cheat bounds mirror validation.ts');
 
 await test('rejects total volume above the session cap', async () => {
-  await assertFails(setDoc(doc(alice, 'workouts', 'w3'), workoutDoc(ALICE, { totalVolume: 999999 })));
+  await assertFails(
+    setDoc(doc(alice, 'workouts', 'w3'), workoutDoc(ALICE, { totalVolume: 999999 })),
+  );
 });
 
 await test('rejects more than 12 exercises', async () => {
   const entries = Array.from({ length: 13 }, () => ({
-    exerciseId: 'push_up', exerciseName: 'Push-up', unit: 'reps', sets: 1, amount: 1, volume: 1, xp: 1,
+    exerciseId: 'push_up',
+    exerciseName: 'Push-up',
+    unit: 'reps',
+    sets: 1,
+    amount: 1,
+    volume: 1,
+    xp: 1,
   }));
   await assertFails(setDoc(doc(alice, 'workouts', 'w4'), workoutDoc(ALICE, { entries })));
 });
@@ -749,7 +951,9 @@ await test('snapshots cannot be edited', async () => {
 });
 
 await test('rejects an unknown source', async () => {
-  await assertFails(setDoc(doc(alice, 'stats_history', 's2'), snapshotDoc(ALICE, { source: 'hacked' })));
+  await assertFails(
+    setDoc(doc(alice, 'stats_history', 's2'), snapshotDoc(ALICE, { source: 'hacked' })),
+  );
 });
 
 await test('a correction snapshot is accepted', async () => {
@@ -781,7 +985,6 @@ await test('rejects an out-of-range measurement on a snapshot', async () => {
     ),
   );
 });
-
 
 /* -------------------------------------------------------------------------- */
 /* Social                                                                      */
@@ -1048,7 +1251,7 @@ await test('a signed-out client cannot write anything', async () => {
   await assertFails(setDoc(doc(nobody, 'stats_history', 'nope'), snapshotDoc(ALICE)));
 });
 
-await test('a snapshot cannot be created carrying another athlete\'s uid', async () => {
+await test("a snapshot cannot be created carrying another athlete's uid", async () => {
   await assertFails(setDoc(doc(bob, 'stats_history', 'forged'), snapshotDoc(ALICE)));
 });
 

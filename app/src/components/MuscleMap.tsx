@@ -63,7 +63,9 @@ export function MuscleMap({ profile }: { profile: Profile }) {
               <li key={rating.muscle} className="p-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-content-strong">{meta.label}</p>
-                  <Chip className={`bg-surface-hover ring-line-strong ${grade.color}`}>{grade.label}</Chip>
+                  <Chip className={`bg-surface-hover ring-line-strong ${grade.color}`}>
+                    {grade.label}
+                  </Chip>
                 </div>
                 <p className="mt-1.5 text-xs leading-relaxed text-content-muted">
                   {MUSCLE_FIXES[rating.muscle]}

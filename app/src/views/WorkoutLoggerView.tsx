@@ -57,18 +57,28 @@ import {
   type MuscleKey,
   type SetupKey,
 } from '../lib/game/muscles';
-import { buildEntry, buildEntryFromReps, entryXp, streakMultiplier, volumeXp } from '../lib/game/xp';
-import { entryVolume, formatSetLadder } from '../lib/game/sets';
 import {
-  loadRoutine,
-  routineItemsFromEntries,
-  routineVolume,
-} from '../lib/game/routines';
+  buildEntry,
+  buildEntryFromReps,
+  entryXp,
+  streakMultiplier,
+  volumeXp,
+} from '../lib/game/xp';
+import { entryVolume, formatSetLadder } from '../lib/game/sets';
+import { loadRoutine, routineItemsFromEntries, routineVolume } from '../lib/game/routines';
 import { deleteRoutine, logWorkout, saveRoutine, type LogWorkoutResult } from '../lib/data';
-import { validateEntry, validateRoutine, validateSession, validateSetLadder, LIMITS } from '../lib/game/validation';
+import {
+  validateEntry,
+  validateRoutine,
+  validateSession,
+  validateSetLadder,
+  LIMITS,
+} from '../lib/game/validation';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { clearDraft, loadDraft, saveDraft } from '../lib/draft';
+import { takeRequestedExercise } from '../lib/handoff';
 
 type Tab = 'log' | 'routines' | 'library';
 
@@ -80,6 +90,7 @@ export function WorkoutLoggerView({
   onNavigate: (view: ViewKey) => void;
 }) {
   const toast = useToast();
+  const { isGuest, requestSignUp } = useAuth();
 
   const [tab, setTab] = useState<Tab>('log');
   const [entries, setEntries] = useState<WorkoutEntry[]>([]);
@@ -104,6 +115,19 @@ export function WorkoutLoggerView({
 
   /** Set once the stored draft has been consulted; guards the save effect. */
   const restoredRef = useRef(false);
+
+  // Something elsewhere — the skill tree — asked for a movement on the way
+  // here. Reading it clears it, so StrictMode's second invocation finds nothing
+  // and the guard leaves the state from the first alone.
+  useEffect(() => {
+    const requested = takeRequestedExercise();
+    if (requested) {
+      setTab('log');
+      setPickedId(requested);
+    }
+    // Mount only: a handoff is consumed once, by whoever mounts first.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const draft = loadDraft(profile.uid);
@@ -210,11 +234,11 @@ export function WorkoutLoggerView({
   };
 
   const startRoutine = (routine: Routine) => {
-    const { entries: loaded, locked: skipped, missing } = loadRoutine(
-      routine,
-      resolve,
-      (exercise) => isUnlocked(exercise, profile),
-    );
+    const {
+      entries: loaded,
+      locked: skipped,
+      missing,
+    } = loadRoutine(routine, resolve, (exercise) => isUnlocked(exercise, profile));
 
     setEntries(loaded);
     // A routine id flows into the existing presetId field; there is no second
@@ -231,7 +255,10 @@ export function WorkoutLoggerView({
         `Still locked: ${skipped.join(', ')}. Open the Library to see how to train for them.`,
       );
     } else {
-      toast.success(`${routine.name} started`, 'Adjust the numbers to match what you actually did.');
+      toast.success(
+        `${routine.name} started`,
+        'Adjust the numbers to match what you actually did.',
+      );
     }
     if (missing.length > 0) {
       toast.info(
@@ -276,6 +303,10 @@ export function WorkoutLoggerView({
   };
 
   const finish = async () => {
+    if (isGuest) {
+      requestSignUp('log a session');
+      return;
+    }
     const check = validateSession(entries);
     if (!check.ok) {
       setSessionError(check.error ?? 'This session cannot be saved.');
@@ -413,7 +444,10 @@ export function WorkoutLoggerView({
               <>
                 <ul className="divide-y divide-line">
                   {entries.map((entry, index) => (
-                    <li key={`${entry.exerciseId}-${index}`} className="flex items-center gap-3 p-4">
+                    <li
+                      key={`${entry.exerciseId}-${index}`}
+                      className="flex items-center gap-3 p-4"
+                    >
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-content">
                           {entry.exerciseName}
@@ -446,7 +480,8 @@ export function WorkoutLoggerView({
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-content-muted">
-                      Streak bonus ({fmt(profile.streak.current)}w)
+                      Streak bonus ({fmt(profile.streak.current)} day
+                      {profile.streak.current === 1 ? '' : 's'})
                     </span>
                     <span className="font-mono text-ember">×{fmtDecimal(multiplier, 2)}</span>
                   </div>
@@ -461,10 +496,7 @@ export function WorkoutLoggerView({
 
                   {sessionError ? (
                     <div className="flex items-start gap-2 rounded-xl bg-danger/10 p-3 ring-1 ring-danger/25">
-                      <TriangleAlert
-                        className="mt-0.5 h-4 w-4 shrink-0 text-danger"
-                        aria-hidden
-                      />
+                      <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-danger" aria-hidden />
                       <p className="text-xs leading-relaxed text-danger">{sessionError}</p>
                     </div>
                   ) : null}
@@ -507,7 +539,12 @@ export function WorkoutLoggerView({
                     </Button>
                   )}
 
-                  <Button size="lg" className="w-full" onClick={() => void finish()} disabled={busy}>
+                  <Button
+                    size="lg"
+                    className="w-full"
+                    onClick={() => void finish()}
+                    disabled={busy}
+                  >
                     {busy ? (
                       <Spinner className="h-4 w-4" />
                     ) : (
@@ -676,7 +713,10 @@ function MuscleChips({ exerciseId }: { exerciseId: string }) {
         </span>
       ))}
       {profile.secondary.map((m: MuscleKey) => (
-        <span key={m} className="rounded bg-surface-hover px-1.5 py-0.5 text-[10px] text-content-muted">
+        <span
+          key={m}
+          className="rounded bg-surface-hover px-1.5 py-0.5 text-[10px] text-content-muted"
+        >
           {MUSCLE_META[m].label}
         </span>
       ))}
@@ -729,7 +769,10 @@ function ExercisePicker({
   const selected = available.find((e) => e.id === selectedId) ?? available[0];
   const previewXp = selected
     ? ladder
-      ? volumeXp(selected, ladder.reduce((total, v) => total + num(v, 0), 0))
+      ? volumeXp(
+          selected,
+          ladder.reduce((total, v) => total + num(v, 0), 0),
+        )
       : entryXp(selected, num(sets, 0), num(amount, 0))
     : 0;
 
@@ -773,7 +816,13 @@ function ExercisePicker({
     );
   }
 
-  const step = (delta: number, value: string, setValue: (v: string) => void, min: number, max: number) => {
+  const step = (
+    delta: number,
+    value: string,
+    setValue: (v: string) => void,
+    min: number,
+    max: number,
+  ) => {
     const next = Math.min(max, Math.max(min, int(num(value, min), min) + delta));
     setValue(String(next));
     setError(null);
@@ -832,7 +881,9 @@ function ExercisePicker({
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-1.5">
-                <Chip className={`${CATEGORY_META[selected.category].ring} ${CATEGORY_META[selected.category].color}`}>
+                <Chip
+                  className={`${CATEGORY_META[selected.category].ring} ${CATEGORY_META[selected.category].color}`}
+                >
                   {CATEGORY_META[selected.category].label}
                 </Chip>
                 <Chip className="bg-surface-hover text-content-muted ring-line-strong">
@@ -859,41 +910,43 @@ function ExercisePicker({
 
         {/* --- Sets & reps with tap-friendly steppers --- */}
         {ladder === null ? (
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Sets" hint={`1–${LIMITS.MAX_SETS}`}>
-            <Stepper
-              value={sets}
-              onChange={(v) => {
-                setSets(v);
-                setError(null);
-              }}
-              onStep={(d) => step(d, sets, setSets, 1, LIMITS.MAX_SETS)}
-              max={LIMITS.MAX_SETS}
-            />
-          </Field>
-          <Field
-            label={selected?.unit === 'seconds' ? 'Seconds / set' : 'Reps / set'}
-            hint={selected?.unit === 'seconds' ? `1–${LIMITS.MAX_SECONDS}` : `1–${LIMITS.MAX_REPS}`}
-          >
-            <Stepper
-              value={amount}
-              onChange={(v) => {
-                setAmount(v);
-                setError(null);
-              }}
-              onStep={(d) =>
-                step(
-                  d * (selected?.unit === 'seconds' ? 5 : 1),
-                  amount,
-                  setAmount,
-                  1,
-                  selected?.unit === 'seconds' ? LIMITS.MAX_SECONDS : LIMITS.MAX_REPS,
-                )
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Sets" hint={`1–${LIMITS.MAX_SETS}`}>
+              <Stepper
+                value={sets}
+                onChange={(v) => {
+                  setSets(v);
+                  setError(null);
+                }}
+                onStep={(d) => step(d, sets, setSets, 1, LIMITS.MAX_SETS)}
+                max={LIMITS.MAX_SETS}
+              />
+            </Field>
+            <Field
+              label={selected?.unit === 'seconds' ? 'Seconds / set' : 'Reps / set'}
+              hint={
+                selected?.unit === 'seconds' ? `1–${LIMITS.MAX_SECONDS}` : `1–${LIMITS.MAX_REPS}`
               }
-              max={selected?.unit === 'seconds' ? LIMITS.MAX_SECONDS : LIMITS.MAX_REPS}
-            />
-          </Field>
-        </div>
+            >
+              <Stepper
+                value={amount}
+                onChange={(v) => {
+                  setAmount(v);
+                  setError(null);
+                }}
+                onStep={(d) =>
+                  step(
+                    d * (selected?.unit === 'seconds' ? 5 : 1),
+                    amount,
+                    setAmount,
+                    1,
+                    selected?.unit === 'seconds' ? LIMITS.MAX_SECONDS : LIMITS.MAX_REPS,
+                  )
+                }
+                max={selected?.unit === 'seconds' ? LIMITS.MAX_SECONDS : LIMITS.MAX_REPS}
+              />
+            </Field>
+          </div>
         ) : (
           <Field
             label={selected?.unit === 'seconds' ? 'Seconds per set' : 'Reps per set'}
@@ -1366,7 +1419,9 @@ function PresetList({
                   </Chip>
                 ) : null}
               </div>
-              <p className="mt-2 text-sm leading-relaxed text-content-muted">{preset.description}</p>
+              <p className="mt-2 text-sm leading-relaxed text-content-muted">
+                {preset.description}
+              </p>
               <div className="mt-2.5 flex flex-wrap gap-1">
                 {preset.targets.map((t) => {
                   const meta = MUSCLE_META[t as MuscleKey];
@@ -1446,7 +1501,9 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
-        active ? 'bg-surface-inset text-content-strong shadow-sm' : 'text-content-muted hover:text-content'
+        active
+          ? 'bg-surface-inset text-content-strong shadow-sm'
+          : 'text-content-muted hover:text-content'
       }`}
     >
       {children}

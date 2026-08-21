@@ -73,12 +73,22 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/friendships/$(pairKey(a, b)));
     }
 
+    function isBoundedList(value, maxLen) {
+      return value is list && value.size() <= maxLen;
+    }
+
+    function isBoundedMap(value, maxKeys) {
+      return value is map && value.size() <= maxKeys;
+    }
+
     function statsAreValid(stats) {
       return stats is map
-        // No `hasAll`: the four accesses below already fail on a missing key,
-        // and this rule set is close enough to Firestore's 1,000-expression
-        // request budget that a redundant check costs a real write.
-        && stats.keys().hasOnly(['strength', 'endurance', 'aesthetics', 'discipline'])
+        // No `hasAll` and no `hasOnly`: the four accesses below already fail on
+        // a missing key, and with exactly four keys required and four present
+        // there is no room for a fifth. `size()` says the same thing for three
+        // expressions where `hasOnly` costs sixteen, which this rule set cannot
+        // spare — see the note on `fieldsAreValid`.
+        && stats.size() == 4
         && isNumInRange(stats.strength, 0, 100000)
         && isNumInRange(stats.endurance, 0, 100000)
         && isNumInRange(stats.aesthetics, 0, 100000)
@@ -92,13 +102,17 @@ service cloud.firestore {
     function measurementValuesAreValid(v) {
       return v is map
         && v.keys().hasOnly(['bodyweight', 'chest', 'back', 'waist', 'biceps', 'thighs', 'calves'])
-        && (!('bodyweight' in v) || isNumInRange(v.bodyweight, 20, 400))
-        && (!('chest' in v) || isNumInRange(v.chest, 10, 250))
-        && (!('back' in v) || isNumInRange(v.back, 10, 250))
-        && (!('waist' in v) || isNumInRange(v.waist, 10, 250))
-        && (!('biceps' in v) || isNumInRange(v.biceps, 10, 250))
-        && (!('thighs' in v) || isNumInRange(v.thighs, 10, 250))
-        && (!('calves' in v) || isNumInRange(v.calves, 10, 250));
+        // Every site is optional, so each reads through `get` with an in-range
+        // default. That is a clause apiece rather than the two an `in` guard
+        // would cost, and this map is checked on the most expensive write the
+        // app makes.
+        && isNumInRange(v.get('bodyweight', 20), 20, 400)
+        && isNumInRange(v.get('chest', 10), 10, 250)
+        && isNumInRange(v.get('back', 10), 10, 250)
+        && isNumInRange(v.get('waist', 10), 10, 250)
+        && isNumInRange(v.get('biceps', 10), 10, 250)
+        && isNumInRange(v.get('thighs', 10), 10, 250)
+        && isNumInRange(v.get('calves', 10), 10, 250);
     }
 
     /* --------------------------------------------------------------------- */
@@ -117,12 +131,47 @@ service cloud.firestore {
       // raw document directly.
       allow read: if isOwner(uid);
 
-      allow create: if isOwner(uid)
-        && userFieldsAreValid()
-        && incoming().totalXp == 0
-        && isIntInRange(incoming().coins, 0, 1000);
+      allow create: if isOwner(uid) && newProfileIsValid();
 
-      allow update: if isOwner(uid) && userFieldsAreValid() && updateIsSane();
+      allow update: if isOwner(uid)
+        && updateIsSane()
+        && fieldsAreValid(incoming(), incoming().diff(resource.data).affectedKeys());
+
+      /**
+       * A profile is created empty, so a create needs far less checking than an
+       * update — and has to cost far less. Running the full field sweep here
+       * was the one shape that would not fit inside Firestore's
+       * 1,000-expression request budget, because on a brand-new document every
+       * single key counts as changed.
+       *
+       * What is checked is everything that could hand a new account an
+       * advantage or reach another athlete: the two counters, the name, the
+       * avatar host, and the fields the leaderboard and friend card project.
+       * The rest start empty by construction — `newProfile` in
+       * src/lib/game/profile.ts writes `{}`, `[]` and `null` into them — and
+       * are validated by `fieldsAreValid` the first time they are written to.
+       */
+      function newProfileIsValid() {
+        let d = incoming();
+        return d.totalXp == 0
+          && d.get('xpVoided', 0) == 0
+          && isIntInRange(d.coins, 0, 1000)
+          && isShortString(d.displayName, 40)
+          && d.displayName.size() >= 1
+          && photoIsAllowed(d.get('photoURL', ''))
+          && d.onboarded is bool
+          && isIntInRange(d.level, 1, 100)
+          && statsAreValid(d.stats)
+          && isShortString(d.tier, 24)
+          && isShortString(d.identity, 24)
+          && streakIsValid(d.streak)
+          && inventoryIsValid(d.inventory);
+      }
+
+      // Erasure is the one exception to "profiles are never deleted from the
+      // client": an athlete must be able to remove their own account from
+      // inside the app. Still owner-only.
+      allow delete: if isOwner(uid);
 
       /**
        * The write-rate guarantees, with `request.resource.data` and
@@ -136,6 +185,7 @@ service cloud.firestore {
       function updateIsSane() {
         let d = incoming();
         let r = resource.data;
+        let voided = d.get('xpVoided', 0);
         return
           // Gross lifetime XP is monotonic — it can never be reduced. A
           // correction does not subtract from it; it adds to `xpVoided`, which
@@ -143,8 +193,8 @@ service cloud.firestore {
           // figure the game shows is the difference of two counters that only
           // ever grow, so no write can invent XP.
           d.totalXp >= r.get('totalXp', 0)
-          && d.get('xpVoided', 0) >= r.get('xpVoided', 0)
-          && d.get('xpVoided', 0) <= d.totalXp
+          && voided >= r.get('xpVoided', 0)
+          && voided <= d.totalXp
           // Per-write ceilings, derived from the largest session the game can
           // actually produce rather than picked as round numbers. With
           // MAX_SESSION_VOLUME at 5,000, the highest xpPerUnit at 8, the
@@ -157,88 +207,98 @@ service cloud.firestore {
           && d.coins - r.get('coins', 0) <= 6000;
       }
 
-      // Erasure is the one exception to "profiles are never deleted from the
-      // client": an athlete must be able to remove their own account from
-      // inside the app. Still owner-only.
-      allow delete: if isOwner(uid);
-
-      function userFieldsAreValid() {
-        let d = incoming();
-        // NOTE: there is deliberately no `hasOnly` allow-list here, unlike
-        // `public_profiles`. It was implemented and then removed, because it
-        // does not fit: Firestore caps a request at 1,000 evaluated
-        // expressions, and `keys().hasOnly(list)` costs roughly (document keys
-        // x list entries). This document carries 32 fields, so the check alone
-        // is around a thousand expressions and denied every write that also
-        // touched `measurements` — including onboarding. Measured, not assumed.
-        //
-        // The residual risk is an athlete using their own private document as
-        // free storage, bounded by Firestore's own 1 MiB document limit. It is
-        // per-account, costs no one else anything, and is not a cross-tenant
-        // hole. If the profile ever sheds fields, reinstate this.
-        let photo = d.get('photoURL', '');
-        return isShortString(d.displayName, 40)
-          && d.displayName.size() >= 1
-          && isShortString(d.get('email', ''), 320)
-          && isShortString(photo, 2048)
-          // Rendered as an <img> to every athlete who opens the leaderboard,
-          // so an arbitrary URL hands its host an HTTP request — IP,
-          // User-Agent, timestamp — from each of them. Restricted to the only
-          // host the sign-in providers actually serve profile images from.
-          && (photo == '' || photo.matches('^https://lh3[.]googleusercontent[.]com/.*'))
-          && d.onboarded is bool
-          && isIntInRange(d.level, 1, 100)
-          && isNumInRange(d.totalXp, 0, 100000000)
-          && isNumInRange(d.get('xpVoided', 0), 0, 100000000)
-          && isIntInRange(d.coins, 0, 100000000)
-          && statsAreValid(d.stats)
-          && isShortString(d.tier, 24)
-          && isShortString(d.identity, 24)
-          && isNumInRange(d.get('bodyFat', 0), 0, 60)
-          // Every clause here uses `get` with a default, so a document written
-          // before this slice — which has none of the three keys — still
-          // validates. That is load bearing: an update validates the *merged*
-          // document, so a legacy profile patched for any other reason must
-          // still pass.
-          && (d.get('measurements', null) == null || measurementsAreValid(d.measurements))
-          && d.get('gymBroMode', true) is bool
-          && d.get('unitSystem', 'metric') in ['metric', 'imperial']
-          && isIntInRange(d.workoutCount, 0, 1000000)
-          && isIntInRange(d.totalReps, 0, 1000000000)
-          && streakIsValid(d.streak)
-          && inventoryIsValid(d.inventory)
-          && (d.get('activeCosmetic', null) == null || isShortString(d.activeCosmetic, 40))
-          && d.goals is list && d.goals.size() <= 10
-          && d.customExercises is list && d.customExercises.size() <= 20
+      /**
+       * Field validation, applied to the keys this write actually touches.
+       *
+       * `k` is a key set: every key on a create, and `diff(resource.data)`'s
+       * affected keys on an update. Guarding each clause with `in k` is not a
+       * shortcut — it is what makes the rule affordable, and it is sound for the
+       * same reason an append-only log is: a value that is already stored got
+       * there through this same function, so re-checking it on an unrelated
+       * write buys nothing.
+       *
+       * It buys nothing and it *costs* a great deal. Firestore caps a request at
+       * 1,000 evaluated expressions, and validating all thirty-odd fields of a
+       * merged document came to slightly more than that — which is why every
+       * write in the live app was being rejected with "maximum of 1000
+       * expressions", including one that only set `photoURL` to the empty
+       * string. Checking a key costs about six expressions; skipping the body
+       * measurements alone saves more than a hundred. Measured against the
+       * emulator with a realistic profile, not assumed.
+       *
+       * The second benefit is that legacy documents stop being a special case.
+       * An update validates the *merged* document, so every clause used to need
+       * `get` with a default in case an older profile lacked the key. A key that
+       * is not being written is now simply not in `k`, so it is not looked at.
+       *
+       * NOTE: there is deliberately no `hasOnly` allow-list here, unlike
+       * `public_profiles`. It was implemented and then removed, because it does
+       * not fit: `keys().hasOnly(list)` costs roughly (document keys x list
+       * entries), and this document carries 32 fields, so the check alone is
+       * around a thousand expressions. The residual risk is an athlete using
+       * their own private document as free storage, bounded by Firestore's own
+       * 1 MiB document limit. It is per-account, costs no one else anything, and
+       * is not a cross-tenant hole.
+       */
+      function fieldsAreValid(d, k) {
+        return
+          // Required fields are read directly, so a write that removes one is an
+          // evaluation error and therefore a denial. Optional fields read
+          // through `get` with a default, which is what lets a profile written
+          // before a field existed — or a document that legitimately drops one —
+          // keep validating.
+          (!('displayName' in k) || (isShortString(d.displayName, 40) && d.displayName.size() >= 1))
+          && (!('email' in k) || isShortString(d.get('email', ''), 320))
+          && (!('photoURL' in k) || photoIsAllowed(d.get('photoURL', '')))
+          && (!('onboarded' in k) || d.onboarded is bool)
+          && (!('level' in k) || isIntInRange(d.level, 1, 100))
+          && (!('totalXp' in k) || isNumInRange(d.totalXp, 0, 100000000))
+          && (!('xpVoided' in k) || isNumInRange(d.get('xpVoided', 0), 0, 100000000))
+          && (!('coins' in k) || isIntInRange(d.coins, 0, 100000000))
+          && (!('stats' in k) || statsAreValid(d.stats))
+          && (!('tier' in k) || isShortString(d.tier, 24))
+          && (!('identity' in k) || isShortString(d.identity, 24))
+          && (!('bodyFat' in k) || isNumInRange(d.get('bodyFat', 0), 0, 60))
+          && (!('measurements' in k) || d.get('measurements', null) == null
+              || measurementsAreValid(d.measurements))
+          && (!('gymBroMode' in k) || d.get('gymBroMode', true) is bool)
+          && (!('unitSystem' in k) || d.get('unitSystem', 'metric') in ['metric', 'imperial'])
+          && (!('workoutCount' in k) || isIntInRange(d.workoutCount, 0, 1000000))
+          && (!('totalReps' in k) || isIntInRange(d.totalReps, 0, 1000000000))
+          && (!('streak' in k) || streakIsValid(d.streak))
+          && (!('inventory' in k) || inventoryIsValid(d.inventory))
+          && (!('activeCosmetic' in k) || d.get('activeCosmetic', null) == null
+              || isShortString(d.activeCosmetic, 40))
+          && (!('goals' in k) || isBoundedList(d.goals, 10))
+          && (!('customExercises' in k) || isBoundedList(d.customExercises, 20))
           // User-authored routines. Mirrors LIMITS.MAX_ROUTINES.
-          // `get` with a default is required: every existing user document
-          // lacks the field, and an update validates the *merged* document, so
-          // a plain `d.routines` would reject every write from an account that
-          // has never saved one.
-          && d.get('routines', []) is list && d.get('routines', []).size() <= 12
-          // Season counters. All three are absent on every live document, so
-          // each clause has to tolerate absence — an update validates the
-          // *merged* document, not the patch.
-          && seasonIsValid(d)
-          && (!('seasonHistory' in d) || (d.seasonHistory is list && d.seasonHistory.size() <= 24))
-          && (!('recentDays' in d) || (d.recentDays is list && d.recentDays.size() <= 20))
-          && d.personalBests is map && d.personalBests.size() <= 200
+          && (!('routines' in k) || isBoundedList(d.get('routines', []), 12))
+          && (!('season' in k) || seasonIsValid(d.get('season', {})))
+          && (!('seasonHistory' in k) || isBoundedList(d.get('seasonHistory', []), 24))
+          && (!('recentDays' in k) || isBoundedList(d.get('recentDays', []), 20))
+          && (!('personalBests' in k) || isBoundedMap(d.personalBests, 200))
           // Per-muscle lifetime volume. Bounded so it cannot be used as storage.
-          && d.get('muscleVolume', {}) is map
-          && d.get('muscleVolume', {}).size() <= 20
-          && isTimestampMs(d.get('createdAt', 0))
-          && isTimestampMs(d.get('updatedAt', 0));
+          && (!('muscleVolume' in k) || isBoundedMap(d.get('muscleVolume', {}), 20))
+          && (!('createdAt' in k) || isTimestampMs(d.get('createdAt', 0)))
+          && (!('updatedAt' in k) || isTimestampMs(d.get('updatedAt', 0)));
       }
 
-      function seasonIsValid(d) {
-        return !('season' in d) || (
-          d.season is map
-          && d.season.keys().hasOnly(['id', 'xp', 'sessions', 'startedAt'])
-          && isShortString(d.season.id, 16)
-          && isNumInRange(d.season.xp, 0, 100000000)
-          && isIntInRange(d.season.sessions, 0, 100000)
-          && isTimestampMs(d.season.get('startedAt', 0))
-        );
+      // Rendered as an <img> to every athlete who opens the leaderboard, so an
+      // arbitrary URL hands its host an HTTP request — IP, User-Agent,
+      // timestamp — from each of them. Restricted to the only host the sign-in
+      // providers actually serve profile images from.
+      function photoIsAllowed(photo) {
+        return isShortString(photo, 2048)
+          && (photo == '' || photo.matches('^https://lh3[.]googleusercontent[.]com/.*'));
+      }
+
+      function seasonIsValid(season) {
+        return season is map
+          && season.keys().hasOnly(['id', 'xp', 'sessions', 'startedAt'])
+          && isShortString(season.get('id', ''), 16)
+          && isNumInRange(season.get('xp', 0), 0, 100000000)
+          && isIntInRange(season.get('sessions', 0), 0, 100000)
+          && isTimestampMs(season.get('startedAt', 0));
       }
 
       function measurementsAreValid(m) {
@@ -260,8 +320,8 @@ service cloud.firestore {
         return inv is map
           // Shields are capped at the shop's max stack.
           && isIntInRange(inv.streakShields, 0, 5)
-          && inv.cosmetics is list && inv.cosmetics.size() <= 20
-          && inv.unlocks is list && inv.unlocks.size() <= 20;
+          && isBoundedList(inv.cosmetics, 20)
+          && isBoundedList(inv.unlocks, 20);
       }
     }
 

@@ -95,8 +95,8 @@ export function MeasurementsCard({ profile }: { profile: Profile }) {
             Body Measurements
           </h2>
           <p className="mt-1 text-xs text-content-muted">
-            Charted over time and never compared to anyone else. Only your back and waist
-            feed a rating — the V-taper trait in the Physique Lab.
+            Charted over time and never compared to anyone else. Only your back and waist feed a
+            rating — the V-taper trait in the Physique Lab.
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={() => (open ? setOpen(false) : openForm())}>

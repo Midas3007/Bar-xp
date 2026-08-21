@@ -146,8 +146,16 @@ export function rateAesthetics(profile: Profile): AestheticTrait[] {
   const bodyFat = num(profile.bodyFat, 0);
   const hasBodyFat = bodyFat > 0;
   const trained = vol(volume, [
-    'chest', 'shoulders', 'triceps', 'biceps', 'lats', 'upper_back',
-    'abs', 'obliques', 'quads', 'glutes',
+    'chest',
+    'shoulders',
+    'triceps',
+    'biceps',
+    'lats',
+    'upper_back',
+    'abs',
+    'obliques',
+    'quads',
+    'glutes',
   ]);
   const hasVolume = trained > 0;
 
@@ -272,12 +280,11 @@ export function rateAesthetics(profile: Profile): AestheticTrait[] {
       what: 'Ab development combined with how lean you are.',
       score: round(midsection, 1),
       grade: gradeFor(midsection, hasVolume || hasBodyFat),
-      tip:
-        !hasBodyFat
-          ? 'Log a body-fat estimate — abs are far more about leanness than about ab training.'
-          : bodyFat > 18
-            ? 'You likely have more ab development than shows. Leanness is the limiter here, not more crunches.'
-            : 'Hanging knee raises and hollow holds. Train abs like any other muscle — with progression.',
+      tip: !hasBodyFat
+        ? 'Log a body-fat estimate — abs are far more about leanness than about ab training.'
+        : bodyFat > 18
+          ? 'You likely have more ab development than shows. Leanness is the limiter here, not more crunches.'
+          : 'Hanging knee raises and hollow holds. Train abs like any other muscle — with progression.',
     },
     {
       id: 'posture',

@@ -7,6 +7,7 @@ import { NeonName } from '../components/GameBits';
 import { SHOP_ITEMS, purchaseState, type ShopItem } from '../lib/game/shop';
 import { purchaseItem, setActiveCosmetic } from '../lib/data';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import { arr, fmt, int } from '../lib/safe';
 
 const ICONS = {
@@ -37,9 +38,14 @@ const SECTIONS: Array<{ kind: ShopItem['kind']; title: string; subtitle: string 
 
 export function ShopView({ profile }: { profile: Profile }) {
   const toast = useToast();
+  const { isGuest, requestSignUp } = useAuth();
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   const buy = async (item: ShopItem) => {
+    if (isGuest) {
+      requestSignUp('spend Bar Coins');
+      return;
+    }
     if (pendingId) return;
     setPendingId(item.id);
     try {
@@ -58,6 +64,10 @@ export function ShopView({ profile }: { profile: Profile }) {
   };
 
   const equip = async (cosmeticId: string | null) => {
+    if (isGuest) {
+      requestSignUp('change your name colour');
+      return;
+    }
     try {
       await setActiveCosmetic(profile, cosmeticId);
       toast.success(cosmeticId ? 'Cosmetic equipped' : 'Cosmetic removed');
@@ -132,7 +142,9 @@ export function ShopView({ profile }: { profile: Profile }) {
                   type="button"
                   onClick={() => void equip(cosmeticId)}
                   className={`rounded-xl px-4 py-2 text-sm font-semibold ring-1 transition ${
-                    active ? 'bg-surface-inset ring-line-strong' : 'ring-line hover:ring-line-strong'
+                    active
+                      ? 'bg-surface-inset ring-line-strong'
+                      : 'ring-line hover:ring-line-strong'
                   }`}
                 >
                   <NeonName
@@ -206,9 +218,7 @@ export function ShopView({ profile }: { profile: Profile }) {
                     {item.kind === 'consumable' ? (
                       <p className="mt-4 text-xs text-content-muted">
                         You hold{' '}
-                        <span className="font-mono font-semibold text-forge">
-                          {fmt(shields)}
-                        </span>{' '}
+                        <span className="font-mono font-semibold text-forge">{fmt(shields)}</span>{' '}
                         of {fmt(item.maxStack ?? 0)}.
                       </p>
                     ) : null}

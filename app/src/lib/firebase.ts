@@ -1,4 +1,4 @@
-import { initializeApp, type FirebaseApp } from 'firebase/app';
+import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, type Auth } from 'firebase/auth';
 import {
   getFirestore,
@@ -33,12 +33,11 @@ export const missingFirebaseKeys: string[] = REQUIRED_KEYS.filter(
 
 export const isFirebaseConfigured = missingFirebaseKeys.length === 0;
 
-let app: FirebaseApp | null = null;
 let authInstance: Auth | null = null;
 let dbInstance: Firestore | null = null;
 
 if (isFirebaseConfigured) {
-  app = initializeApp(config);
+  const app = initializeApp(config);
   authInstance = getAuth(app);
   try {
     // IndexedDB-backed cache: the gym is where the signal dies, and a logged

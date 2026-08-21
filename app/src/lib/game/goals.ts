@@ -145,9 +145,9 @@ const TEMPLATES: GoalTemplate[] = [
   },
 ];
 
-function templateToGoal(template: GoalTemplate): Goal {
+function templateToGoal(template: GoalTemplate, rng: Rng = Math.random): Goal {
   return {
-    id: `${template.id}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+    id: `${template.id}_${Date.now().toString(36)}_${rng().toString(36).slice(2, 7)}`,
     templateId: template.id,
     title: template.title,
     description: template.description,
@@ -167,7 +167,14 @@ function templateToGoal(template: GoalTemplate): Goal {
  * user's level has not reached. Falls back to level-1 templates so the slots
  * are always filled.
  */
-export function rollGoals(level: unknown, existing: Goal[], count: number): Goal[] {
+export type Rng = () => number;
+
+export function rollGoals(
+  level: unknown,
+  existing: Goal[],
+  count: number,
+  rng: Rng = Math.random,
+): Goal[] {
   const lvl = Math.max(1, int(level, 1));
   const taken = new Set(arr<Goal>(existing).map((g) => g.templateId));
 
@@ -177,18 +184,18 @@ export function rollGoals(level: unknown, existing: Goal[], count: number): Goal
   // Shuffle a copy so a user does not get the same three goals every cycle.
   const shuffled = [...pool];
   for (let i = shuffled.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
 
-  return shuffled.slice(0, Math.max(0, int(count, 0))).map(templateToGoal);
+  return shuffled.slice(0, Math.max(0, int(count, 0))).map((t) => templateToGoal(t, rng));
 }
 
 /** Top the user's goal list back up to the full slot count. */
-export function ensureGoals(level: unknown, existing: unknown): Goal[] {
+export function ensureGoals(level: unknown, existing: unknown, rng: Rng = Math.random): Goal[] {
   const active = arr<Goal>(existing).filter((g) => g && !g.completedAt);
   if (active.length >= ACTIVE_GOAL_SLOTS) return active.slice(0, ACTIVE_GOAL_SLOTS);
-  return [...active, ...rollGoals(level, active, ACTIVE_GOAL_SLOTS - active.length)];
+  return [...active, ...rollGoals(level, active, ACTIVE_GOAL_SLOTS - active.length, rng)];
 }
 
 export interface GoalAdvanceInput {
@@ -197,6 +204,8 @@ export interface GoalAdvanceInput {
   xpEarned: number;
   totalReps: number;
   streak: number;
+  /** Injectable only so the demo fixture can reproduce the same athlete. */
+  rng?: Rng;
 }
 
 export interface GoalAdvanceResult {
@@ -217,7 +226,8 @@ export function advanceGoals(
   level: unknown,
   input: GoalAdvanceInput,
 ): GoalAdvanceResult {
-  const active = ensureGoals(level, goals);
+  const rng = input.rng ?? Math.random;
+  const active = ensureGoals(level, goals, rng);
   const completed: Goal[] = [];
   const survivors: Goal[] = [];
 
@@ -278,7 +288,7 @@ export function advanceGoals(
     completed.length > 0
       ? [
           ...survivors,
-          ...rollGoals(level, survivors, ACTIVE_GOAL_SLOTS - survivors.length).map((g) =>
+          ...rollGoals(level, survivors, ACTIVE_GOAL_SLOTS - survivors.length, rng).map((g) =>
             g.type === 'streak' ? { ...g, baseline: Math.max(0, num(input.streak, 0)) } : g,
           ),
         ]

@@ -55,18 +55,54 @@ export const MUSCLE_META: Record<
   }
 > = {
   chest: { label: 'Chest', short: 'CHE', region: 'upper', hex: '#fb923c', hexLight: '#a83408' },
-  shoulders: { label: 'Shoulders', short: 'SHO', region: 'upper', hex: '#f59e0b', hexLight: '#9a4a08' },
+  shoulders: {
+    label: 'Shoulders',
+    short: 'SHO',
+    region: 'upper',
+    hex: '#f59e0b',
+    hexLight: '#9a4a08',
+  },
   triceps: { label: 'Triceps', short: 'TRI', region: 'upper', hex: '#fbbf24', hexLight: '#8a5108' },
   biceps: { label: 'Biceps', short: 'BIC', region: 'upper', hex: '#38bdf8', hexLight: '#0369a1' },
-  forearms: { label: 'Forearms & Grip', short: 'FOR', region: 'upper', hex: '#0ea5e9', hexLight: '#075985' },
+  forearms: {
+    label: 'Forearms & Grip',
+    short: 'FOR',
+    region: 'upper',
+    hex: '#0ea5e9',
+    hexLight: '#075985',
+  },
   lats: { label: 'Lats', short: 'LAT', region: 'upper', hex: '#22d3ee', hexLight: '#0b5f75' },
-  upper_back: { label: 'Upper Back', short: 'UBK', region: 'upper', hex: '#2dd4bf', hexLight: '#0d5f59' },
+  upper_back: {
+    label: 'Upper Back',
+    short: 'UBK',
+    region: 'upper',
+    hex: '#2dd4bf',
+    hexLight: '#0d5f59',
+  },
   abs: { label: 'Abs', short: 'ABS', region: 'core', hex: '#c084fc', hexLight: '#7326b8' },
-  obliques: { label: 'Obliques', short: 'OBL', region: 'core', hex: '#a855f7', hexLight: '#6b21a8' },
-  lower_back: { label: 'Lower Back', short: 'LBK', region: 'core', hex: '#a78bfa', hexLight: '#5b21b6' },
+  obliques: {
+    label: 'Obliques',
+    short: 'OBL',
+    region: 'core',
+    hex: '#a855f7',
+    hexLight: '#6b21a8',
+  },
+  lower_back: {
+    label: 'Lower Back',
+    short: 'LBK',
+    region: 'core',
+    hex: '#a78bfa',
+    hexLight: '#5b21b6',
+  },
   glutes: { label: 'Glutes', short: 'GLU', region: 'lower', hex: '#4ade80', hexLight: '#12662d' },
   quads: { label: 'Quads', short: 'QUA', region: 'lower', hex: '#22c55e', hexLight: '#166534' },
-  hamstrings: { label: 'Hamstrings', short: 'HAM', region: 'lower', hex: '#16a34a', hexLight: '#14532d' },
+  hamstrings: {
+    label: 'Hamstrings',
+    short: 'HAM',
+    region: 'lower',
+    hex: '#16a34a',
+    hexLight: '#14532d',
+  },
   calves: { label: 'Calves', short: 'CAL', region: 'lower', hex: '#65a30d', hexLight: '#3f6212' },
 };
 
@@ -84,19 +120,21 @@ export type EquipmentKey =
   | 'wall'
   | 'jump_rope';
 
-export const EQUIPMENT_META: Record<
-  EquipmentKey,
-  { label: string; short: string; note: string }
-> = {
-  none: { label: 'Floor only', short: 'Floor', note: 'Nothing but the ground.' },
-  pullup_bar: { label: 'Pull-up bar', short: 'Bar', note: 'Any overhead bar you can hang from.' },
-  dip_bars: { label: 'Parallel bars', short: 'Dip bars', note: 'Dip station, parallettes, or two sturdy surfaces.' },
-  low_bar: { label: 'Low bar', short: 'Low bar', note: 'A waist-height bar, or a table edge.' },
-  elevated: { label: 'Raised surface', short: 'Bench', note: 'A bench, chair, step or box.' },
-  vertical_pole: { label: 'Vertical pole', short: 'Pole', note: 'An upright post you can grip.' },
-  wall: { label: 'Wall', short: 'Wall', note: 'Any clear wall.' },
-  jump_rope: { label: 'Jump rope', short: 'Rope', note: 'A skipping rope.' },
-};
+export const EQUIPMENT_META: Record<EquipmentKey, { label: string; short: string; note: string }> =
+  {
+    none: { label: 'Floor only', short: 'Floor', note: 'Nothing but the ground.' },
+    pullup_bar: { label: 'Pull-up bar', short: 'Bar', note: 'Any overhead bar you can hang from.' },
+    dip_bars: {
+      label: 'Parallel bars',
+      short: 'Dip bars',
+      note: 'Dip station, parallettes, or two sturdy surfaces.',
+    },
+    low_bar: { label: 'Low bar', short: 'Low bar', note: 'A waist-height bar, or a table edge.' },
+    elevated: { label: 'Raised surface', short: 'Bench', note: 'A bench, chair, step or box.' },
+    vertical_pole: { label: 'Vertical pole', short: 'Pole', note: 'An upright post you can grip.' },
+    wall: { label: 'Wall', short: 'Wall', note: 'Any clear wall.' },
+    jump_rope: { label: 'Jump rope', short: 'Rope', note: 'A skipping rope.' },
+  };
 
 /**
  * Training-location groups — the practical question is "what can I use right
@@ -152,44 +190,136 @@ interface MuscleProfile {
 const P: Record<string, MuscleProfile> = {
   /* Push */
   push_up: { equipment: 'none', primary: ['chest', 'triceps'], secondary: ['shoulders', 'abs'] },
-  incline_push_up: { equipment: 'elevated', primary: ['chest'], secondary: ['triceps', 'shoulders', 'abs'] },
-  pike_push_up: { equipment: 'none', primary: ['shoulders', 'triceps'], secondary: ['upper_back', 'abs'] },
+  incline_push_up: {
+    equipment: 'elevated',
+    primary: ['chest'],
+    secondary: ['triceps', 'shoulders', 'abs'],
+  },
+  pike_push_up: {
+    equipment: 'none',
+    primary: ['shoulders', 'triceps'],
+    secondary: ['upper_back', 'abs'],
+  },
   dip: { equipment: 'dip_bars', primary: ['chest', 'triceps'], secondary: ['shoulders'] },
-  diamond_push_up: { equipment: 'none', primary: ['triceps'], secondary: ['chest', 'shoulders', 'abs'] },
-  archer_push_up: { equipment: 'none', primary: ['chest', 'triceps'], secondary: ['shoulders', 'abs', 'obliques'] },
-  handstand_push_up: { equipment: 'wall', primary: ['shoulders', 'triceps'], secondary: ['upper_back', 'abs'] },
-  one_arm_push_up: { equipment: 'none', primary: ['chest', 'triceps'], secondary: ['abs', 'obliques', 'shoulders'] },
+  diamond_push_up: {
+    equipment: 'none',
+    primary: ['triceps'],
+    secondary: ['chest', 'shoulders', 'abs'],
+  },
+  archer_push_up: {
+    equipment: 'none',
+    primary: ['chest', 'triceps'],
+    secondary: ['shoulders', 'abs', 'obliques'],
+  },
+  handstand_push_up: {
+    equipment: 'wall',
+    primary: ['shoulders', 'triceps'],
+    secondary: ['upper_back', 'abs'],
+  },
+  one_arm_push_up: {
+    equipment: 'none',
+    primary: ['chest', 'triceps'],
+    secondary: ['abs', 'obliques', 'shoulders'],
+  },
 
   /* Pull */
-  australian_row: { equipment: 'low_bar', primary: ['upper_back', 'lats'], secondary: ['biceps', 'forearms'] },
-  chin_up: { equipment: 'pullup_bar', primary: ['biceps', 'lats'], secondary: ['upper_back', 'forearms', 'abs'] },
-  pull_up: { equipment: 'pullup_bar', primary: ['lats', 'upper_back'], secondary: ['biceps', 'forearms', 'abs'] },
-  wide_pull_up: { equipment: 'pullup_bar', primary: ['lats'], secondary: ['upper_back', 'biceps', 'forearms'] },
-  archer_pull_up: { equipment: 'pullup_bar', primary: ['lats', 'biceps'], secondary: ['upper_back', 'obliques', 'forearms'] },
-  muscle_up: { equipment: 'pullup_bar', primary: ['lats', 'triceps'], secondary: ['upper_back', 'biceps', 'chest', 'abs'] },
+  australian_row: {
+    equipment: 'low_bar',
+    primary: ['upper_back', 'lats'],
+    secondary: ['biceps', 'forearms'],
+  },
+  chin_up: {
+    equipment: 'pullup_bar',
+    primary: ['biceps', 'lats'],
+    secondary: ['upper_back', 'forearms', 'abs'],
+  },
+  pull_up: {
+    equipment: 'pullup_bar',
+    primary: ['lats', 'upper_back'],
+    secondary: ['biceps', 'forearms', 'abs'],
+  },
+  wide_pull_up: {
+    equipment: 'pullup_bar',
+    primary: ['lats'],
+    secondary: ['upper_back', 'biceps', 'forearms'],
+  },
+  archer_pull_up: {
+    equipment: 'pullup_bar',
+    primary: ['lats', 'biceps'],
+    secondary: ['upper_back', 'obliques', 'forearms'],
+  },
+  muscle_up: {
+    equipment: 'pullup_bar',
+    primary: ['lats', 'triceps'],
+    secondary: ['upper_back', 'biceps', 'chest', 'abs'],
+  },
 
   /* Legs */
   squat: { equipment: 'none', primary: ['quads', 'glutes'], secondary: ['hamstrings', 'calves'] },
   lunge: { equipment: 'none', primary: ['quads', 'glutes'], secondary: ['hamstrings', 'calves'] },
-  pistol_squat: { equipment: 'none', primary: ['quads', 'glutes'], secondary: ['hamstrings', 'calves', 'abs'] },
+  pistol_squat: {
+    equipment: 'none',
+    primary: ['quads', 'glutes'],
+    secondary: ['hamstrings', 'calves', 'abs'],
+  },
 
   /* Core */
-  plank: { equipment: 'none', primary: ['abs'], secondary: ['obliques', 'lower_back', 'shoulders'] },
+  plank: {
+    equipment: 'none',
+    primary: ['abs'],
+    secondary: ['obliques', 'lower_back', 'shoulders'],
+  },
   hollow_hold: { equipment: 'none', primary: ['abs'], secondary: ['obliques', 'quads'] },
   leg_raise: { equipment: 'none', primary: ['abs'], secondary: ['obliques', 'quads'] },
-  hanging_knee_raise: { equipment: 'pullup_bar', primary: ['abs'], secondary: ['obliques', 'forearms', 'lats'] },
-  toes_to_bar: { equipment: 'pullup_bar', primary: ['abs'], secondary: ['obliques', 'lats', 'forearms', 'hamstrings'] },
-  l_sit: { equipment: 'dip_bars', primary: ['abs', 'quads'], secondary: ['triceps', 'shoulders', 'lats'] },
+  hanging_knee_raise: {
+    equipment: 'pullup_bar',
+    primary: ['abs'],
+    secondary: ['obliques', 'forearms', 'lats'],
+  },
+  toes_to_bar: {
+    equipment: 'pullup_bar',
+    primary: ['abs'],
+    secondary: ['obliques', 'lats', 'forearms', 'hamstrings'],
+  },
+  l_sit: {
+    equipment: 'dip_bars',
+    primary: ['abs', 'quads'],
+    secondary: ['triceps', 'shoulders', 'lats'],
+  },
 
   /* Skill */
-  planche_lean: { equipment: 'none', primary: ['shoulders', 'chest'], secondary: ['triceps', 'abs', 'forearms'] },
-  front_lever: { equipment: 'pullup_bar', primary: ['lats', 'abs'], secondary: ['upper_back', 'lower_back', 'forearms'] },
-  full_planche: { equipment: 'none', primary: ['shoulders', 'chest'], secondary: ['triceps', 'abs', 'lower_back', 'forearms'] },
-  human_flag: { equipment: 'vertical_pole', primary: ['obliques', 'shoulders'], secondary: ['lats', 'abs', 'forearms'] },
+  planche_lean: {
+    equipment: 'none',
+    primary: ['shoulders', 'chest'],
+    secondary: ['triceps', 'abs', 'forearms'],
+  },
+  front_lever: {
+    equipment: 'pullup_bar',
+    primary: ['lats', 'abs'],
+    secondary: ['upper_back', 'lower_back', 'forearms'],
+  },
+  full_planche: {
+    equipment: 'none',
+    primary: ['shoulders', 'chest'],
+    secondary: ['triceps', 'abs', 'lower_back', 'forearms'],
+  },
+  human_flag: {
+    equipment: 'vertical_pole',
+    primary: ['obliques', 'shoulders'],
+    secondary: ['lats', 'abs', 'forearms'],
+  },
 
   /* Conditioning */
-  burpee: { equipment: 'none', primary: ['quads', 'chest'], secondary: ['shoulders', 'abs', 'calves', 'glutes'] },
-  mountain_climber: { equipment: 'none', primary: ['abs'], secondary: ['obliques', 'shoulders', 'quads'] },
+  burpee: {
+    equipment: 'none',
+    primary: ['quads', 'chest'],
+    secondary: ['shoulders', 'abs', 'calves', 'glutes'],
+  },
+  mountain_climber: {
+    equipment: 'none',
+    primary: ['abs'],
+    secondary: ['obliques', 'shoulders', 'quads'],
+  },
   jump_rope: { equipment: 'jump_rope', primary: ['calves'], secondary: ['quads', 'forearms'] },
 };
 
@@ -309,16 +439,18 @@ export function normalizeMuscleVolume(value: unknown): MuscleVolume {
 
 export type MuscleGrade = 'untrained' | 'neglected' | 'developing' | 'strong' | 'dominant';
 
-export const MUSCLE_GRADE_META: Record<
-  MuscleGrade,
-  { label: string; color: string; bar: string }
-> = {
-  untrained: { label: 'Untrained', color: 'text-content-muted', bar: 'from-surface-strong to-content-faint' },
-  neglected: { label: 'Neglected', color: 'text-danger', bar: 'from-danger-vivid to-danger' },
-  developing: { label: 'Developing', color: 'text-warn', bar: 'from-warn-vivid to-warn' },
-  strong: { label: 'Strong', color: 'text-forge', bar: 'from-forge-vivid to-forge' },
-  dominant: { label: 'Dominant', color: 'text-vital', bar: 'from-vital-vivid to-vital' },
-};
+export const MUSCLE_GRADE_META: Record<MuscleGrade, { label: string; color: string; bar: string }> =
+  {
+    untrained: {
+      label: 'Untrained',
+      color: 'text-content-muted',
+      bar: 'from-surface-strong to-content-faint',
+    },
+    neglected: { label: 'Neglected', color: 'text-danger', bar: 'from-danger-vivid to-danger' },
+    developing: { label: 'Developing', color: 'text-warn', bar: 'from-warn-vivid to-warn' },
+    strong: { label: 'Strong', color: 'text-forge', bar: 'from-forge-vivid to-forge' },
+    dominant: { label: 'Dominant', color: 'text-vital', bar: 'from-vital-vivid to-vital' },
+  };
 
 export interface MuscleRating {
   muscle: MuscleKey;
@@ -440,7 +572,11 @@ export function analyseBalance(volume: unknown): BalanceCheck[] {
           : 'Reasonable split for a calisthenics athlete.',
   });
 
-  const antPost = ratioOf(v, ['chest', 'abs', 'quads'], ['upper_back', 'lats', 'glutes', 'hamstrings', 'lower_back']);
+  const antPost = ratioOf(
+    v,
+    ['chest', 'abs', 'quads'],
+    ['upper_back', 'lats', 'glutes', 'hamstrings', 'lower_back'],
+  );
   checks.push({
     id: 'front_back',
     label: 'Front vs Back',
@@ -460,8 +596,10 @@ export function analyseBalance(volume: unknown): BalanceCheck[] {
 
 /** Concrete suggestions for a muscle that is falling behind. */
 export const MUSCLE_FIXES: Record<MuscleKey, string> = {
-  chest: 'Add push-ups, diamond push-ups or dips. Slow the lowering to 3 seconds for more stimulus.',
-  shoulders: 'Pike push-ups and, later, wall handstand holds. Shoulders respond well to frequent light work.',
+  chest:
+    'Add push-ups, diamond push-ups or dips. Slow the lowering to 3 seconds for more stimulus.',
+  shoulders:
+    'Pike push-ups and, later, wall handstand holds. Shoulders respond well to frequent light work.',
   triceps: 'Diamond push-ups and dips. Keep the elbows tucked to the ribs.',
   biceps: 'Chin-ups over pull-ups — the supinated grip loads the biceps far harder.',
   forearms: 'Simply hang from the bar for time. Grip is the limiter in most pulling work.',
@@ -469,7 +607,8 @@ export const MUSCLE_FIXES: Record<MuscleKey, string> = {
   upper_back: 'Australian rows with a pause at the top. This is the fix for rounded posture.',
   abs: 'Hanging knee raises beat crunches. Add hollow holds for straight-arm carryover.',
   obliques: 'Side planks and any single-side work. Human flag progressions load them hardest.',
-  lower_back: 'Supermans and reverse hyperextensions. Front lever tuck holds train it isometrically.',
+  lower_back:
+    'Supermans and reverse hyperextensions. Front lever tuck holds train it isometrically.',
   glutes: 'Lunges and single-leg work. Glutes need range of motion more than reps.',
   quads: 'Squats to full depth, then progress toward pistol squats.',
   hamstrings: 'Nordic curl negatives and single-leg deadlifts. Almost always the weakest link.',

@@ -13,7 +13,10 @@
       the wss: origins are listed — omit them and the app looks fine until the
       first write.
     -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://lh3.googleusercontent.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://*.cloudfunctions.net wss://*.firebaseio.com wss://*.googleapis.com; frame-src 'self' https://*.firebaseapp.com https://accounts.google.com; base-uri 'self'; form-action 'self'; object-src 'none'" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://lh3.googleusercontent.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://*.cloudfunctions.net wss://*.firebaseio.com wss://*.googleapis.com; frame-src 'self' https://*.firebaseapp.com https://accounts.google.com; base-uri 'self'; form-action 'self'; object-src 'none'"
+    />
     <meta name="theme-color" content="#f1f4f9" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#07080d" media="(prefers-color-scheme: dark)" />
     <!--

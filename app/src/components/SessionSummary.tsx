@@ -261,10 +261,7 @@ export function SessionSummary({
           </div>
         ) : null}
 
-        <div
-          className={`mt-2 flex gap-3 ${reduced ? '' : 'animate-fade-up'}`}
-          style={stagger()}
-        >
+        <div className={`mt-2 flex gap-3 ${reduced ? '' : 'animate-fade-up'}`} style={stagger()}>
           <Button variant="secondary" className="flex-1" onClick={onShare} disabled={sharing}>
             {sharing ? <Spinner className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
             Share card

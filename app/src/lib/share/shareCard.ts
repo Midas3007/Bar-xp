@@ -45,13 +45,16 @@ export interface ShareCardData {
  * sign-in provider and are entirely user-controlled.
  */
 export function escapeXml(value: unknown): string {
-  return str(value, '')
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+  return (
+    str(value, '')
+      // eslint-disable-next-line no-control-regex -- stripping unprintables is the point
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;')
+  );
 }
 
 /**

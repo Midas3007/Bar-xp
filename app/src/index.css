@@ -216,17 +216,17 @@
      replaces a blanket `:focus-visible { outline: none }` that had left roughly
      35 of 36 interactive elements with no keyboard affordance at all. */
   :where(
-      a[href],
-      area,
-      button,
-      input,
-      select,
-      textarea,
-      summary,
-      [role='button'],
-      [role='tab'],
-      [tabindex]:not([tabindex='-1'])
-    ):focus-visible {
+    a[href],
+    area,
+    button,
+    input,
+    select,
+    textarea,
+    summary,
+    [role='button'],
+    [role='tab'],
+    [tabindex]:not([tabindex='-1'])
+  ):focus-visible {
     outline: 2px solid rgb(var(--ring-focus));
     outline-offset: 2px;
   }

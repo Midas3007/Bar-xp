@@ -18,24 +18,51 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const out = mkdtempSync(join(tmpdir(), 'barxp-game-'));
 
 const SOURCES = [
-  'src/lib/safe.ts', 'src/lib/types.ts', 'src/lib/theme.ts',
-  'src/lib/game/constants.ts', 'src/lib/game/xp.ts', 'src/lib/game/streak.ts',
-  'src/lib/game/sets.ts', 'src/lib/game/routines.ts',
-  'src/lib/game/profile.ts', 'src/lib/game/validation.ts', 'src/lib/game/shop.ts',
-  'src/lib/game/goals.ts', 'src/lib/game/achievements.ts', 'src/lib/game/muscles.ts',
-  'src/lib/game/measurements.ts', 'src/lib/game/aesthetics.ts',
+  'src/lib/safe.ts',
+  'src/lib/types.ts',
+  'src/lib/theme.ts',
+  'src/lib/game/constants.ts',
+  'src/lib/game/xp.ts',
+  'src/lib/game/streak.ts',
+  'src/lib/game/sets.ts',
+  'src/lib/game/routines.ts',
+  'src/lib/game/profile.ts',
+  'src/lib/game/validation.ts',
+  'src/lib/game/shop.ts',
+  'src/lib/game/goals.ts',
+  'src/lib/game/achievements.ts',
+  'src/lib/game/muscles.ts',
+  'src/lib/game/measurements.ts',
+  'src/lib/game/aesthetics.ts',
   'src/lib/game/correction.ts',
-  'src/lib/game/friends.ts', 'src/lib/game/season.ts', 'src/lib/game/challenges.ts',
+  'src/lib/game/exercises.ts',
+  'src/lib/game/skillTree.ts',
+  'src/lib/demo/fixture.ts',
+  'src/lib/game/friends.ts',
+  'src/lib/game/season.ts',
+  'src/lib/game/challenges.ts',
   'src/lib/share/shareCard.ts',
 ];
 
 const tsc = process.platform === 'win32' ? 'tsc.cmd' : 'tsc';
 try {
-  execFileSync(tsc, [
-    '--target', 'es2022', '--module', 'esnext',
-    '--moduleResolution', 'bundler', '--outDir', out, '--skipLibCheck', '--strict',
-    ...SOURCES,
-  ], { cwd: root, stdio: 'inherit' });
+  execFileSync(
+    tsc,
+    [
+      '--target',
+      'es2022',
+      '--module',
+      'esnext',
+      '--moduleResolution',
+      'bundler',
+      '--outDir',
+      out,
+      '--skipLibCheck',
+      '--strict',
+      ...SOURCES,
+    ],
+    { cwd: root, stdio: 'inherit' },
+  );
 } catch {
   console.error('\ntypecheck failed — fix the errors above before the tests can run');
   process.exit(1);
@@ -48,9 +75,15 @@ writeFileSync(join(out, 'package.json'), '{"type":"module"}\n');
 const addExtensions = (dir) => {
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);
-    if (statSync(full).isDirectory()) { addExtensions(full); continue; }
+    if (statSync(full).isDirectory()) {
+      addExtensions(full);
+      continue;
+    }
     if (!name.endsWith('.js')) continue;
-    writeFileSync(full, readFileSync(full, 'utf8').replace(/from '(\.\.?\/[^']*)'/g, "from '$1.js'"));
+    writeFileSync(
+      full,
+      readFileSync(full, 'utf8').replace(/from '(\.\.?\/[^']*)'/g, "from '$1.js'"),
+    );
   }
 };
 addExtensions(out);
@@ -58,7 +91,10 @@ addExtensions(out);
 cpSync(join(root, 'src/lib/game/__tests__'), join(out, 'game/__tests__'), { recursive: true });
 
 try {
-  execFileSync(process.execPath, ['--test', 'game/__tests__/game.test.mjs'], { cwd: out, stdio: 'inherit' });
+  execFileSync(process.execPath, ['--test', 'game/__tests__/game.test.mjs'], {
+    cwd: out,
+    stdio: 'inherit',
+  });
 } catch {
   process.exit(1);
 }

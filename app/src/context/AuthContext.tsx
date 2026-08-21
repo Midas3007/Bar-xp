@@ -24,10 +24,18 @@ import {
 } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 
-import { COLLECTIONS, getAuthOrThrow, getDbOrThrow, googleProvider, isFirebaseConfigured } from '../lib/firebase';
+import {
+  COLLECTIONS,
+  getAuthOrThrow,
+  getDbOrThrow,
+  googleProvider,
+  isFirebaseConfigured,
+} from '../lib/firebase';
 import type { Profile } from '../lib/types';
 import { normalizeProfile, sanitizeDisplayName, UNNAMED_ATHLETE } from '../lib/game/profile';
 import { ensureProfile, eraseAccountData, persistRecalculation, decayPatch } from '../lib/data';
+import { setDemoActive } from '../lib/demo/state';
+import { getDemoData } from '../lib/demo/fixture';
 import { rolloverSeason, seasonIdFor, seasonLabel } from '../lib/game/season';
 import { resolvePendingSeasonPlacements } from '../lib/social';
 import { applyStreakDecay, dayKey, safeStreak } from '../lib/game/streak';
@@ -51,6 +59,14 @@ export interface AuthContextValue {
   /** Send a reset link. Resolves true when the request was accepted. */
   resetPassword: (email: string) => Promise<boolean>;
   signOut: () => Promise<void>;
+  /** True while a visitor is looking around the read-only demo athlete. */
+  isGuest: boolean;
+  enterDemo: () => void;
+  exitDemo: () => void;
+  /** Set when a guest tried to do something that needs an account. */
+  guestPrompt: string | null;
+  requestSignUp: (action: string) => void;
+  dismissGuestPrompt: () => void;
   /**
    * Erase everything this account owns and remove the sign-in itself.
    * `password` is required only for email/password accounts that have not
@@ -107,6 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(isFirebaseConfigured);
   const [authError, setAuthError] = useState<string | null>(null);
   const [backgroundNotice, setBackgroundNotice] = useState<string | null>(null);
+  const [isGuest, setIsGuest] = useState(false);
+  const [guestPrompt, setGuestPrompt] = useState<string | null>(null);
 
   /**
    * The live profile listener's teardown.
@@ -205,9 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ref,
         (snapshot) => {
           if (!mountedRef.current) return;
-          const next = snapshot.exists()
-            ? normalizeProfile(nextUser.uid, snapshot.data())
-            : null;
+          const next = snapshot.exists() ? normalizeProfile(nextUser.uid, snapshot.data()) : null;
           setProfile(next);
           profileRef.current = next;
           setLoading(false);
@@ -448,6 +464,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [detachProfileListener]);
 
+  const enterDemo = useCallback(() => {
+    // The module flag is what `lib/data.ts` reads; the React flag is what the
+    // UI reads. They are set together and never independently.
+    setDemoActive(true);
+    setIsGuest(true);
+    setGuestPrompt(null);
+    setLoading(false);
+  }, []);
+
+  const exitDemo = useCallback(() => {
+    setDemoActive(false);
+    setIsGuest(false);
+    setGuestPrompt(null);
+  }, []);
+
+  const requestSignUp = useCallback((action: string) => {
+    setGuestPrompt(action);
+  }, []);
+
+  const dismissGuestPrompt = useCallback(() => setGuestPrompt(null), []);
+
   const deleteAccount = useCallback(
     async (password?: string) => {
       const current = getAuthOrThrow().currentUser;
@@ -486,7 +523,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      profile,
+      // A guest has no Firebase session, so the demo athlete stands in for the
+      // profile everywhere the app reads one. Every write path refuses.
+      profile: isGuest ? getDemoData().profile : profile,
       loading,
       authError,
       clearAuthError: () => setAuthError(null),
@@ -496,6 +535,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resetPassword,
       signOut,
       deleteAccount,
+      isGuest,
+      enterDemo,
+      exitDemo,
+      guestPrompt,
+      requestSignUp,
+      dismissGuestPrompt,
       backgroundNotice,
       dismissBackgroundNotice: () => setBackgroundNotice(null),
     }),
@@ -511,6 +556,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resetPassword,
       signOut,
       deleteAccount,
+      isGuest,
+      enterDemo,
+      exitDemo,
+      guestPrompt,
+      requestSignUp,
+      dismissGuestPrompt,
     ],
   );
 

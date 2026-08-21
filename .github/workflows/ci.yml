@@ -17,7 +17,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: app/package-lock.json
 
@@ -28,6 +28,12 @@ jobs:
           java-version: 21
 
       - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
 
       - name: Typecheck
         run: npm run typecheck

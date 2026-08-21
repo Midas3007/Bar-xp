@@ -67,8 +67,8 @@ export function SettingsCard({ profile }: { profile: Profile }) {
           <div>
             <p className="text-sm font-medium text-content">Gym Bro Mode</p>
             <p className="mt-0.5 text-xs text-content-muted">
-              Chud / Normie / Chad / GIGACHAD instead of Lagging / Building / Good / Standout in
-              the Physique Lab. Same scores either way.
+              Chud / Normie / Chad / GIGACHAD instead of Lagging / Building / Good / Standout in the
+              Physique Lab. Same scores either way.
             </p>
           </div>
           <Toggle
@@ -101,7 +101,9 @@ function UnitButton({
       onClick={onClick}
       aria-pressed={active}
       className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
-        active ? 'bg-forge-vivid/20 text-forge ring-1 ring-inset ring-forge/30' : 'text-content-muted hover:text-content'
+        active
+          ? 'bg-forge-vivid/20 text-forge ring-1 ring-inset ring-forge/30'
+          : 'text-content-muted hover:text-content'
       }`}
     >
       {children}

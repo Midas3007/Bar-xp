@@ -84,13 +84,19 @@ export function validateEntry(
   if (s > LIMITS.MAX_SETS) return fail(`${LIMITS.MAX_SETS} sets is the maximum per exercise.`);
 
   if (!Number.isFinite(a) || !Number.isInteger(a)) {
-    return fail(exercise.unit === 'seconds' ? 'Seconds must be a whole number.' : 'Reps must be a whole number.');
+    return fail(
+      exercise.unit === 'seconds'
+        ? 'Seconds must be a whole number.'
+        : 'Reps must be a whole number.',
+    );
   }
 
   if (exercise.unit === 'seconds') {
     if (a < LIMITS.MIN_SECONDS) return fail('A hold needs at least 1 second.');
     if (a > LIMITS.MAX_SECONDS) {
-      return fail(`A single hold over ${LIMITS.MAX_SECONDS + 1}s is not accepted. Split it into sets.`);
+      return fail(
+        `A single hold over ${LIMITS.MAX_SECONDS + 1}s is not accepted. Split it into sets.`,
+      );
     }
   } else {
     if (a < LIMITS.MIN_REPS) return fail('You need at least 1 rep.');
@@ -103,9 +109,7 @@ export function validateEntry(
 }
 
 /** Validate a full session before it is written. */
-export function validateSession(
-  entries: Array<Partial<WorkoutEntry>>,
-): ValidationResult {
+export function validateSession(entries: Array<Partial<WorkoutEntry>>): ValidationResult {
   if (entries.length === 0) return fail('Add at least one exercise before finishing.');
   if (entries.length > LIMITS.MAX_ENTRIES) {
     return fail(`A session can hold up to ${LIMITS.MAX_ENTRIES} exercises.`);
@@ -133,11 +137,15 @@ export function validateAssessment(input: {
   const plank = num(input.plankSeconds, NaN);
   const bodyFat = num(input.bodyFat, NaN);
 
-  if (!Number.isFinite(pullUps) || pullUps < 0) return fail('Enter your max pull-ups (0 is a valid answer).');
-  if (pullUps > LIMITS.MAX_ASSESS_PULL_UPS) return fail(`Cap is ${LIMITS.MAX_ASSESS_PULL_UPS} pull-ups.`);
+  if (!Number.isFinite(pullUps) || pullUps < 0)
+    return fail('Enter your max pull-ups (0 is a valid answer).');
+  if (pullUps > LIMITS.MAX_ASSESS_PULL_UPS)
+    return fail(`Cap is ${LIMITS.MAX_ASSESS_PULL_UPS} pull-ups.`);
 
-  if (!Number.isFinite(pushUps) || pushUps < 0) return fail('Enter your max push-ups (0 is a valid answer).');
-  if (pushUps > LIMITS.MAX_ASSESS_PUSH_UPS) return fail(`Cap is ${LIMITS.MAX_ASSESS_PUSH_UPS} push-ups.`);
+  if (!Number.isFinite(pushUps) || pushUps < 0)
+    return fail('Enter your max push-ups (0 is a valid answer).');
+  if (pushUps > LIMITS.MAX_ASSESS_PUSH_UPS)
+    return fail(`Cap is ${LIMITS.MAX_ASSESS_PUSH_UPS} push-ups.`);
 
   if (!Number.isFinite(plank) || plank < 0) return fail('Enter your max plank hold in seconds.');
   if (plank > LIMITS.MAX_ASSESS_PLANK) return fail('A plank over an hour is not accepted.');
@@ -189,17 +197,16 @@ export function validateCustomExercise(input: {
     return fail(`You can store up to ${LIMITS.MAX_CUSTOM_EXERCISES} custom movements.`);
   }
   if (!Number.isFinite(xp) || xp < LIMITS.MIN_CUSTOM_XP || xp > LIMITS.MAX_CUSTOM_XP) {
-    return fail(`Base XP must be between ${LIMITS.MIN_CUSTOM_XP} and ${LIMITS.MAX_CUSTOM_XP} per rep.`);
+    return fail(
+      `Base XP must be between ${LIMITS.MIN_CUSTOM_XP} and ${LIMITS.MAX_CUSTOM_XP} per rep.`,
+    );
   }
 
   return OK;
 }
 
 /** Validate a per-set ladder, e.g. [12, 10, 8], against the anti-cheat bounds. */
-export function validateSetLadder(
-  exercise: Exercise | undefined,
-  reps: unknown,
-): ValidationResult {
+export function validateSetLadder(exercise: Exercise | undefined, reps: unknown): ValidationResult {
   if (!exercise) return fail('Pick an exercise first.');
 
   const raw = arr<unknown>(reps);

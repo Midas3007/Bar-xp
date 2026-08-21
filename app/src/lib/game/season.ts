@@ -206,7 +206,11 @@ export function rolloverSeason(
   };
 }
 
-export function accrueSeason(state: SeasonState, xp: unknown, now: number = Date.now()): SeasonState {
+export function accrueSeason(
+  state: SeasonState,
+  xp: unknown,
+  now: number = Date.now(),
+): SeasonState {
   const base = safeSeason(state);
   return {
     id: base.id,

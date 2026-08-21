@@ -166,10 +166,7 @@ export function scoreSession(
       unresolvedXp += Math.max(0, num(entry.xp, 0));
       continue;
     }
-    volumeByExercise.set(
-      entry.exerciseId,
-      (volumeByExercise.get(entry.exerciseId) ?? 0) + volume,
-    );
+    volumeByExercise.set(entry.exerciseId, (volumeByExercise.get(entry.exerciseId) ?? 0) + volume);
   }
   for (const [exerciseId, sessionVolume] of volumeByExercise) {
     const exercise = resolve(exerciseId);
